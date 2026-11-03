@@ -18,6 +18,15 @@ class PngTest < Minitest::Test
     assert_refused_quietly png(Zlib::Deflate.deflate("\x00\x7F").byteslice(0..-5)), /Corrupt PNG data/
   end
 
+  def test_a_bit_depth_the_color_type_does_not_allow_is_refused
+    # Indexed with a palette and a transparent entry, at 200 bits per sample instead of 1, 2, 4 or 8.
+    data = "\x89PNG\r\n\x1A\n".b + chunk("IHDR", [1, 1, 200, 3, 0, 0, 0].pack("NNCCCCC")) + chunk("PLTE", "\x00\x00\x00") +
+      chunk("tRNS", "\x00") + chunk("IDAT", Zlib::Deflate.deflate("\x00" + "\x00" * 25)) + chunk("IEND", "")
+
+    error = assert_raises(Prawn::Errors::UnsupportedImageType) { Prawn::Document.new { image StringIO.new(data) }.render }
+    assert_match(/invalid bit depth/, error.message)
+  end
+
   private
 
   # A 1x1 grayscale image, 8 bits per sample: one filter byte and one sample per row.

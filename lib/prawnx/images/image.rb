@@ -86,6 +86,9 @@ module Prawn
       # Compressed input fed at a time: at zlib's highest ratio, 4 KB inflate to about 4 MB before the size check.
       INFLATE_CHUNK_BYTES = 4096
       MAXIMUM_IMAGE_BYTES = 1 << 30
+      # The bit depths the PNG specification allows for each color type.
+      BIT_DEPTHS = {GRAYSCALE => [1, 2, 4, 8, 16], TRUE_COLOR => [8, 16], INDEXED => [1, 2, 4, 8],
+                    GRAYSCALE_ALPHA => [8, 16], TRUE_COLOR_ALPHA => [8, 16]}.freeze
 
       attr_reader :palette, :transparency, :width, :height, :bits, :color_type, :compression_method,
         :filter_method, :interlace_method, :alpha_channel
@@ -179,6 +182,7 @@ module Prawn
         raise Errors::UnsupportedImageType, "PNG uses an unsupported compression method" if compression_method != 0
         raise Errors::UnsupportedImageType, "PNG uses an unsupported filter method" if filter_method != 0
         raise Errors::UnsupportedImageType, "PNG uses unsupported interlace method" if interlace_method != 0
+        raise Errors::UnsupportedImageType, "PNG uses an invalid bit depth" if BIT_DEPTHS[color_type]&.include?(bits) == false
 
         dictionary = {Type: :XObject, Subtype: :Image, Height: height, Width: width, BitsPerComponent: bits}
         if color_type == INDEXED && alpha_channel?
