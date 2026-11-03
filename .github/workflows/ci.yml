@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   gem:
-    uses: next-gen-gems/.github/.github/workflows/gem-ci.yml@ci/shared
+    uses: next-gen-gems/.github/.github/workflows/gem-ci.yml@main
     with:
       extra-rubies: '["truffleruby-head"]'
       apt-packages: mupdf-tools poppler-utils qpdf
