@@ -10,6 +10,9 @@ gem "prawnx" # instead of prawn, prawn-table and prawn-svg
 `pdf.table` and `pdf.svg` work without any other gem; `require "prawn/table"` and `require "prawn-svg"` keep
 working.
 
+The gem has its own version, `PrawnX::VERSION`. `Prawn::VERSION` is the version of the Prawn API it reproduces,
+2.5.0, so code that checks Prawn's version keeps working.
+
 ## Beyond Prawn
 
 What would move pixels away from Prawn's stays off unless asked for.
