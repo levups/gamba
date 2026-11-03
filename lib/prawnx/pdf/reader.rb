@@ -480,10 +480,15 @@ module PDF
         @scanner.skip(WHITESPACE)
       end
 
+      # StringScanner#peek_byte, which strscan only has from Ruby 3.4.
+      def next_byte
+        @scanner.string.getbyte(@scanner.pos)
+      end
+
       # A stray delimiter, ")", ">", "]", "{" or "}", is skipped as viewers do.
       def parse_value
         @scanner.skip(STRAY_DELIMITERS)
-        case @scanner.peek_byte
+        case next_byte
         when 47 then Name.new(value: name_bytes)
         when 40 then parse_literal_string
         when 60
@@ -530,7 +535,7 @@ module PDF
           break if @scanner.skip(/>>/n)
           raise Prawn::Errors::MalformedPDF, "Unterminated dictionary" if @scanner.eos?
 
-          unless @scanner.peek_byte == 47
+          unless next_byte == 47
             parse_value # a value without its key: dropped, as viewers do
             next
           end
