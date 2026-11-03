@@ -25,7 +25,7 @@ module Prawn
     def curve_to(destination, options = {})
       options[:bounds] || raise(Errors::InvalidGraphicsPath, "Bounding points for bezier curve must be specified as :bounds => [[x1,y1],[x2,y2]]")
 
-      add_content("#{PDF::Core.real_params((options[:bounds] << destination).flat_map { map_to_absolute(it) })} c")
+      add_content("#{PDF::Core.real_params((options[:bounds] << destination).flat_map { map_to_absolute(_1) })} c")
     end
 
     def rectangle(point, width, height)
@@ -91,7 +91,7 @@ module Prawn
 
     def polygon(*points)
       move_to(points[0])
-      (points.drop(1) << points[0]).each { line_to(*it) }
+      (points.drop(1) << points[0]).each { line_to(*_1) }
       add_content("h")
     end
 
@@ -99,7 +99,7 @@ module Prawn
       move_to(point_on_line(radius, points[1], points[0]))
       sides = points.size
       points << points[0] << points[1]
-      sides.times { rounded_vertex(radius, points[it], points[it + 1], points[it + 2]) }
+      sides.times { rounded_vertex(radius, points[_1], points[_1 + 1], points[_1 + 2]) }
       add_content("h")
     end
 

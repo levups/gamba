@@ -41,11 +41,11 @@ module PrawnX
 
       def header(size)
         [size, "", 0x02100000, "mntr", "RGB ", "XYZ ", 2026, 1, 1, 0, 0, 0, "acsp", "APPL", 0, "", "", 0, 0,
-          *D50_WHITE.map { s15_fixed16(it) }, ""].pack("N a4 N a4 a4 a4 n6 a4 a4 N a4 a4 Q> N N3 a4") + ("\x00" * 44)
+          *D50_WHITE.map { s15_fixed16(_1) }, ""].pack("N a4 N a4 a4 a4 n6 a4 a4 N a4 a4 Q> N N3 a4") + ("\x00" * 44)
       end
 
       def xyz(values)
-        "XYZ ".b + ("\x00" * 4) + values.map { s15_fixed16(it) }.pack("N3")
+        "XYZ ".b + ("\x00" * 4) + values.map { s15_fixed16(_1) }.pack("N3")
       end
 
       def s15_fixed16(value)

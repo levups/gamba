@@ -17,7 +17,7 @@ class OracleComparerTest < Minitest::Test
 
   def self.rendering
     @rendering ||= Dir.mktmpdir do |directory|
-      paths = DOCUMENT_BY_NAME.map { |name, body| File.join(directory, "#{name}.rb").tap { File.write(it, body) } }
+      paths = DOCUMENT_BY_NAME.map { |name, body| File.join(directory, "#{name}.rb").tap { File.write(_1, body) } }
       Oracle.render("prawn", paths, File.join(Oracle::ROOT, "tmp/oracle_comparer"))
     end
   end

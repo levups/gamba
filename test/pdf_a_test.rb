@@ -9,7 +9,7 @@ require "prawn"
 # they are installed: MUSTANG_JAR names Mustang's CLI jar, JAVA the Java it runs on.
 class PdfATest < Minitest::Test
   MUSTANG_JAR = ENV.fetch("MUSTANG_JAR", File.expand_path("~/.cache/prawnx-tools/Mustang-CLI.jar"))
-  JAVA = ENV.fetch("JAVA", ["/opt/homebrew/opt/openjdk/bin/java", "java"].find { system(it, "-version", err: File::NULL, out: File::NULL) })
+  JAVA = ENV.fetch("JAVA", ["/opt/homebrew/opt/openjdk/bin/java", "java"].find { system(_1, "-version", err: File::NULL, out: File::NULL) })
   DATA_DIRECTORY = File.join(Oracle::ROOT, "corpus/cache/prawn/data")
   INVOICE_XML = File.read(File.join(__dir__, "fixtures/factur_x_en16931.xml"))
 

@@ -32,7 +32,7 @@ module Prawn
     def formatted_text(array, options = {})
       options = inspect_options_for_text(options.dup)
       color = options.delete(:color)
-      array = array.map { it[:color] ? it : it.merge(color:) } if color
+      array = array.map { _1[:color] ? _1 : _1.merge(color:) } if color
 
       if @indent_paragraphs
         text_formatter.array_paragraphs(array).each do |paragraph|

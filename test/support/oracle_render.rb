@@ -99,7 +99,7 @@ def render(example, output_directory)
   if example.options[:standalone]
     Dir.mktmpdir do |directory|
       Dir.chdir(directory) { example.block.call }
-      Dir["#{directory}/*.pdf"].each { FileUtils.mv(it, "#{output}-#{File.basename(it)}") }
+      Dir["#{directory}/*.pdf"].each { FileUtils.mv(_1, "#{output}-#{File.basename(_1)}") }
     end
   else
     document = Prawn::Document.new
@@ -113,4 +113,4 @@ end
 
 output_directory, *paths = ARGV
 FileUtils.mkdir_p(output_directory)
-paths.flat_map { examples_from(it) }.each { render(it, output_directory) }
+paths.flat_map { examples_from(_1) }.each { render(_1, output_directory) }

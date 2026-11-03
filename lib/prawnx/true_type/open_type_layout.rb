@@ -21,7 +21,7 @@ module PrawnX
 
       # Glyphs and the characters each stands for, ligatures applied: [[glyph, [code, …]], …].
       def shape(codes)
-        clusters = codes.map { [@file.glyph_by_code[it], [it]] }
+        clusters = codes.map { [@file.glyph_by_code[_1], [_1]] }
         return clusters if @ligatures_by_first_glyph.empty?
 
         shaped = []
@@ -72,14 +72,14 @@ module PrawnX
             end
           end
         end
-        ligatures.transform_values { |list| list.sort_by { -it[0].size } }
+        ligatures.transform_values { |list| list.sort_by { -_1[0].size } }
       end
 
       def read_pair_lookups
         table = @file.table("GPOS")
         return [] unless table && @features.include?("kern")
 
-        lookups(table, "kern", PAIR_ADJUSTMENT, GPOS_EXTENSION).filter_map { pair_lookup(table, it) }
+        lookups(table, "kern", PAIR_ADJUSTMENT, GPOS_EXTENSION).filter_map { pair_lookup(table, _1) }
       end
 
       def pair_lookup(table, subtable)
@@ -98,7 +98,7 @@ module PrawnX
 
             set = subtable + set_offsets[index]
             count = table.unpack1("@#{set} n")
-            record = (0...count).find { table.unpack1("@#{set + 2 + (it * (record_size + 2))} n") == right }
+            record = (0...count).find { table.unpack1("@#{set + 2 + (_1 * (record_size + 2))} n") == right }
             record && table.unpack1("@#{set + 4 + (record * (record_size + 2)) + advance_position} s>")
           end
         when 2
@@ -109,7 +109,7 @@ module PrawnX
             next unless coverage[left]
 
             record = (first_classes[left] * second_count) + second_classes[right]
-            table.unpack1("@#{subtable + 16 + (record * record_size) + advance_position} s>").then { it.zero? ? nil : it }
+            table.unpack1("@#{subtable + 16 + (record * record_size) + advance_position} s>").then { _1.zero? ? nil : _1 }
           end
         end
       end
@@ -145,8 +145,8 @@ module PrawnX
 
       def default_language_features(table, script_list)
         script_count = table.unpack1("@#{script_list} n")
-        offset_by_tag = Array.new(script_count) { table.unpack("@#{script_list + 2 + (it * 6)} a4 n") }.to_h
-        script_offset = offset_by_tag.values_at(*PREFERRED_SCRIPTS).find { !it.nil? } || offset_by_tag.values.first
+        offset_by_tag = Array.new(script_count) { table.unpack("@#{script_list + 2 + (_1 * 6)} a4 n") }.to_h
+        script_offset = offset_by_tag.values_at(*PREFERRED_SCRIPTS).find { !_1.nil? } || offset_by_tag.values.first
         return [] unless script_offset
 
         script = script_list + script_offset
@@ -167,7 +167,7 @@ module PrawnX
           table.unpack("@#{offset + 4} n#{count}").each_with_index.to_h
         else
           table.unpack("@#{offset + 4} n#{count * 3}").each_slice(3).each_with_object({}) do |(first, last, start_index), index|
-            (first..last).each { index[it] = start_index + (it - first) }
+            (first..last).each { index[_1] = start_index + (_1 - first) }
           end
         end
       end
@@ -177,10 +177,10 @@ module PrawnX
         format = table.unpack1("@#{offset} n")
         if format == 1
           start, count = table.unpack("@#{offset + 2} n2")
-          table.unpack("@#{offset + 6} n#{count}").each { classes[start + it[1]] = it[0] }
+          table.unpack("@#{offset + 6} n#{count}").each { classes[start + _1[1]] = _1[0] }
         else
           count = table.unpack1("@#{offset + 2} n")
-          table.unpack("@#{offset + 4} n#{count * 3}").each_slice(3) { |first, last, value| (first..last).each { classes[it] = value } }
+          table.unpack("@#{offset + 4} n#{count * 3}").each_slice(3) { |first, last, value| (first..last).each { classes[_1] = value } }
         end
         classes
       end

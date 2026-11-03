@@ -11,7 +11,7 @@ module Prawn
           if @layout
             Array(shaped_runs(text, options[:kerning]))
           elsif options[:kerning]
-            kern(text).map { it.is_a?(Numeric) ? it : glyph_string(it) }
+            kern(text).map { _1.is_a?(Numeric) ? _1 : glyph_string(_1) }
           else
             [glyph_string(text.codepoints)]
           end
@@ -37,7 +37,7 @@ module Prawn
           Type: :FontDescriptor, FontName: font_name, FontBBox: bbox, Flags: pdf_flags, StemV: stem_v, ItalicAngle: italic_angle,
           Ascent: @ascender, Descent: @descender, CapHeight: cap_height, XHeight: x_height, FontFile3: font_file
         )
-        widths = glyphs.sort.flat_map { [it, [Integer(@ttf.advance_widths[it] * scale_factor)]] }
+        widths = glyphs.sort.flat_map { [_1, [Integer(@ttf.advance_widths[_1] * scale_factor)]] }
         descendant = @document.ref!(
           Type: :Font, Subtype: :CIDFontType0, BaseFont: font_name, FontDescriptor: descriptor, W: widths,
           CIDSystemInfo: {Registry: PDF::Core::LiteralString.new("Adobe"), Ordering: PDF::Core::LiteralString.new("Identity"), Supplement: 0}

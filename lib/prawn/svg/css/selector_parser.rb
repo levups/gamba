@@ -1,5 +1,7 @@
 module Prawn::SVG::CSS
   class SelectorParser
+    ATTRIBUTE_OPERATORS = ["=", "*=", "~=", "^=", "|=", "$=", nil].freeze
+
     def self.parse(selector)
       tokens = tokenise_css_selector(selector) or return
 
@@ -16,7 +18,7 @@ module Prawn::SVG::CSS
 
           result.last[part] << token.name
         when Attribute
-          return nil unless ["=", "*=", "~=", "^=", "|=", "$=", nil].include?(token.operator)
+          return nil unless ATTRIBUTE_OPERATORS.include?(token.operator)
 
           (result.last[:attribute] ||= []) << [token.key, token.operator, token.value]
         when Combinator
