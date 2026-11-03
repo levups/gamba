@@ -1,9 +1,12 @@
 name: CI
 
+# The blocks shared by the gems of next-gen-gems stay identical: bin/x-gems-ci-check in levups/oss guards them.
+
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,28 +16,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gem:
-    uses: next-gen-gems/.github/.github/workflows/gem-ci.yml@main
-    with:
-      extra-rubies: '["truffleruby-head"]'
-      apt-packages: mupdf-tools poppler-utils qpdf
-      brew-packages: mupdf-tools poppler qpdf
-      java-version: "21"
-      cache-path: |
-        corpus/cache
-        ~/.cache/prawnx-tools
-      cache-key-files: |
-        corpus/manifest.yml
-        .github/workflows/ci.yml
-      # Mustang is the Factur-X validator test/pdf_a_test.rb runs.
-      setup-command: |
-        BUNDLE_GEMFILE=oracle/Gemfile bundle install
-        bundle exec rake corpus:fetch
-        mkdir -p ~/.cache/prawnx-tools
-        test -f ~/.cache/prawnx-tools/Mustang-CLI.jar || curl -sSfL -o ~/.cache/prawnx-tools/Mustang-CLI.jar https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
-      test-command: |
-        ORACLE_CANDIDATE=prawn FUZZ_CASES=0 bundle exec rake test
-        bundle exec rake test
-        FUZZ_SEED=$GITHUB_RUN_ID FUZZ_CASES=300 bundle exec ruby -Itest test/fuzz_test.rb
-        INPUT_FUZZ_SEED=$GITHUB_RUN_ID INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb
-      timeout-minutes: 15
+  rubocop:
+    name: RuboCop
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+          bundler-cache: true
+      - run: bundle exec rubocop --format github
+
+  test:
+    name: Ruby ${{ matrix.ruby }}${{ matrix.gemfile != 'Gemfile' && format(', {0}', matrix.gemfile) || '' }}${{ matrix.os != 'ubuntu-latest' && format(', {0}', matrix.os) || '' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    continue-on-error: ${{ endsWith(matrix.ruby, '-head') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        # Every Ruby the core team still maintains (https://endoflife.date/ruby), ruby-head, then this gem's extra ones.
+        ruby: ["3.3", "3.4", "4.0", ruby-head, truffleruby-head]
+        gemfile: [Gemfile]
+        # A private repository gets no macOS runner: its job waits until it times out. Public ones only.
+        include: ${{ fromJSON(github.event.repository.private && '[]' || '[{"os":"macos-latest","ruby":"4.0","gemfile":"Gemfile"}]') }}
+    env:
+      BUNDLE_GEMFILE: ${{ matrix.gemfile != 'Gemfile' && matrix.gemfile || '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes mupdf-tools poppler-utils qpdf
+      - if: runner.os == 'macOS'
+        run: brew install mupdf-tools poppler qpdf
+      # Mustang, the Factur-X validator test/pdf_a_test.rb runs, needs Java.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/cache@v6
+        with:
+          path: |
+            corpus/cache
+            ~/.cache/prawnx-tools
+          key: prawnx-${{ runner.os }}-${{ hashFiles('corpus/manifest.yml', '.github/workflows/ci.yml') }}
+      - run: |
+          BUNDLE_GEMFILE=oracle/Gemfile bundle install
+          bundle exec rake corpus:fetch
+          mkdir -p ~/.cache/prawnx-tools
+          test -f ~/.cache/prawnx-tools/Mustang-CLI.jar || curl -sSfL -o ~/.cache/prawnx-tools/Mustang-CLI.jar https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
+      - run: |
+          ORACLE_CANDIDATE=prawn FUZZ_CASES=0 bundle exec rake test
+          bundle exec rake test
+          FUZZ_SEED=$GITHUB_RUN_ID FUZZ_CASES=300 bundle exec ruby -Itest test/fuzz_test.rb
+          INPUT_FUZZ_SEED=$GITHUB_RUN_ID INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb
