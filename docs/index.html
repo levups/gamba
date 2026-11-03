@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrawnX</title>
+<meta name="description" content="Prawn’s API, rewritten for speed: the same pages, pixel for pixel, in lighter files, faster and with less memory. Tables and SVG included.">
+<meta property="og:title" content="PrawnX — Prawn’s API, rewritten for speed">
+<meta property="og:description" content="A rewrite of Prawn, prawn-table and prawn-svg: the same pages pixel for pixel, lighter files, faster renders, PDF/A-3 and Factur-X on top.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#c2361b">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800&family=Inter+Tight:wght@400;600&family=Fira+Code&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="home">
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="page">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="./" aria-current="page">PrawnX</a>
+    <a href="guide.html">Guide</a>
+    <a href="compatibility.html">Compatibility</a>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="https://github.com/next-gen-gems/prawnx">GitHub</a>
+  </nav>
+
+  <main id="main">
+    <header class="hero">
+      <h1 class="wordmark">PrawnX</h1>
+      <div>
+        <p class="byline"><span id="byline-speed">Prawn’s API, rewritten for speed.</span><span class="byline-sub">The same pages, pixel for pixel.</span></p>
+        <p class="summary">A rewrite of Prawn, prawn-table and prawn-svg in one gem: lighter files, faster renders, less memory, and PDF/A-3 and Factur-X on top.</p>
+        <code class="install">gem "prawnx"</code>
+        <p class="links"><a href="guide.html">Get started</a><a href="compatibility.html">Where it differs from Prawn</a><a href="benchmarks.html">Benchmarks</a></p>
+      </div>
+    </header>
+
+    <section aria-labelledby="numbers-title">
+      <h2 id="numbers-title">In numbers</h2>
+      <div class="tiles" id="tiles"></div>
+      <p class="note more" id="tiles-note">Loading the latest numbers…</p>
+      <p class="more"><a href="benchmarks.html">Every measurement, and how to reproduce it</a></p>
+    </section>
+
+    <section aria-labelledby="why-title">
+      <h2 id="why-title">Why</h2>
+      <div class="prose">
+        <p>Prawn draws good pages, slowly. Profiling an invoice with a table shows where the time goes: line breaking rebuilds its regular expressions for every line, every number is formatted then patched, and TrueType fonts are read again for each document.</p>
+        <p>PrawnX keeps Prawn’s Ruby API and its pages, and rewrites what sits underneath. Your code does not change; the PDF it produces looks the same, weighs less, and comes out faster.</p>
+      </div>
+    </section>
+
+    <section aria-labelledby="changes-title">
+      <h2 id="changes-title">What changes</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>One gem instead of three</h3>
+          <p><code>pdf.table</code> and <code>pdf.svg</code> work without prawn-table or prawn-svg; <code>require "prawn/table"</code> and <code>require "prawn-svg"</code> keep working.</p>
+          <p><a href="guide.html#installation">Installation</a></p>
+        </div>
+        <div class="card">
+          <h3>Lighter files, same pixels</h3>
+          <p>Every PDF is written as PDF 1.5: compressed streams, the other objects packed in one compressed object stream, a cross-reference stream. Identical images are embedded once.</p>
+          <p><a href="guide.html#output">Output</a></p>
+        </div>
+        <div class="card">
+          <h3>Fonts parsed once per process</h3>
+          <p>A TrueType or OpenType font is read once, frozen and shared by every document and thread, until its file changes. <code>PrawnX.eager_load!</code> loads it all before a server forks.</p>
+          <p><a href="guide.html#fonts">Fonts</a></p>
+        </div>
+        <div class="card">
+          <h3>PDF/A-3 and Factur-X</h3>
+          <p><code>pdf_a: true</code> writes a PDF/A-3b document; <code>factur_x</code> embeds the invoice XML your invoicing system produced.</p>
+          <p><a href="guide.html#pdf-a">PDF/A and Factur-X</a></p>
+        </div>
+        <div class="card">
+          <h3>Prawn’s bugs, fixed and declared</h3>
+          <p>Each fix is proven by a specification and listed with the exact differences the oracle reports. Everything else matches Prawn.</p>
+          <p><a href="compatibility.html">Compatibility</a></p>
+        </div>
+        <div class="card">
+          <h3>Safer SVG by default</h3>
+          <p>SVG images fetch nothing from the web unless asked to: a submitted SVG cannot make the server request a URL.</p>
+          <p><a href="compatibility.html#svg">SVG web requests</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="proof-title">
+      <h2 id="proof-title">Same pages</h2>
+      <div class="prose">
+        <p>An oracle renders every example of Prawn’s and prawn-table’s manuals and every sample SVG of prawn-svg with Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4, and with PrawnX, each in its own process. It compares their pages, their text and its positions to 0.01 pt, their pixels at 150 dpi in MuPDF and in Poppler, their validity and their weight. A seeded fuzzer writes random documents and compares them the same way.</p>
+      </div>
+      <p class="more"><a href="compatibility.html#testing">How PrawnX is tested</a></p>
+    </section>
+
+    <section aria-labelledby="start-title">
+      <h2 id="start-title">Quick start</h2>
+      <div class="split">
+        <div>
+          <p class="code-label">Gemfile</p>
+<pre><code>gem "prawnx" # instead of prawn, prawn-table and prawn-svg</code></pre>
+        </div>
+        <div>
+          <p class="code-label">Your code, unchanged</p>
+<pre><code>Prawn::Document.generate("hello.pdf") do
+  text "Hello, World!"
+  table [%w[SKU Qty], %w[A-1 2]]
+end</code></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Next Gen Gems, by Level UP Solutions</p>
+    <nav aria-label="Next Gen Gems">
+      <ul class="family">
+        <li><a href="https://next-gen-gems.github.io/slimx/">SlimX</a></li>
+        <li><a href="https://next-gen-gems.github.io/browserx/">BrowserX</a></li>
+        <li><a href="https://next-gen-gems.github.io/prawnx/" aria-current="page">PrawnX</a></li>
+        <li><a href="https://next-gen-gems.github.io/gretelx/">GretelX</a></li>
+        <li><a href="https://github.com/next-gen-gems/prawnx">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </footer>
+</div>
+<script src="site.js"></script>
+</body>
+</html>
