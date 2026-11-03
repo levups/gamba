@@ -40,7 +40,7 @@ module Prawn
     def initialize(options = {}, &block)
       options = options.dup
       Prawn.verify_options(VALID_OPTIONS, options)
-      self.class.extensions.reverse_each { extend(it) }
+      self.class.extensions.reverse_each { extend(_1) }
 
       initialize_internals(options)
       @pdf_a = options.delete(:pdf_a) == true
@@ -131,7 +131,7 @@ module Prawn
       output = arguments.first
       (1..page_count).each do |page_number|
         go_to_page(page_number)
-        repeaters.each { it.run(page_number) }
+        repeaters.each { _1.run(page_number) }
       end
       pdf = render_document
       output << pdf if output.respond_to?(:<<)

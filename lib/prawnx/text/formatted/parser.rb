@@ -20,9 +20,9 @@ module Prawn
           "<b>" => :bold, "<strong>" => :bold, "<i>" => :italic, "<em>" => :italic, "<u>" => :underline,
           "<strikethrough>" => :strikethrough, "<sub>" => :subscript, "<sup>" => :superscript
         }.freeze
-        STYLE_BY_CLOSING_TAG = STYLE_BY_OPENING_TAG.transform_keys { it.sub("<", "</") }.freeze
+        STYLE_BY_CLOSING_TAG = STYLE_BY_OPENING_TAG.transform_keys { _1.sub("<", "</") }.freeze
         PREFIX_BY_STYLE = {bold: "<b>", italic: "<i>", underline: "<u>", strikethrough: "<strikethrough>", subscript: "<sub>", superscript: "<sup>"}.freeze
-        SUFFIX_BY_STYLE = PREFIX_BY_STYLE.transform_values { it.sub("<", "</") }.freeze
+        SUFFIX_BY_STYLE = PREFIX_BY_STYLE.transform_values { _1.sub("<", "</") }.freeze
 
         def self.format(string, *_arguments)
           array_from_tokens(string.gsub(%r{<br\s*/?>}, "\n").scan(PARSER_REGEX))
@@ -115,12 +115,12 @@ module Prawn
               when /^<color[^>]*>$/
                 rgb = attribute(token, "rgb", hash_prefixed: true)
                 colors << rgb if rgb
-                cmyk = CMYK_ATTRIBUTES.map { attribute(token, it, hash_prefixed: true)&.then { |value| Integer(value, 10) } }
+                cmyk = CMYK_ATTRIBUTES.map { attribute(token, _1, hash_prefixed: true)&.then { |value| Integer(value, 10) } }
                 colors << cmyk if cmyk.all?
               when /^<font[^>]*>$/
-                attribute(token, "name")&.then { fonts << it }
-                attribute(token, "size")&.then { sizes << Float(it) }
-                attribute(token, "character_spacing")&.then { character_spacings << Float(it) }
+                attribute(token, "name")&.then { fonts << _1 }
+                attribute(token, "size")&.then { sizes << Float(_1) }
+                attribute(token, "character_spacing")&.then { character_spacings << Float(_1) }
               else
                 array << {
                   text: unescape(token), styles: styles.dup, color: colors.last, local:, link:, anchor:,

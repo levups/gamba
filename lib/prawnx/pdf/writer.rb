@@ -91,7 +91,7 @@ module PDF
       # Each row is one byte of type, then the offset or the object stream, then the generation or the index.
       def cross_reference_stream(identifier, location_by_identifier)
         size = identifier + 1
-        offset_width = [(location_by_identifier.values.map { it[1] }.max.bit_length + 7) / 8, 1].max
+        offset_width = [(location_by_identifier.values.map { _1[1] }.max.bit_length + 7) / 8, 1].max
         rows = (+"\x00".b) << ("\x00" * offset_width).b << "\xFF\xFF".b
         (1...size).each do |object_identifier|
           type, field, generation_or_index = location_by_identifier.fetch(object_identifier)

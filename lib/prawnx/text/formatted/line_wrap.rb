@@ -32,8 +32,8 @@ module Prawn
           Breaks.new(
             soft_hyphen: soft_hyphen&.freeze,
             zero_width_space: zero_width_space&.freeze,
-            scan_pattern: Regexp.new(patterns.map { it.encode(encoding) }.join("|")),
-            word_division_pattern: Regexp.union([*["\t", "\n", "\v", "\r", " "].map { it.encode(encoding) }, zero_width_space, soft_hyphen, "-"].compact),
+            scan_pattern: Regexp.new(patterns.map { _1.encode(encoding) }.join("|")),
+            word_division_pattern: Regexp.union([*["\t", "\n", "\v", "\r", " "].map { _1.encode(encoding) }, zero_width_space, soft_hyphen, "-"].compact),
             ends_with_break_pattern: Regexp.new("[#{break_characters}]$"),
             last_word_pattern: Regexp.new("[^#{break_characters}]*$"),
             begins_with_break_pattern: Regexp.new("^[#{break_characters}]")

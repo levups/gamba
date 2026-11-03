@@ -49,14 +49,14 @@ module Prawn
       end
 
       def bbox
-        @bbox ||= @attributes["fontbbox"].split(/\s+/).map { Integer(it) }
+        @bbox ||= @attributes["fontbbox"].split(/\s+/).map { Integer(_1) }
       end
 
       def compute_width_of(string, options = {})
         scale = (options[:size] || size) / 1000.0
         return unscaled_width_of(string) * scale unless options[:kerning]
 
-        strings, offsets = kern(string).partition { it.is_a?(String) }
+        strings, offsets = kern(string).partition { _1.is_a?(String) }
         (unscaled_width_of(strings.join) - offsets.sum) * scale
       end
 
@@ -103,7 +103,7 @@ module Prawn
       end
 
       def find_font(file)
-        directory = self.class.metrics_path.find { File.exist?("#{it}/#{file}") }
+        directory = self.class.metrics_path.find { File.exist?("#{_1}/#{file}") }
         raise Errors::UnknownFont, "Couldn't find the font: #{file} in any of:\n#{self.class.metrics_path.join("\n")}" unless directory
 
         "#{directory}/#{file}"
@@ -119,11 +119,11 @@ module Prawn
           runs.last << byte
           last_byte = byte
         end
-        runs.map { it.is_a?(String) ? it.force_encoding(::Encoding::Windows_1252) : it }
+        runs.map { _1.is_a?(String) ? _1.force_encoding(::Encoding::Windows_1252) : _1 }
       end
 
       def unscaled_width_of(string)
-        string.each_byte.sum { @width_by_byte[it] }
+        string.each_byte.sum { @width_by_byte[_1] }
       end
 
       def parse_afm(file_name)
@@ -163,7 +163,7 @@ module Prawn
           right_byte = byte_by_name[right]
           table[(left_byte << 8) | right_byte] = offset if left_byte && right_byte
         end
-        width_by_byte = Encoding::WinAnsi::CHARACTERS.map { width_by_name.fetch(it, 0) }
+        width_by_byte = Encoding::WinAnsi::CHARACTERS.map { width_by_name.fetch(_1, 0) }
         Metrics.new(width_by_byte: width_by_byte.freeze, kerning_by_byte_pair: kerning_by_byte_pair.freeze, attributes: attributes.freeze)
       end
     end
