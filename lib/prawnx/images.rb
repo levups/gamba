@@ -29,7 +29,7 @@ module Prawn
     end
 
     def find(image_blob)
-      @handlers.find { it.can_render?(image_blob) } || raise(Errors::UnsupportedImageType, "image file is an unrecognised format")
+      @handlers.find { _1.can_render?(image_blob) } || raise(Errors::UnsupportedImageType, "image file is an unrecognised format")
     end
   end
 

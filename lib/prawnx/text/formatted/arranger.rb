@@ -73,7 +73,7 @@ module Prawn
           initialize_line
           @unconsumed = []
           array.each do |hash|
-            hash[:text].scan(/[^\n]+|\n/) { @unconsumed << hash.merge(text: it) }
+            hash[:text].scan(/[^\n]+|\n/) { @unconsumed << hash.merge(text: _1) }
           end
         end
 

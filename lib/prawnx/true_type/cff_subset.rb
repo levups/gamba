@@ -36,12 +36,12 @@ module PrawnX
 
         old_charstrings_offset = operands(top_operators, CHARSTRINGS).first
         charstrings, = read_index(old_charstrings_offset)
-        kept = glyphs_kept.to_h { [it, true] }
+        kept = glyphs_kept.to_h { [_1, true] }
         new_charstrings = charstrings.each_with_index.map { |charstring, glyph| kept[glyph] ? charstring : ENDCHAR }
 
         font_dicts = nil
         if (fd_array_offset = operands(top_operators, FD_ARRAY).first)
-          font_dicts = read_index(fd_array_offset).first.map { parse_dict(it) }
+          font_dicts = read_index(fd_array_offset).first.map { parse_dict(_1) }
         end
 
         # Every offset operand is written as a five-byte integer, so the new Top DICT's size is known before its
@@ -54,7 +54,7 @@ module PrawnX
         fd_array_new_offset = nil
         if font_dicts
           fd_array_new_offset = charstrings_offset + appended.bytesize
-          appended += index(font_dicts.map { encode_dict(relocated(it, delta, nil, nil)) })
+          appended += index(font_dicts.map { encode_dict(relocated(_1, delta, nil, nil)) })
         end
         new_top = encode_dict(relocated(top_operators, delta, charstrings_offset, fd_array_new_offset))
         @cff.byteslice(0, names_end) + index([new_top]) + tail + appended
@@ -65,7 +65,7 @@ module PrawnX
         return [[], offset + 2] if count.zero?
 
         offset_size = @cff.getbyte(offset + 2)
-        offsets = Array.new(count + 1) { read_offset(offset + 3 + (it * offset_size), offset_size) }
+        offsets = Array.new(count + 1) { read_offset(offset + 3 + (_1 * offset_size), offset_size) }
         data_start = offset + 3 + ((count + 1) * offset_size) - 1
         items = offsets.each_cons(2).map { |first, last| @cff.byteslice(data_start + first, last - first) }
         [items, data_start + offsets.last]
@@ -79,8 +79,8 @@ module PrawnX
         return [0].pack("n") if items.empty?
 
         offsets = items.each_with_object([1]) { |item, list| list << (list.last + item.bytesize) }
-        offset_size = [1, 2, 3, 4].find { offsets.last < (1 << (8 * it)) }
-        packed_offsets = offsets.map { [it].pack("N").byteslice(4 - offset_size, offset_size) }.join
+        offset_size = [1, 2, 3, 4].find { offsets.last < (1 << (8 * _1)) }
+        packed_offsets = offsets.map { [_1].pack("N").byteslice(4 - offset_size, offset_size) }.join
         [items.size].pack("n") + offset_size.chr + packed_offsets + items.join.b
       end
 
@@ -128,7 +128,7 @@ module PrawnX
       end
 
       def operands(entries, operator)
-        entries.find { it[0] == operator }&.dig(1) || []
+        entries.find { _1[0] == operator }&.dig(1) || []
       end
 
       # Offsets into the font move by delta; CharStrings and FDArray point at their new copies at the end.
@@ -148,7 +148,7 @@ module PrawnX
 
       def encode_dict(entries)
         entries.each_with_object(+"".b) do |(operator, new_values, raw), dict|
-          dict << (new_values ? new_values.map { [FIVE_BYTE_INTEGER, it].pack("Cl>") }.join : raw)
+          dict << (new_values ? new_values.map { [FIVE_BYTE_INTEGER, _1].pack("Cl>") }.join : raw)
           dict << operator.pack("C*")
         end
       end
