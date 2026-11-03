@@ -30,7 +30,7 @@ module PDF
     def escape_name(name)
       return "/#{name}" if name.match?(REGULAR_NAME)
 
-      (+"/").concat(*name.b.each_byte.map { DELIMITER_OR_IRREGULAR_BYTES.include?(it) ? format("#%02X", it) : it.chr })
+      (+"/").concat(*name.b.each_byte.map { DELIMITER_OR_IRREGULAR_BYTES.include?(_1) ? format("#%02X", _1) : _1.chr })
     end
 
     # Five decimals, trailing zeros dropped but one: 1 is "1.0", 0.5 is "0.5", 1/3 is "0.33333".
@@ -42,7 +42,7 @@ module PDF
     end
 
     def real_params(numbers)
-      numbers.map { real(it) }.join(" ")
+      numbers.map { real(_1) }.join(" ")
     end
 
     # Integers as integers, other numbers to five decimals without a trailing ".0".
@@ -67,7 +67,7 @@ module PDF
       when ByteString then "<#{value.unpack1("H*")}>"
       when Time then "(#{value.strftime("D:%Y%m%d%H%M%S%z").chop.chop}'00')"
       when String then "<#{(in_content_stream ? value : utf16be(value)).unpack1("H*")}>"
-      when Array then "[#{value.map { serialize(it, in_content_stream) }.join(" ")}]"
+      when Array then "[#{value.map { serialize(_1, in_content_stream) }.join(" ")}]"
       when Hash then "<<#{value.map { |key, entry| "#{serialize(key.to_sym)} #{serialize(entry, in_content_stream)}" }.join("\n")}>>"
       when Reference then value.to_s
       when Serializable then serialize(value.to_hash, in_content_stream)

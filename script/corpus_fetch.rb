@@ -26,7 +26,7 @@ YAML.load_file(File.expand_path("../corpus/manifest.yml", __dir__)).each do |nam
 
     FileUtils.rm_rf(directory)
     FileUtils.mkdir_p(directory)
-    source.fetch("keep").each { FileUtils.mv(File.join(download_directory, it), directory) }
+    source.fetch("keep").each { FileUtils.mv(File.join(download_directory, _1), directory) }
   end
   File.write(stamp, source.fetch("commit"))
   puts "#{name}: #{source.fetch("commit")}"

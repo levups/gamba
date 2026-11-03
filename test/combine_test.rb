@@ -36,7 +36,7 @@ class CombineTest < Minitest::Test
 
     original = document("alice", pages: 2)
     QPDF_VARIANTS.each do |name, arguments|
-      variant = qpdf(original, arguments.map { (it == '""') ? "" : it })
+      variant = qpdf(original, arguments.map { (_1 == '""') ? "" : _1 })
 
       assert_equal rasterized(original), rasterized(PrawnX.combine([variant])), "a file with #{name}"
     end
@@ -57,7 +57,7 @@ class CombineTest < Minitest::Test
     combined = PrawnX.combine([document("alice", page_size: "LETTER")], page_size: A4, orientation: :landscape)
 
     assert_equal [[0, 0, 841.89, 595.28]], media_boxes(combined)
-    xs, ys = glyphs(combined).map { it.drop(1) }.transpose
+    xs, ys = glyphs(combined).map { _1.drop(1) }.transpose
     assert_in_delta xs.min, xs.max, 0.5, "the line runs upward"
     assert_equal ys.sort.reverse, ys
   end
@@ -139,7 +139,7 @@ class CombineTest < Minitest::Test
 
     original = document("alice")
     encrypted = qpdf(original, ["--object-streams=generate", "--encrypt", "", "owner", "256", "--"])
-    broken = encrypted.sub(/startxref\s+\d+/) { |line| line.sub(/\d+\z/) { (it.to_i - 7).to_s } }
+    broken = encrypted.sub(/startxref\s+\d+/) { |line| line.sub(/\d+\z/) { (_1.to_i - 7).to_s } }
 
     assert_equal rasterized(original), rasterized(PrawnX.combine([broken]))
   end
@@ -149,7 +149,7 @@ class CombineTest < Minitest::Test
 
     original = document("alice")
     encrypted = qpdf(original, ["--object-streams=disable", "--allow-weak-crypto", "--encrypt", "", "owner", "128", "--use-aes=n", "--force-V4", "--"])
-    without_length = encrypted.sub(%r{/Length 128(?=[^0-9])}n) { " " * it.bytesize }
+    without_length = encrypted.sub(%r{/Length 128(?=[^0-9])}n) { " " * _1.bytesize }
 
     assert_equal rasterized(original), rasterized(PrawnX.combine([without_length]))
   end
@@ -169,7 +169,7 @@ d) Tj"
     combined = PrawnX.combine([source])
 
     assert_equal "a(b)c Ad", glyphs(combined).map(&:first).join
-    assert_equal [72.25], glyphs(combined).first(1).map { it[1].round(2) }
+    assert_equal [72.25], glyphs(combined).first(1).map { _1[1].round(2) }
   end
 
   def test_an_empty_object_stream_with_a_predictor_reads_as_empty
@@ -184,7 +184,7 @@ d) Tj"
   end
 
   def test_a_file_that_needs_a_password_is_refused_by_name
-    locked = Prawn::Document.new { text "alice" }.tap { it.encrypt_document(user_password: "secret") }.render
+    locked = Prawn::Document.new { text "alice" }.tap { _1.encrypt_document(user_password: "secret") }.render
 
     assert_raises(Prawn::Errors::EncryptedPDF) { PrawnX.combine([locked]) }
   end
@@ -201,7 +201,7 @@ d) Tj"
   def test_damaged_files_fail_cleanly
     samples = [document("alice", pages: 2), classic_pdf({4 => stream("BT /F1 24 Tf 72 700 Td (bob) Tj ET")})]
     if system("qpdf", "--version", out: File::NULL)
-      samples += QPDF_VARIANTS.values.map { |arguments| qpdf(samples.first, arguments.map { (it == '""') ? "" : it }) }
+      samples += QPDF_VARIANTS.values.map { |arguments| qpdf(samples.first, arguments.map { (_1 == '""') ? "" : _1 }) }
     end
     random = Random.new(FUZZ_SEED)
     failures = []
@@ -258,14 +258,14 @@ d) Tj"
   end
 
   def test_a_chain_of_lengths_deeper_than_any_real_file_is_refused
-    chain = (6..10_005).to_h { [it, "<< /Length #{it + 1} 0 R >>\nstream\nx\nendstream"] }
+    chain = (6..10_005).to_h { [_1, "<< /Length #{_1 + 1} 0 R >>\nstream\nx\nendstream"] }
     source = classic_pdf({4 => "<< /Length 6 0 R >>\nstream\nBT ET\nendstream", 10_006 => "1", **chain})
 
     assert_raises(Prawn::Errors::MalformedPDF) { PrawnX.combine([source]) }
   end
 
   def test_a_long_list_of_objects_is_copied_whole
-    chain = (6..20_005).to_h { [it, "[#{it + 1} 0 R]"] }
+    chain = (6..20_005).to_h { [_1, "[#{_1 + 1} 0 R]"] }
     source = classic_pdf({3 => PAGE.sub(">> >>", ">> >> /Next 6 0 R"), 4 => stream("BT ET"), 20_006 => "[]", **chain})
     reader = PDF::Core::Reader.new(PrawnX.combine([source]))
     length = 0
@@ -279,7 +279,7 @@ d) Tj"
   end
 
   def test_objects_parsed_over_and_over_are_refused
-    overlapping = "(" + (1000...3000).map { "#{it} 0 obj (" }.join
+    overlapping = "(" + (1000...3000).map { "#{_1} 0 obj (" }.join
     source = classic_pdf({4 => stream("BT /F1 24 Tf 72 700 Td (alice) Tj ET"), 6 => overlapping})
     shifted = source.sub("%PDF-1.4\n", "%PDF-1.4\n% inserted after the offsets were counted\n")
 
@@ -288,9 +288,9 @@ d) Tj"
 
   def test_an_object_stream_whose_index_misleads_is_read_in_linear_time
     reader = PDF::Core::Reader.new(packed_catalog_pdf(annotations: 20_000))
-    annotations = Timeout.timeout(2) { reader.resolve(reader.pages.first[1][:Annots]).map { reader.resolve(it) } }
+    annotations = Timeout.timeout(2) { reader.resolve(reader.pages.first[1][:Annots]).map { reader.resolve(_1) } }
 
-    assert_equal 20_000, annotations.count { it.is_a?(Hash) && it[:Subtype] }
+    assert_equal 20_000, annotations.count { _1.is_a?(Hash) && _1[:Subtype] }
   end
 
   def test_a_cross_reference_stream_without_width_is_rebuilt_instead_of_read_forever
@@ -331,8 +331,8 @@ d) Tj"
   def packed_catalog_pdf(colors: 1, bits: 8, annotations: 0, xref_widths: "[1 4 2]")
     annotation_numbers = (100...(100 + annotations)).to_a
     packed = {1 => "<< /Type /Catalog /Pages 2 0 R >>"}
-    annotation_numbers.each { packed[it] = "<< /Type /Annot /Subtype /Square /Rect [0 0 10 10] >>" }
-    page = PAGE.sub("/Contents 4 0 R", "/Contents 4 0 R /Annots [#{annotation_numbers.map { "#{it} 0 R" }.join(" ")}]")
+    annotation_numbers.each { packed[_1] = "<< /Type /Annot /Subtype /Square /Rect [0 0 10 10] >>" }
+    page = PAGE.sub("/Contents 4 0 R", "/Contents 4 0 R /Annots [#{annotation_numbers.map { "#{_1} 0 R" }.join(" ")}]")
     plain = {2 => "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", 3 => page, 4 => stream("BT ET"),
              5 => "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"}
 
@@ -341,7 +341,7 @@ d) Tj"
     row_width = (colors * bits * 16 + 7) / 8
     decoded = (header + body).b
     decoded << " " * (-decoded.bytesize % row_width)
-    predicted = decoded.bytes.each_slice(row_width).map { [0, *it].pack("C*") }.join
+    predicted = decoded.bytes.each_slice(row_width).map { [0, *_1].pack("C*") }.join
     data = Zlib::Deflate.deflate(predicted)
     plain[6] = "<< /Type /ObjStm /N #{packed.size} /First #{header.bytesize} /Filter /FlateDecode " \
       "/DecodeParms << /Predictor 12 /Colors #{colors} /BitsPerComponent #{bits} /Columns 16 >> /Length #{data.bytesize} >>\n" \
@@ -350,7 +350,7 @@ d) Tj"
     output = +"%PDF-1.5\n".b
     offsets = plain.to_h { |number, value| [number, output.bytesize].tap { output << "#{number} 0 obj\n#{value}\nendobj\n".b } }
     offsets[7] = output.bytesize
-    size = [8, *annotation_numbers.map { it + 1 }].max
+    size = [8, *annotation_numbers.map { _1 + 1 }].max
     rows = (0...size).map do |number|
       if offsets.key?(number) then [1, offsets[number], 0]
       elsif number == 1 then [2, 6, 0]
@@ -358,7 +358,7 @@ d) Tj"
       else [0, 0, 0]
       end
     end
-    xref = Zlib::Deflate.deflate(rows.map { it.pack("CNn") }.join)
+    xref = Zlib::Deflate.deflate(rows.map { _1.pack("CNn") }.join)
     output << "7 0 obj\n<< /Type /XRef /Size #{size} /W #{xref_widths} /Root 1 0 R /Filter /FlateDecode /Length #{xref.bytesize} >>\n".b
     output << "stream\n".b << xref << "\nendstream\nendobj\nstartxref\n#{offsets[7]}\n%%EOF\n".b
   end
@@ -383,7 +383,7 @@ d) Tj"
   def rasterized(pdf)
     Dir.mktmpdir do |directory|
       File.binwrite(File.join(directory, "document.pdf"), pdf)
-      Oracle.rasterize(File.join(directory, "document.pdf"), File.join(directory, "page")).map { File.binread(it) }
+      Oracle.rasterize(File.join(directory, "document.pdf"), File.join(directory, "page")).map { File.binread(_1) }
     end
   end
 
@@ -405,7 +405,7 @@ d) Tj"
 
   def media_boxes(pdf)
     reader = PDF::Core::Reader.new(pdf)
-    reader.pages.map { |_, page| reader.resolve(page[:MediaBox]).map { reader.resolve(it).then { (it.to_f % 1).zero? ? it.to_f.to_i : it.to_f } } }
+    reader.pages.map { |_, page| reader.resolve(page[:MediaBox]).map { |value| reader.resolve(value).then { |number| (number.to_f % 1).zero? ? number.to_f.to_i : number.to_f } } }
   end
 
   PAGE = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"

@@ -9,7 +9,7 @@ module Prawn
       end
 
       def render(flags = {})
-        super.map { it[:text] }.join
+        super.map { _1[:text] }.join
       end
     end
   end

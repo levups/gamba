@@ -187,7 +187,7 @@ module Prawn
 
     def generate_unique_id
       font_count = @document.font_registry.size + 1
-      font_count += 1 until @document.page.fonts.keys.none? { it.to_s.start_with?("F#{font_count}.") }
+      font_count += 1 until @document.page.fonts.keys.none? { _1.to_s.start_with?("F#{font_count}.") }
       :"F#{font_count}"
     end
   end

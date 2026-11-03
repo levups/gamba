@@ -25,7 +25,7 @@ module Prawn
 
     def current_transformation_matrix_with_translation(x = 0, y = 0)
       a, b, c, d, e, f = (@transformation_stack || [IDENTITY]).last
-      [a, b, c, d, (a * x) + (c * y) + e, (b * x) + (d * y) + f].map { Float(it) }
+      [a, b, c, d, (a * x) + (c * y) + e, (b * x) + (d * y) + f].map { Float(_1) }
     end
 
     private

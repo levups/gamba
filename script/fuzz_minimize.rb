@@ -23,7 +23,7 @@ abort "#{path} renders like Prawn" unless differs.call(statements)
 
 index = 0
 while index < statements.size
-  shorter = statements.dup.tap { it.delete_at(index) }
+  shorter = statements.dup.tap { _1.delete_at(index) }
   if differs.call(shorter)
     statements = shorter
   else

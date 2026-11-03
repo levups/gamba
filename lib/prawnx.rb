@@ -87,12 +87,12 @@ end
 
 module Prawn
   module Fonts
-    %i[TTF TTC DFont].each { autoload it, ::File.expand_path("prawnx/fonts/ttf", __dir__) }
+    %i[TTF TTC DFont].each { autoload _1, ::File.expand_path("prawnx/fonts/ttf", __dir__) }
     autoload :OTF, ::File.expand_path("prawnx/fonts/otf", __dir__)
   end
 
   class Font
-    %i[TTF TTC DFont].each { autoload it, ::File.expand_path("prawnx/fonts/ttf", __dir__) }
+    %i[TTF TTC DFont].each { autoload _1, ::File.expand_path("prawnx/fonts/ttf", __dir__) }
   end
 end
 

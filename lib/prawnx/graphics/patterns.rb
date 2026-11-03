@@ -52,7 +52,7 @@ module Prawn
         end
         raise ArgumentError, "The first stop must have a position of 0" if stops.first.position != 0
         raise ArgumentError, "The last stop must have a position of 1" if stops.last.position != 1
-        color_types = stops.map { color_type(it.color) }
+        color_types = stops.map { color_type(_1.color) }
         color_types.uniq!
         raise ArgumentError, "All colors must be of the same color space" if color_types.length > 1
 
@@ -62,7 +62,7 @@ module Prawn
       def gradient_registry_key(gradient)
         _x1, _y1, x2, y2, transformation = gradient_coordinates(gradient)
         key = [gradient.type.to_s, transformation, x2, y2, gradient.r1 || -1, gradient.r2 || -1, gradient.stops.length,
-          gradient.stops.map { [it.position, it.color] }].flatten
+          gradient.stops.map { [_1.position, _1.color] }].flatten
         Digest::SHA1.hexdigest(key.join(","))
       end
 

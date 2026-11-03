@@ -134,7 +134,7 @@ module Prawn
           end
           page.finalize
         end
-        @before_render_callbacks.each { it.call(self) }
+        @before_render_callbacks.each { _1.call(self) }
         finalize_pdf_a if pdf_a?
         PDF::Core::Writer.call(objects: @objects, root: @root, info: @info, version: @version, trailer: @trailer, encryption: @encryption,
           identified: pdf_a?)

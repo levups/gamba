@@ -36,7 +36,7 @@ module PrawnX
       @pages_reference = reference({Type: :Pages})
       root = reference({Type: :Catalog, Pages: @pages_reference})
       info = reference({Producer: "PrawnX"})
-      version = sources.map { copy_pages(PDF::Core::Reader.new(source_bytes(it))) }.max || 1.3
+      version = sources.map { copy_pages(PDF::Core::Reader.new(source_bytes(_1))) }.max || 1.3
       @pages_reference.data.merge!(Kids: @kids, Count: @kids.size)
       PDF::Core::Writer.call(objects: @objects, root:, info:, version:)
     end
@@ -58,7 +58,7 @@ module PrawnX
     end
 
     def reference(data)
-      PDF::Core::Reference.new(@objects.size + 1, data).tap { @objects << it }
+      PDF::Core::Reference.new(@objects.size + 1, data).tap { @objects << _1 }
     end
 
     # Page references first, so a link from one page to another lands on the copy instead of dragging the old tree.
@@ -100,14 +100,14 @@ module PrawnX
           identifier = content_identifier(value.number)
           identifier ? (@shared[identifier] ||= pending_copy(value.number)) : pending_copy(value.number)
         end
-      when Hash then value.transform_values { copy_value(it) }
-      when Array then value.map { copy_value(it) }
+      when Hash then value.transform_values { copy_value(_1) }
+      when Array then value.map { copy_value(_1) }
       else value
       end
     end
 
     def pending_copy(number)
-      reference(nil).tap { @pending << [number, it] }
+      reference(nil).tap { @pending << [number, _1] }
     end
 
     # Objects with the same content, references included, are written once: the fonts, images and glyph procedures a
@@ -143,7 +143,7 @@ module PrawnX
         description << ">>"
       when Array
         description << "["
-        value.each { describe(it, description) || (return nil) }
+        value.each { describe(_1, description) || (return nil) }
         description << "]"
       when PDF::Core::ByteString then description << "(" << value.bytesize.to_s << ":" << value << ")"
       when PDF::Core::Name then description << PDF::Core.escape_name(value.value) << " "
@@ -208,7 +208,7 @@ module PrawnX
     def contents(value)
       resolved = @reader.resolve(value)
       value = resolved if resolved.is_a?(Array)
-      Array(value).filter_map { copy_value(it) if it.is_a?(PDF::Core::Reader::Ref) }
+      Array(value).filter_map { copy_value(_1) if _1.is_a?(PDF::Core::Reader::Ref) }
     end
 
     # Annotation rectangles follow the content they sit on.
@@ -239,7 +239,7 @@ module PrawnX
         states = (appearance.is_a?(PDF::Core::Reference) && !appearance.stream?) ? appearance.data : appearance
         next turned_form(appearance, linear) unless states.is_a?(Hash)
 
-        states.transform_values { turned_form(it, linear) }
+        states.transform_values { turned_form(_1, linear) }
       end
     end
 
@@ -249,14 +249,14 @@ module PrawnX
       own = plain_matrix(form.data[:Matrix])
       return form unless own
 
-      reference(form.data.merge(Matrix: multiply(own, linear))).tap { it.stream = form.stream }
+      reference(form.data.merge(Matrix: multiply(own, linear))).tap { _1.stream = form.stream }
     end
 
     def plain_matrix(values)
       return [1.0, 0.0, 0.0, 1.0, 0.0, 0.0] if values.nil?
       return nil unless values.is_a?(Array) && values.size == 6
 
-      numbers = values.map { numeric(it) }
+      numbers = values.map { numeric(_1) }
       numbers.all? ? numbers : nil
     end
 
@@ -264,7 +264,7 @@ module PrawnX
       values = @reader.resolve(value)
       return nil unless values.is_a?(Array) && values.size == 4
 
-      numbers = values.map { number(it) }
+      numbers = values.map { number(_1) }
       return nil if numbers.any?(&:nil?) || numbers[0] == numbers[2] || numbers[1] == numbers[3]
 
       left, right = [numbers[0], numbers[2]].minmax
@@ -275,7 +275,7 @@ module PrawnX
     def plain_box(values)
       return nil unless values.is_a?(Array) && values.size == 4
 
-      numbers = values.map { numeric(it) }
+      numbers = values.map { numeric(_1) }
       numbers.any?(&:nil?) ? nil : numbers
     end
 

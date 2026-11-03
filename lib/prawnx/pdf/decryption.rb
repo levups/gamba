@@ -67,8 +67,8 @@ module PDF
       def decrypt_strings(value, number, generation)
         case value
         when ByteString then ByteString.new(decrypt_bytes(value, @string_method, number, generation))
-        when Array then value.map { decrypt_strings(it, number, generation) }
-        when Hash then value.transform_values { decrypt_strings(it, number, generation) }
+        when Array then value.map { decrypt_strings(_1, number, generation) }
+        when Hash then value.transform_values { decrypt_strings(_1, number, generation) }
         else value
         end
       end
@@ -121,7 +121,7 @@ module PDF
         return Prawn::Document::Arcfour.new(key).encrypt(PADDING) == user_entry if @revision == 2
 
         hash = Prawn::Document::Arcfour.new(key).encrypt(Digest::MD5.digest(PADDING + file_identifier))
-        1.upto(19) { |round| hash = Prawn::Document::Arcfour.new(key.bytes.map { it ^ round }.pack("C*")).encrypt(hash) }
+        1.upto(19) { |round| hash = Prawn::Document::Arcfour.new(key.bytes.map { _1 ^ round }.pack("C*")).encrypt(hash) }
         hash == user_entry.byteslice(0, 16)
       end
 

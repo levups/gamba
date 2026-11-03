@@ -69,7 +69,7 @@ module PrawnX
           code = subset.code_by_cluster[key]
           return [index, code] if code
         end
-        subset_index = @subsets.rindex { it.next_code && !it.full? } || begin
+        subset_index = @subsets.rindex { _1.next_code && !_1.full? } || begin
           @subsets << Subset.new({[SPACE] => SPACE, SPACE => SPACE}, {SPACE => @glyph_for_cluster.call([SPACE])}, FIRST_FREE_CODE)
           @subsets.size - 1
         end

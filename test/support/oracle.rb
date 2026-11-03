@@ -40,7 +40,7 @@ module Oracle
 
   # prawn-table's manual, without its table of contents.
   def self.table_manual_examples
-    Dir[File.join(ROOT, "corpus/cache/prawn-table/manual/table/*.rb")].sort.select { File.read(it).include?("Example.generate(filename)") }
+    Dir[File.join(ROOT, "corpus/cache/prawn-table/manual/table/*.rb")].sort.select { File.read(_1).include?("Example.generate(filename)") }
   end
 
   def self.render(engine, paths, directory)
@@ -52,7 +52,7 @@ module Oracle
   end
 
   def self.example_names(rendering)
-    Dir.children(rendering.directory).map { File.basename(it, ".*") }.uniq.sort
+    Dir.children(rendering.directory).map { File.basename(_1, ".*") }.uniq.sort
   end
 
   def self.differences(reference, candidate, name)
@@ -89,7 +89,7 @@ module Oracle
   def self.invalidity(pdf)
     output, status = Open3.capture2e("qpdf", "--check", pdf)
     output, status = Open3.capture2e("qpdf", "--check", "--password=#{MANUAL_USER_PASSWORD}", pdf) if output.include?("invalid password")
-    output.lines.grep(/WARNING|ERROR|error/).first(3).join.strip.then { it.empty? ? "qpdf exit #{status.exitstatus}" : it } unless status.success?
+    output.lines.grep(/WARNING|ERROR|error/).first(3).join.strip.then { _1.empty? ? "qpdf exit #{status.exitstatus}" : _1 } unless status.success?
   end
 
   def self.text_differences(reference_pdf, candidate_pdf)
@@ -131,7 +131,7 @@ module Oracle
         if element == "font"
           font = [value_by_name.fetch("name").sub(/\A[A-Z]{6}\+/, ""), value_by_name.fetch("size").to_f.round(POSITION_PRECISION_DIGITS)]
         else
-          position = value_by_name.fetch_values("x", "y").map { it.to_f.round(POSITION_PRECISION_DIGITS) }
+          position = value_by_name.fetch_values("x", "y").map { _1.to_f.round(POSITION_PRECISION_DIGITS) }
           glyphs << [value_by_name.fetch("c"), *font, *position]
         end
       end
@@ -198,9 +198,9 @@ module Oracle
   def self.pnm_rows(image)
     content = File.binread(image)
     header = content[/\AP\d\s+\d+\s+\d+\s+\d+\s/]
-    _format, width, height = header.split.map { Integer(it[/\d+/]) }
+    _format, width, height = header.split.map { Integer(_1[/\d+/]) }
     row_bytes = width * (content.start_with?("P5") ? 1 : 3)
-    Array.new(height) { content.byteslice(header.bytesize + it * row_bytes, row_bytes) }
+    Array.new(height) { content.byteslice(header.bytesize + _1 * row_bytes, row_bytes) }
   end
 
   def self.mutool(*arguments, pdf)
