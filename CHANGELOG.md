@@ -11,4 +11,6 @@ speed.
 - Opt-in beyond Prawn: OpenType ligatures and GPOS kerning per font, CFF (`.otf`) fonts, PDF/A-3b and Factur-X,
   `PrawnX.eager_load!` before a server forks.
 - SVG images fetch nothing from the web unless `enable_web_requests: true`.
+- `PrawnX.combine(sources, page_size:, orientation:)` puts the pages of PDFs written elsewhere in one file, in
+  place of combine_pdf.
 - Runs on Ruby 3.3 and later, every Ruby still maintained.

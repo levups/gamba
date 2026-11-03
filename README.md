@@ -47,6 +47,9 @@ end
 
 # Before a server forks: load TrueType and SVG support once, shared by every worker
 PrawnX.eager_load!
+
+# Pages of PDFs written elsewhere, one after the other: carrier labels, supplier invoices (instead of combine_pdf)
+PrawnX.combine([label, other_label], page_size: [288, 432], orientation: :portrait)
 ```
 
 OpenType fonts with CFF outlines (`.otf`) embed like TrueType ones, and render like the font itself. PrawnX does
@@ -55,6 +58,14 @@ not build the Factur-X XML: it embeds the one the invoicing system produced.
 SVG images do not fetch anything from the web unless asked to (`svg data, enable_web_requests: true`): prawn-svg
 0.40 fetches by default, which lets a submitted SVG make the server request any URL. prawn-svg 1.0 plans the same
 default.
+
+`PrawnX.combine` reads xref tables, cross-reference and object streams, incremental updates, and files encrypted
+with an owner password only (RC4, AES-128, AES-256); a file that needs a user password raises
+`Prawn::Errors::EncryptedPDF`, a damaged one it cannot repair `Prawn::Errors::MalformedPDF`. Content streams are
+copied as they were encoded, and what several sources share (a carrier's fonts and logo) is written once. With
+`page_size`, each page is scaled from its lower left corner to fit, keeping its proportions; with `orientation`, a
+page the other way round turns a quarter counterclockwise, as combine_pdf does. A `/Rotate` is applied to the
+content first, where combine_pdf left it to the viewer. Outlines, forms and tagged structure are not carried over.
 
 ## Comparing an app's PDFs
 
