@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrawnX Compatibility</title>
+<meta name="description" content="Where PrawnX differs from Prawn, prawn-table and prawn-svg: the Prawn bugs it fixes, its safer SVG default, its lighter files, and how the oracle proves the rest identical.">
+<meta name="theme-color" content="#c2361b">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800&family=Inter+Tight:wght@400;600&family=Fira+Code&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="page">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="./">PrawnX</a>
+    <a href="guide.html">Guide</a>
+    <a href="compatibility.html" aria-current="page">Compatibility</a>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="https://github.com/next-gen-gems/prawnx">GitHub</a>
+  </nav>
+
+  <main id="main">
+    <header>
+      <h1 class="page-title">Compatibility</h1>
+      <p class="lede">PrawnX draws the pages Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 draw. Every exception is on this page, declared in the repository and checked by the oracle.</p>
+      <ul class="toc">
+        <li><a href="#bugs">Prawn bugs PrawnX fixes</a></li>
+        <li><a href="#svg">SVG web requests</a></li>
+        <li><a href="#files">Lighter files</a></li>
+        <li><a href="#opt-in">Off unless asked for</a></li>
+        <li><a href="#loading">Loading and versions</a></li>
+        <li><a href="#testing">How it is tested</a></li>
+      </ul>
+    </header>
+
+    <section id="bugs" aria-labelledby="bugs-title">
+      <h2 id="bugs-title">Prawn bugs PrawnX fixes</h2>
+      <p class="note">A bug counts only when a specification or Prawn’s own documentation proves it; a mere preference becomes an option. <code>test/divergences.yml</code> lists each one, its proof, the examples that show it, and the exact differences the oracle must report: no more, no fewer.</p>
+      <table class="options">
+        <thead><tr><th scope="col">Prawn’s behaviour</th><th scope="col">Proof</th></tr></thead>
+        <tbody>
+          <tr><td>Encrypted documents have no <code>/ID</code> in their trailer, so qpdf and strict readers reject them</td><td>ISO 32000-1 §7.5.5, trailer dictionary, ID: “Required if an Encrypt entry is present”</td></tr>
+          <tr><td>Built-in fonts measure Ÿ (byte 159) as ÿ, so right-aligned or wrapped text holding it overflows</td><td>ISO 32000-1 Annex D.2: WinAnsiEncoding maps byte 237 octal to Ydieresis, not ydieresis</td></tr>
+          <tr><td>The faces of one font collection share their width cache, so text in one face is measured with another’s widths</td><td><code>Prawn::Font#eql?</code> compares the file name, family and size, which every face of a <code>.ttc</code> shares; Prawn documents each face as a font of its own</td></tr>
+          <tr><td>TrueType-flavoured subsetting of CFF fonts changes how their glyphs rasterize</td><td>The subset Prawn embeds (through TTFunk) renders differently from the unmodified font program; PrawnX keeps outlines and hints untouched, and renders like the font itself</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="svg" aria-labelledby="svg-title">
+      <h2 id="svg-title">SVG web requests</h2>
+      <div class="prose">
+        <p>SVG images do not fetch anything from the web unless asked to: <code>svg data, enable_web_requests: true</code>. prawn-svg 0.40 fetches by default, which lets a submitted SVG make the server request any URL. prawn-svg 1.0 plans the same default as PrawnX.</p>
+      </div>
+    </section>
+
+    <section id="files" aria-labelledby="files-title">
+      <h2 id="files-title">Lighter files</h2>
+      <div class="prose">
+        <p>The pages are the same; the bytes are not. PrawnX writes at least PDF 1.5, with compressed streams, one compressed object stream and a cross-reference stream, where Prawn writes plain objects and an xref table. The oracle checks that each PrawnX file passes <code>qpdf --check</code> and weighs no more than Prawn’s. Tools that read PDF files byte for byte, rather than through a PDF parser, see a different file.</p>
+      </div>
+    </section>
+
+    <section id="opt-in" aria-labelledby="opt-in-title">
+      <h2 id="opt-in-title">Off unless asked for</h2>
+      <div class="prose">
+        <p>What would move pixels away from Prawn’s stays off unless asked for:</p>
+        <ul>
+          <li>OpenType ligatures and GPOS pair kerning, per font: <code>font "Inter.ttf", features: %i[liga kern]</code>;</li>
+          <li>PDF/A-3b and Factur-X: <code>Prawn::Document.new(pdf_a: true)</code>, then <code>factur_x</code>.</li>
+        </ul>
+        <p><a href="guide.html#features">OpenType features</a> · <a href="guide.html#pdf-a">PDF/A and Factur-X</a></p>
+      </div>
+    </section>
+
+    <section id="loading" aria-labelledby="loading-title">
+      <h2 id="loading-title">Loading and versions</h2>
+      <div class="prose">
+        <ul>
+          <li>PrawnX raises a <code>LoadError</code> when the prawn gem is in the bundle too: remove prawn, prawn-table and prawn-svg from the Gemfile.</li>
+          <li><code>Prawn::VERSION</code> is <code>"2.5.0"</code>, the API PrawnX mirrors, since Prawn extensions check it; <code>PrawnX::VERSION</code> is PrawnX’s own.</li>
+          <li>The public methods of Prawn 2.5 are listed in <code>test/contract/prawn-2.5.0.yml</code>, generated by <code>script/contract_extract.rb</code>. PrawnX accepts every call Prawn accepts on those of its contract; <code>test/contract/decisions.yml</code> settles each method outside the Stable API, with the reason when it is left out.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="testing" aria-labelledby="testing-title">
+      <h2 id="testing-title">How it is tested</h2>
+      <ol class="steps">
+        <li><strong>An oracle.</strong> It renders every example of Prawn’s and prawn-table’s manuals and every sample SVG of prawn-svg with Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 and with PrawnX, each in its own process, and compares their pages, their text and its positions to 0.01 pt, their pixels at 150 dpi in two renderers that share no code (MuPDF and Poppler), their validity (<code>qpdf --check</code>) and their weight. Examples listed in <code>test/oracle_passing.txt</code> must stay identical; one that becomes identical must join the list. <code>test/oracle_examples</code> holds documents of our own for what the manuals do not show.</li>
+        <li><strong>The oracle against itself.</strong> <code>ORACLE_CANDIDATE=prawn bundle exec rake test</code> runs Prawn as the candidate, which proves the comparison reports nothing when nothing differs.</li>
+        <li><strong>A document fuzzer.</strong> Seeded, it writes random documents (text in all its options, boxes, columns, tables, shapes, pages) and compares them the same way. CI adds 300 from a fresh seed on every run; <code>script/fuzz_minimize.rb</code> shrinks a failing one.</li>
+        <li><strong>An input fuzzer.</strong> It corrupts sample PNGs, JPEGs and fonts (flipped bytes, truncations, forged lengths): each must render or raise an error PrawnX names, never crash inside a parser, hang or exhaust memory.</li>
+        <li><strong>veraPDF.</strong> PDF/A documents are checked by veraPDF when it is installed.</li>
+      </ol>
+      <div class="prose">
+<pre><code>FUZZ_SEED=42 FUZZ_CASES=500 bundle exec ruby -Itest test/fuzz_test.rb
+ruby -Itest script/fuzz_minimize.rb tmp/fuzz/documents/fuzz_0042.rb</code></pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Next Gen Gems, by Level UP Solutions</p>
+    <nav aria-label="Next Gen Gems">
+      <ul class="family">
+        <li><a href="https://next-gen-gems.github.io/slimx/">SlimX</a></li>
+        <li><a href="https://next-gen-gems.github.io/browserx/">BrowserX</a></li>
+        <li><a href="https://next-gen-gems.github.io/prawnx/" aria-current="page">PrawnX</a></li>
+        <li><a href="https://next-gen-gems.github.io/gretelx/">GretelX</a></li>
+        <li><a href="https://github.com/next-gen-gems/prawnx">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </footer>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

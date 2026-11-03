@@ -4,7 +4,7 @@ it follows their behaviour and, in places, the structure of their code.
 
 Prawn, PDF::Core, TTFunk and prawn-table are copyrighted free software produced by Gregory
 Brown along with community contributions. See their git logs for authorship
-information. PrawnX is copyright (c) 2026 Clément Joubert and its contributors.
+information. PrawnX is Copyright (c) 2026 Level UP Solutions and its contributors.
 
 lib/prawn-svg.rb and lib/prawn/svg come from prawn-svg 0.40.4, copyright 2010-2019
 Roger Nesbitt, under the MIT license in LICENSE-prawn-svg, adapted to PrawnX.
