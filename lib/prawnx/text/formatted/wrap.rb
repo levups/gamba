@@ -56,7 +56,7 @@ module Prawn
             accumulated_width += fragment.width
           end
           @laid_out_lines << [@baseline_y, drawn_fragments] if @laid_out_lines
-          @printed_lines << printed_fragments.map { it.dup.force_encoding(::Encoding::UTF_8) }.join
+          @printed_lines << printed_fragments.map { _1.dup.force_encoding(::Encoding::UTF_8) }.join
         end
 
         def word_spacing_for_this_line

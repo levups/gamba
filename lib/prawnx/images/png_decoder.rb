@@ -30,9 +30,9 @@ module Prawn
         case filter
         when NONE then nil
         when SUB
-          (bytes_per_pixel...row.bytesize).each { row.setbyte(it, (row.getbyte(it) + row.getbyte(it - bytes_per_pixel)) & 0xFF) }
+          (bytes_per_pixel...row.bytesize).each { row.setbyte(_1, (row.getbyte(_1) + row.getbyte(_1 - bytes_per_pixel)) & 0xFF) }
         when UP
-          row.bytesize.times { row.setbyte(it, (row.getbyte(it) + previous.getbyte(it)) & 0xFF) }
+          row.bytesize.times { row.setbyte(_1, (row.getbyte(_1) + previous.getbyte(_1)) & 0xFF) }
         when AVERAGE
           row.bytesize.times do |index|
             left = (index >= bytes_per_pixel) ? row.getbyte(index - bytes_per_pixel) : 0

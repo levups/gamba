@@ -13,65 +13,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  rubocop:
-    name: RuboCop
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "4.0"
-          bundler-cache: true
-      - run: bundle exec rubocop --format github
-
-  test:
-    name: Tests (Ruby ${{ matrix.ruby }}, ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        ruby: ["3.4", "4.0", ruby-head, truffleruby-head]
-        include:
-          - os: macos-latest
-            ruby: "4.0"
-    steps:
-      - uses: actions/checkout@v7
-      - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install --yes mupdf-tools poppler-utils qpdf
-      - if: runner.os == 'macOS'
-        run: brew install mupdf-tools poppler qpdf
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: ${{ matrix.ruby }}
-          bundler-cache: true
-      - run: BUNDLE_GEMFILE=oracle/Gemfile bundle install
-      - uses: actions/cache@v6
-        with:
-          path: corpus/cache
-          key: corpus-${{ hashFiles('corpus/manifest.yml') }}
-      - run: bundle exec rake corpus:fetch
-      - uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "21"
-      - uses: actions/cache@v6
-        with:
-          path: ~/.cache/prawnx-tools
-          key: mustang-2.26.0
-      - name: Mustang, the Factur-X validator
-        run: |
-          mkdir -p ~/.cache/prawnx-tools
-          test -f ~/.cache/prawnx-tools/Mustang-CLI.jar || curl -sSfL -o ~/.cache/prawnx-tools/Mustang-CLI.jar https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
-      - name: The oracle against Prawn itself
-        env:
-          FUZZ_CASES: "0"
-        run: ORACLE_CANDIDATE=prawn bundle exec rake test
-      - name: PrawnX
-        run: bundle exec rake test
-      - name: Fuzz with a fresh seed
-        run: FUZZ_SEED=${{ github.run_id }} FUZZ_CASES=300 bundle exec ruby -Itest test/fuzz_test.rb
-      - name: Corrupted images and fonts with a fresh seed
-        run: INPUT_FUZZ_SEED=${{ github.run_id }} INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb
+  gem:
+    uses: next-gen-gems/.github/.github/workflows/gem-ci.yml@main
+    with:
+      extra-rubies: '["truffleruby-head"]'
+      apt-packages: mupdf-tools poppler-utils qpdf
+      brew-packages: mupdf-tools poppler qpdf
+      java-version: "21"
+      cache-path: |
+        corpus/cache
+        ~/.cache/prawnx-tools
+      cache-key-files: |
+        corpus/manifest.yml
+        .github/workflows/ci.yml
+      # Mustang is the Factur-X validator test/pdf_a_test.rb runs.
+      setup-command: |
+        BUNDLE_GEMFILE=oracle/Gemfile bundle install
+        bundle exec rake corpus:fetch
+        mkdir -p ~/.cache/prawnx-tools
+        test -f ~/.cache/prawnx-tools/Mustang-CLI.jar || curl -sSfL -o ~/.cache/prawnx-tools/Mustang-CLI.jar https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
+      test-command: |
+        ORACLE_CANDIDATE=prawn FUZZ_CASES=0 bundle exec rake test
+        bundle exec rake test
+        FUZZ_SEED=$GITHUB_RUN_ID FUZZ_CASES=300 bundle exec ruby -Itest test/fuzz_test.rb
+        INPUT_FUZZ_SEED=$GITHUB_RUN_ID INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb
+      timeout-minutes: 15

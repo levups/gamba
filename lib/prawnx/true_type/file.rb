@@ -169,7 +169,7 @@ module PrawnX
 
       # Fonts may come from users: everything layout reads later is read and checked once, here.
       def validate!
-        missing = REQUIRED_TABLES.reject { table?(it) }
+        missing = REQUIRED_TABLES.reject { table?(_1) }
         raise Error, "Malformed font: no #{missing.join(", ")} table" unless missing.empty?
         raise Error, "Malformed font: no outlines" if outline_format == :unknown
 
@@ -211,7 +211,7 @@ module PrawnX
       def glyph_offsets
         @glyph_offsets ||=
           if header.index_to_location_format.zero?
-            table("loca").unpack("n#{glyph_count + 1}").map { it * 2 }
+            table("loca").unpack("n#{glyph_count + 1}").map { _1 * 2 }
           else
             table("loca").unpack("N#{glyph_count + 1}")
           end
@@ -275,7 +275,7 @@ module PrawnX
             name = (@bytes.byteslice(map_offset + name_list_offset + name_offset + 1, @bytes.getbyte(map_offset + name_list_offset + name_offset)) unless name_offset == 0xFFFF)
             [name, data_offset + (attributes_and_offset & 0xFFFFFF) + 4]
           end
-          chosen = index.is_a?(String) ? references.find { it[0] == index } : references[index]
+          chosen = index.is_a?(String) ? references.find { _1[0] == index } : references[index]
           raise Error, "No font #{index.inspect} in this resource file" unless chosen
 
           @offset_base = chosen[1]
@@ -329,15 +329,15 @@ module PrawnX
         when 6
           first_code, count = cmap.unpack("@#{offset + 6} n2")
           count = [count, (cmap.bytesize - offset - 10) / 2].min
-          cmap.unpack("@#{offset + 10} n#{count}").each { glyph_by_code[first_code + it[1]] = it[0] }
+          cmap.unpack("@#{offset + 10} n#{count}").each { glyph_by_code[first_code + _1[1]] = _1[0] }
         when 10
           first_code, count = cmap.unpack("@#{offset + 12} N2")
           count = [count, (cmap.bytesize - offset - 20) / 2].min
-          cmap.unpack("@#{offset + 20} n#{count}").each { glyph_by_code[first_code + it[1]] = it[0] }
+          cmap.unpack("@#{offset + 20} n#{count}").each { glyph_by_code[first_code + _1[1]] = _1[0] }
         when 12
           group_count = [cmap.unpack1("@#{offset + 12} N"), (cmap.bytesize - offset - 16) / 12].min
           cmap.unpack("@#{offset + 16} N#{group_count * 3}").each_slice(3) do |start_code, end_code, start_glyph|
-            (start_code..[end_code, MAXIMUM_CODE_POINT].min).each { glyph_by_code[it] = start_glyph + (it - start_code) }
+            (start_code..[end_code, MAXIMUM_CODE_POINT].min).each { glyph_by_code[_1] = start_glyph + (_1 - start_code) }
           end
         end
         glyph_by_code.each { |code, glyph| glyph_by_code[code] = 0 if glyph >= glyph_count }
@@ -350,7 +350,7 @@ module PrawnX
         return unless name
 
         count, strings_offset = name.unpack("@2 n2")
-        records = Array.new(count) { name.unpack("@#{6 + (it * 12)} n6") }
+        records = Array.new(count) { name.unpack("@#{6 + (_1 * 12)} n6") }
         record = records.find { |platform, _, _, id| id == name_id && platform == 3 } ||
           records.find { |platform, _, _, id| id == name_id && platform == 1 } ||
           records.find { |_, _, _, id| id == name_id }

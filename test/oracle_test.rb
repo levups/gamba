@@ -8,7 +8,7 @@ require "yaml"
 class OracleTest < Minitest::Test
   PASSING_LIST = File.join(__dir__, "oracle_passing.txt")
   DIVERGENCES = YAML.load_file(File.join(__dir__, "divergences.yml"))
-  DIVERGENCE_BY_EXAMPLE = DIVERGENCES.flat_map { |divergence| divergence.fetch("examples").map { [it, divergence] } }.to_h
+  DIVERGENCE_BY_EXAMPLE = DIVERGENCES.flat_map { |divergence| divergence.fetch("examples").map { [_1, divergence] } }.to_h
   CANDIDATE = ENV.fetch("ORACLE_CANDIDATE", "prawnx")
   OUTPUT_DIRECTORY = File.join(Oracle::ROOT, "tmp/oracle")
 
@@ -19,7 +19,7 @@ class OracleTest < Minitest::Test
     raise "Prawn cannot render the manual: #{reference.failure}" if reference.failure
 
     candidate = Oracle.render(CANDIDATE, Oracle.example_files, File.join(OUTPUT_DIRECTORY, CANDIDATE))
-    passing_names = File.foreach(PASSING_LIST, chomp: true).reject { it.empty? || it.start_with?("#") }
+    passing_names = File.foreach(PASSING_LIST, chomp: true).reject { _1.empty? || _1.start_with?("#") }
     passing_names = Oracle.example_names(reference) if CANDIDATE == "prawn"
 
     Oracle.example_names(reference).each do |name|

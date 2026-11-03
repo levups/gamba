@@ -20,8 +20,8 @@ module PDF::Core
     }.freeze
     INCHES_BY_SIZE = {"FOLIO" => [8.5, 13], "LEGAL" => [8.5, 14], "LETTER" => [8.5, 11], "TABLOID" => [11, 17]}.freeze
 
-    SIZES = MILLIMETERS_BY_SIZE.transform_values { |sides| sides.map { (it * POINTS_PER_INCH / MILLIMETERS_PER_INCH).round(2) } }
-      .merge(INCHES_BY_SIZE.transform_values { |sides| sides.map { it * POINTS_PER_INCH } })
+    SIZES = MILLIMETERS_BY_SIZE.transform_values { |sides| sides.map { (_1 * POINTS_PER_INCH / MILLIMETERS_PER_INCH).round(2) } }
+      .merge(INCHES_BY_SIZE.transform_values { |sides| sides.map { _1 * POINTS_PER_INCH } })
       .freeze
   end
 end

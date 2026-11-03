@@ -33,10 +33,10 @@ module PrawnX
       def add_components(originals)
         level = originals
         loop do
-          components = level.flat_map { component_glyphs(@file.glyph_data(it)) }
+          components = level.flat_map { component_glyphs(@file.glyph_data(_1)) }
           break if components.empty?
 
-          components.each { glyph_for(it) }
+          components.each { glyph_for(_1) }
           level = components
         end
       end
@@ -50,10 +50,10 @@ module PrawnX
         end
         glyph_count = glyphs.size
         widths = @file.advance_widths
-        left_side_bearings = original_glyphs.map { left_side_bearing(it) }
+        left_side_bearings = original_glyphs.map { left_side_bearing(_1) }
 
-        bounds = glyphs.filter_map { it.unpack("s>5") if it.bytesize >= 10 }
-        advances = original_glyphs.map { widths[it] }
+        bounds = glyphs.filter_map { _1.unpack("s>5") if _1.bytesize >= 10 }
+        advances = original_glyphs.map { widths[_1] }
         tables = {
           "head" => head_table(bounds),
           "hhea" => horizontal_header(bounds, advances, left_side_bearings, glyph_count),
@@ -61,9 +61,9 @@ module PrawnX
           "hmtx" => horizontal_metrics(original_glyphs, widths, left_side_bearings),
           "loca" => offsets.pack("N*"),
           "glyf" => glyf,
-          "post" => @file.table("post").byteslice(0, 32).dup.tap { it[0, 4] = "\x00\x03\x00\x00".b }
+          "post" => @file.table("post").byteslice(0, 32).dup.tap { _1[0, 4] = "\x00\x03\x00\x00".b }
         }
-        COPIED_TABLES.each { tables[it] = @file.table(it) if @file.table?(it) }
+        COPIED_TABLES.each { tables[_1] = @file.table(_1) if @file.table?(_1) }
         Subset.assemble(tables.merge(extra_tables))
       end
 
@@ -81,7 +81,7 @@ module PrawnX
           body << data << ("\x00" * ((4 - (data.bytesize % 4)) % 4))
         end
         font = directory << body
-        head_offset = 12 + (table_count * 16) + tags.take_while { it != "head" }.sum { (tables[it].bytesize + 3) & ~3 }
+        head_offset = 12 + (table_count * 16) + tags.take_while { _1 != "head" }.sum { (tables[_1].bytesize + 3) & ~3 }
         font[head_offset + 8, 4] = [(CHECKSUM_MAGIC - Subset.checksum(font)) & 0xFFFFFFFF].pack("N")
         font
       end
@@ -162,7 +162,7 @@ module PrawnX
       def head_table(bounds)
         head = @file.table("head").dup
         head[8, 4] = "\x00\x00\x00\x00".b
-        head[36, 8] = [bounds.map { it[1] }.min || 0, bounds.map { it[2] }.min || 0, bounds.map { it[3] }.max || 0, bounds.map { it[4] }.max || 0].pack("s>4")
+        head[36, 8] = [bounds.map { _1[1] }.min || 0, bounds.map { _1[2] }.min || 0, bounds.map { _1[3] }.max || 0, bounds.map { _1[4] }.max || 0].pack("s>4")
         head[50, 2] = [1].pack("n")
         head
       end
@@ -170,7 +170,7 @@ module PrawnX
       def horizontal_header(bounds, advances, left_side_bearings, glyph_count)
         hhea = @file.table("hhea").dup
         right_side_bearings = bounds.zip(advances).filter_map { |bound, advance| advance - (bound[3] - bound[1]) - bound[1] if bound && advance }
-        extents = bounds.map { it[3] }
+        extents = bounds.map { _1[3] }
         hhea[10, 8] = [advances.compact.max || 0, left_side_bearings.min || 0, right_side_bearings.min || 0, extents.max || 0].pack("n s>3")
         hhea[34, 2] = [glyph_count].pack("n")
         hhea
@@ -182,8 +182,8 @@ module PrawnX
         maxp[4, 2] = [glyph_count].pack("n")
         return maxp if maxp.bytesize < 10
 
-        simple = glyphs.select { it.bytesize >= 10 && it.unpack1("s>") >= 0 }
-        contours = simple.map { it.unpack1("s>") }
+        simple = glyphs.select { _1.bytesize >= 10 && _1.unpack1("s>") >= 0 }
+        contours = simple.map { _1.unpack1("s>") }
         points = simple.zip(contours).map! { |glyph, count| count.zero? ? 0 : glyph.unpack1("@#{10 + ((count - 1) * 2)} n") + 1 }
         maxp[6, 4] = [points.max || 0, contours.max || 0].pack("n2")
         maxp

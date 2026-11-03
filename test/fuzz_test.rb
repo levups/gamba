@@ -18,7 +18,7 @@ class FuzzTest < Minitest::Test
     FileUtils.mkdir_p(File.join(DIRECTORY, "documents"))
     generator = FuzzDocuments.new(SEED)
     paths = Array.new(CASES) do |index|
-      File.join(DIRECTORY, "documents", format("fuzz_%04d.rb", index)).tap { File.write(it, generator.document) }
+      File.join(DIRECTORY, "documents", format("fuzz_%04d.rb", index)).tap { File.write(_1, generator.document) }
     end
     reference = Oracle.render("prawn", paths, File.join(DIRECTORY, "prawn"))
     candidate = Oracle.render("prawnx", paths, File.join(DIRECTORY, "prawnx"))

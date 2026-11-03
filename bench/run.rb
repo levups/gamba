@@ -19,7 +19,7 @@ DATA_DIRECTORY = File.expand_path("../corpus/cache/prawn/data", __dir__)
 document_path, iterations = ARGV
 body = File.read(document_path)
 # Prawn compresses only when asked: compared at its lightest.
-render = -> { Prawn::Document.new(compress: true).tap { it.instance_eval(body, document_path) }.render }
+render = -> { Prawn::Document.new(compress: true).tap { _1.instance_eval(body, document_path) }.render }
 
 pdf = render.call
 GC.start

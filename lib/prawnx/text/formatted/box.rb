@@ -28,7 +28,7 @@ module Prawn
 
         def initialize(formatted_text, options = {})
           @inked = false
-          self.class.extensions.reverse_each { extend(it) }
+          self.class.extensions.reverse_each { extend(_1) }
           Prawn.verify_options(valid_options, options)
           options = options.dup
           @overflow = options[:overflow] || :truncate
@@ -84,13 +84,13 @@ module Prawn
             unprinted_text = (@rotate != 0 && @inked) ? render_rotated(text) : wrap(text)
             @inked = false
           end
-          unprinted_text.map { it.merge(text: @document.font.to_utf8(it[:text])) }
+          unprinted_text.map { _1.merge(text: @document.font.to_utf8(_1[:text])) }
         end
 
         # Whether the lines of a `render(dry_run: true, keep_layout: true)` can be drawn again as they are.
         def layout_reusable?
           !@laid_out_lines.nil? && @everything_printed && @rotate.zero? && @vertical_align == :top &&
-            @overflow != :shrink_to_fit && self.class.extensions.empty? && @original_array.none? { it[:color] }
+            @overflow != :shrink_to_fit && self.class.extensions.empty? && @original_array.none? { _1[:color] }
         end
 
         # Draws, with its top left corner at `at`, the lines the last kept layout wrapped, without wrapping them again.
@@ -100,7 +100,7 @@ module Prawn
             @inked = true
             @laid_out_lines.each do |baseline_y, drawn_fragments|
               @baseline_y = baseline_y
-              drawn_fragments.each { format_and_draw_fragment(*it) }
+              drawn_fragments.each { format_and_draw_fragment(*_1) }
             end
             @inked = false
           end
@@ -131,7 +131,7 @@ module Prawn
           fragment.baseline = y
           return unless @inked
 
-          fragment.callback_objects.each { it.render_behind(fragment) if it.respond_to?(:render_behind) }
+          fragment.callback_objects.each { _1.render_behind(fragment) if _1.respond_to?(:render_behind) }
           @document.word_spacing(word_spacing) do
             if @draw_text_callback
               @draw_text_callback.call(fragment.text, at: [x, y], kerning: @kerning)
@@ -161,7 +161,7 @@ module Prawn
 
         def normalized_text(flags)
           text = normalize_encoding
-          text.each { it.delete(:color) } if flags[:dry_run]
+          text.each { _1.delete(:color) } if flags[:dry_run]
           text
         end
 
@@ -171,7 +171,7 @@ module Prawn
 
         def normalize_encoding
           formatted_text = original_text
-          formatted_text = formatted_text.flat_map { fragments_by_fallback_font(it) } unless @fallback_fonts.empty?
+          formatted_text = formatted_text.flat_map { fragments_by_fallback_font(_1) } unless @fallback_fonts.empty?
           formatted_text.each do |hash|
             if hash[:font]
               @document.font(hash[:font]) { hash[:text] = @document.font.normalize_encoding(hash[:text]) }
@@ -195,7 +195,7 @@ module Prawn
               font_glyph_pairs << [font_for_glyph(character, fragment_font, fallback_fonts.dup, fragment_font_options), character]
             end
           end
-          font_glyph_pairs.each { it[0] = nil if it[0] == original_font } if hash[:font].nil?
+          font_glyph_pairs.each { _1[0] = nil if _1[0] == original_font } if hash[:font].nil?
 
           fragments = []
           current_font = nil
@@ -292,7 +292,7 @@ module Prawn
           @document.stroke_line(fragment.underline_points) if fragment.styles.include?(:underline)
           @document.stroke_line(fragment.strikethrough_points) if fragment.styles.include?(:strikethrough)
           draw_link_annotations(fragment)
-          fragment.callback_objects.each { it.render_in_front(fragment) if it.respond_to?(:render_in_front) }
+          fragment.callback_objects.each { _1.render_in_front(fragment) if _1.respond_to?(:render_in_front) }
         end
 
         def draw_link_annotations(fragment)

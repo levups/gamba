@@ -4,5 +4,5 @@ font "DejaVuSans", size: 9
 image "#{DATA_DIRECTORY}/images/letterhead.jpg", width: 200
 text "Invoice INV-2026-0001 — Alice Example", style: :bold, size: 14
 move_down 10
-lines = Array.new(10) { ["SKU#{it}", "Gadget, deluxe edition, model #{it} with remote control unit", "2", "$1,299.00", "$2,598.00"] }
+lines = Array.new(10) { ["SKU#{_1}", "Gadget, deluxe edition, model #{_1} with remote control unit", "2", "$1,299.00", "$2,598.00"] }
 table([%w[SKU Description Qty Unit Total], *lines], header: true, width: bounds.width, cell_style: {padding: 3})

@@ -14,7 +14,7 @@ module PDF
     DELIMITER_OR_IRREGULAR_BYTES = ((0..32).to_a + [35, 37, 40, 41, 47, 60, 62, 91, 93, 123, 125] + (127..255).to_a).freeze
     LITERAL_STRING_ESCAPES = {"(" => "\\(", ")" => "\\)", "\\" => "\\\\", "\r" => "\\r"}.freeze
     NAME_BY_SYMBOL = Hash.new do |cache, symbol|
-      cache[symbol] = (+"/").concat(*symbol.to_s.b.each_byte.map { DELIMITER_OR_IRREGULAR_BYTES.include?(it) ? format("#%02X", it) : it.chr }).freeze
+      cache[symbol] = (+"/").concat(*symbol.to_s.b.each_byte.map { DELIMITER_OR_IRREGULAR_BYTES.include?(_1) ? format("#%02X", _1) : _1.chr }).freeze
     end
 
     module_function
@@ -28,7 +28,7 @@ module PDF
     end
 
     def real_params(numbers)
-      numbers.map { real(it) }.join(" ")
+      numbers.map { real(_1) }.join(" ")
     end
 
     # Integers as integers, other numbers to five decimals without a trailing ".0".
@@ -51,7 +51,7 @@ module PDF
       when ByteString then "<#{value.unpack1("H*")}>"
       when Time then "(#{value.strftime("D:%Y%m%d%H%M%S%z").chop.chop}'00')"
       when String then "<#{(in_content_stream ? value : utf16be(value)).unpack1("H*")}>"
-      when Array then "[#{value.map { serialize(it, in_content_stream) }.join(" ")}]"
+      when Array then "[#{value.map { serialize(_1, in_content_stream) }.join(" ")}]"
       when Hash then "<<#{value.map { |key, entry| "#{serialize(key.to_sym)} #{serialize(entry, in_content_stream)}" }.join("\n")}>>"
       when Reference then value.to_s
       when Serializable then serialize(value.to_hash, in_content_stream)

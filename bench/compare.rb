@@ -23,13 +23,13 @@ def measure(engine, document)
   settings = Oracle::ENGINES.fetch(engine)
   command = [*TIME_COMMAND, "bundle", "exec", "ruby", "--yjit", *settings[:load_path], File.join(__dir__, "run.rb"), document, ITERATIONS.to_s]
   output, report, status = Bundler.with_unbundled_env { Open3.capture3({"BUNDLE_GEMFILE" => settings[:gemfile]}, *command) }
-  return {unavailable: report.lines.find { it.match?(/cannot load|Error/) }&.strip} unless status.success?
+  return {unavailable: report.lines.find { _1.match?(/cannot load|Error/) }&.strip} unless status.success?
 
   JSON.parse(output.lines.last, symbolize_names: true).merge(peak_memory_megabytes: peak_memory_megabytes(report))
 end
 
 results = Dir[File.join(__dir__, "documents/*.rb")].sort.to_h do |document|
-  [File.basename(document, ".rb"), Oracle::ENGINES.keys.to_h { [it, measure(it, document)] }]
+  [File.basename(document, ".rb"), Oracle::ENGINES.keys.to_h { [_1, measure(_1, document)] }]
 end
 
 results.each do |document, measures_by_engine|

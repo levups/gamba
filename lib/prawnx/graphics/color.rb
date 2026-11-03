@@ -30,11 +30,11 @@ module Prawn
       module_function
 
       def rgb2hex(rgb)
-        rgb.map { format("%02x", it) }.join
+        rgb.map { format("%02x", _1) }.join
       end
 
       def hex2rgb(hex)
-        [hex[0..1], hex[2..3], hex[4..5]].map { it.to_i(16) }
+        [hex[0..1], hex[2..3], hex[4..5]].map { _1.to_i(16) }
       end
 
       private
@@ -64,7 +64,7 @@ module Prawn
           r, g, b = hex2rgb(color)
           [r / 255.0, g / 255.0, b / 255.0]
         when :CMYK
-          color.map { it / 100.0 }
+          color.map { _1 / 100.0 }
         end
       end
 
