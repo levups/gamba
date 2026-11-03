@@ -27,6 +27,26 @@ module PDF
       TYPE_OBJECT_STREAM = Name.new(value: "ObjStm")
       FLATE = Name.new(value: "FlateDecode")
       TYPE_CATALOG = Name.new(value: "Catalog")
+      # Limits on what a hostile file can make the reader spend. Raised past them, LimitExceeded is never repaired
+      # around: the file is refused.
+      LimitExceeded = Class.new(Prawn::Errors::MalformedPDF)
+      # Arrays and dictionaries inside one another; real files nest a handful of levels, PDFium stops at 64 too.
+      MAX_NESTING_DEPTH = 64
+      # Objects loading one another: a /Length or an object stream in an object stream. Real files need 3.
+      MAX_RESOLUTION_DEPTH = 32
+      # Object and cross-reference streams hold dictionaries and offsets, which Flate packs 5 to 10 times: 100 times
+      # the whole file, decoded, leaves room for any real one; 256 MiB caps the memory a large file may claim.
+      DECODED_BYTES_PER_FILE_BYTE = 100
+      MAX_DECODED_BYTES = 256 * 1024 * 1024
+      # Bytes parsed, per byte of file or decoded stream: a damaged encrypted file is read about 4 times over (first
+      # pass, rebuild, restart once decrypting), objects whose bytes overlap many more.
+      SCANS_PER_BYTE = 16
+      INFLATE_CHUNK_BYTES = 1024
+      # PNG predictor parameters MuPDF accepts (ISO 32000-1 table 8 sets no maximum to /Colors; 32 is the most
+      # colorants a colour space has, Annex C).
+      PREDICTOR_BITS_PER_COMPONENT = [1, 2, 4, 8, 16].freeze
+      PREDICTOR_COLORS = 1..32
+      STRAY_DELIMITERS = /(?:[\x00\t\n\f\r ]+|%[^\r\n]*|[)>\]{}])*/n
 
       attr_reader :version
 
@@ -35,12 +55,18 @@ module PDF
         @scanner = StringScanner.new(@bytes)
         @objects = {}
         @object_streams = {}
+        @nesting_depth = 0
+        @resolution_depth = 0
+        @decoded_bytes_left = [@bytes.bytesize * DECODED_BYTES_PER_FILE_BYTE, MAX_DECODED_BYTES].min
+        @scanned_bytes_left = @bytes.bytesize * SCANS_PER_BYTE
         raise Prawn::Errors::MalformedPDF, "Not a PDF file: no %PDF- header" unless (header = @bytes.index("%PDF-")) && header < 1024
 
         @version = @bytes.byteslice(header + 5, 3).to_f
         begin
           read_cross_references
           raise Prawn::Errors::MalformedPDF, "The trailer has no /Root" unless @trailer[:Root]
+        rescue LimitExceeded
+          raise
         rescue Prawn::Errors::MalformedPDF
           rebuild_cross_references
         end
@@ -66,8 +92,15 @@ module PDF
       def object(number)
         return @objects[number] if @objects.key?(number)
 
+        raise LimitExceeded, "Objects nested deeper than #{MAX_RESOLUTION_DEPTH} levels" if @resolution_depth >= MAX_RESOLUTION_DEPTH
+
         @objects[number] = nil # a reference loop resolves to null instead of recursing forever
-        @objects[number] = load_object(number)
+        @resolution_depth += 1
+        begin
+          @objects[number] = load_object(number)
+        ensure
+          @resolution_depth -= 1
+        end
       end
 
       # Each page with the attributes it inherits from its ancestors (ISO 32000-1 §7.7.3.4): [reference, dictionary].
@@ -170,10 +203,10 @@ module PDF
       def read_cross_reference_stream(stream_number, stream)
         dictionary = stream.dictionary
         widths = Array(dictionary[:W]).map { Reader.integer(it, -1) }
-        raise Prawn::Errors::MalformedPDF, "Bad /W in a cross-reference stream" unless widths.size == 3 && widths.all? { it.between?(0, 8) }
+        row_width = widths.sum
+        raise Prawn::Errors::MalformedPDF, "Bad /W in a cross-reference stream" unless widths.size == 3 && widths.all? { it.between?(0, 8) } && row_width.positive?
 
         rows = decode(stream)
-        row_width = widths.sum
         index = Array(dictionary[:Index] || [0, Reader.integer(dictionary[:Size])]).each_slice(2)
         position = 0
         index.each do |first, count|
@@ -220,7 +253,9 @@ module PDF
         while (start = @bytes.index("trailer", position))
           @scanner.pos = start + 7
           dictionary = begin
-            parse_value
+            parse_top_level_value
+          rescue LimitExceeded
+            raise
           rescue Prawn::Errors::MalformedPDF
             nil
           end
@@ -239,6 +274,8 @@ module PDF
 
           offsets = begin
             object_stream(number)[2]
+          rescue LimitExceeded
+            raise
           rescue Prawn::Errors::MalformedPDF
             next # a damaged object stream loses its own objects, not the file
           end
@@ -263,6 +300,8 @@ module PDF
         when :compressed
           object_from_stream(field, index, number)
         end
+      rescue LimitExceeded
+        raise
       rescue Prawn::Errors::MalformedPDF
         nil
       end
@@ -273,12 +312,26 @@ module PDF
         @scanner.pos = offset
         raise Prawn::Errors::MalformedPDF, "No object at offset #{offset}" unless @scanner.skip(OBJECT_HEADER)
 
-        number = @scanner[1].to_i
-        generation = @scanner[2].to_i
-        value = parse_value
-        skip_whitespace
-        value = Stream.new(dictionary: value, data: stream_data(value)) if value.is_a?(Hash) && @scanner.skip(STREAM_KEYWORD)
-        [number, generation, value]
+        charging_scanned_bytes(offset) do
+          number = @scanner[1].to_i
+          generation = @scanner[2].to_i
+          value = parse_value
+          skip_whitespace
+          value = Stream.new(dictionary: value, data: stream_data(value)) if value.is_a?(Hash) && @scanner.skip(STREAM_KEYWORD)
+          [number, generation, value]
+        end
+      end
+
+      def parse_top_level_value
+        charging_scanned_bytes(@scanner.pos) { parse_value }
+      end
+
+      # Offsets may point anywhere, inside one another's bytes: parsing the same bytes over and over is refused.
+      def charging_scanned_bytes(start)
+        yield
+      ensure
+        @scanned_bytes_left -= @scanner.pos - start
+        raise LimitExceeded, "The file makes the reader parse its bytes over and over" if @scanned_bytes_left.negative?
       end
 
       # /Length is trusted when "endstream" follows it; otherwise the data runs to the next "endstream".
@@ -294,6 +347,7 @@ module PDF
         finish = @bytes.index("endstream", start) || @bytes.bytesize
         finish -= 1 if finish > start && @bytes.getbyte(finish - 1) == 10
         finish -= 1 if finish > start && @bytes.getbyte(finish - 1) == 13
+        @scanner.pos = finish # charged as parsed: the search for endstream read these bytes
         @bytes.byteslice(start, finish - start)
       end
 
@@ -308,34 +362,39 @@ module PDF
         stream = object_stream(stream_number)
         return nil unless stream
 
-        data, first, offsets = stream
+        data, first, offsets, offset_by_number = stream
         found, offset = offsets[index]
-        found, offset = offsets.find { it[0] == number } unless found == number
-        return nil unless found && offset && (first + offset).between?(0, data.bytesize)
+        offset = offset_by_number[number] unless found == number
+        return nil unless offset && (first + offset).between?(0, data.bytesize)
 
         scanner = @scanner
         @scanner = StringScanner.new(data)
         @scanner.pos = first + offset
-        parse_value
+        parse_top_level_value
       ensure
         @scanner = scanner if scanner
       end
 
-      # [decoded bytes, /First, [[number, offset], ...]], inflated once per object stream; false when it is not a stream.
+      # [decoded bytes, /First, [[number, offset], ...], {number => offset}], inflated once per object stream; false
+      # when it is not a stream. The first offset of a number wins, as a scan of the header would find it.
       def object_stream(stream_number)
         @object_streams[stream_number] ||= begin
           value = object(stream_number)
           if value.is_a?(Stream)
             data = decode(value)
             first = Reader.integer(value.dictionary[:First])
-            [data, first, data.byteslice(0, first).to_s.scan(/\d+/n).map(&:to_i).each_slice(2).to_a]
+            offsets = data.byteslice(0, first).to_s.scan(/\d+/n).map(&:to_i).each_slice(2).to_a
+            offset_by_number = {}
+            offsets.each { |number, offset| offset_by_number[number] = offset unless offset_by_number.key?(number) }
+            [data, first, offsets, offset_by_number]
           else
             false
           end
         end
       end
 
-      # Object and cross-reference streams only: Flate, optionally with a PNG predictor (§7.4.4.4).
+      # Object and cross-reference streams only: Flate, optionally with a PNG predictor (§7.4.4.4). Every filter's
+      # output counts against what the file may decode in all.
       def decode(stream)
         filters = [resolve(stream.dictionary[:Filter])].flatten
         filters.compact!
@@ -343,45 +402,46 @@ module PDF
         filters.each_with_index.reduce(stream.data) do |data, (filter, position)|
           raise Prawn::Errors::MalformedPDF, "Unsupported filter #{filter.inspect} on an object stream" unless filter == FLATE
 
-          unpredict(inflate(data), resolve(parameters[position]))
+          inflated = inflate(data)
+          @decoded_bytes_left -= inflated.bytesize
+          @scanned_bytes_left += inflated.bytesize * SCANS_PER_BYTE
+          unpredict(inflated, resolve(parameters[position]))
         end
       end
 
+      # Input fed a chunk at a time, output taken as it comes, so that a bomb stops at the ceiling instead of filling
+      # memory. A truncated or padded stream keeps what inflated before the damage.
       def inflate(data)
         zstream = Zlib::Inflate.new
-        output = zstream.inflate(data)
-        zstream.finish
+        output = +"".b
+        collect = lambda do |chunk|
+          output << chunk
+          raise LimitExceeded, "Object streams inflate to more than the file may decode" if output.bytesize > @decoded_bytes_left
+        end
+        0.step(data.bytesize - 1, INFLATE_CHUNK_BYTES) { zstream.inflate(data.byteslice(it, INFLATE_CHUNK_BYTES), &collect) }
+        zstream.finish(&collect)
         output
       rescue Zlib::Error => error
-        partial_inflate(data) || raise(Prawn::Errors::MalformedPDF, "Corrupt object stream: #{error.message}")
+        raise Prawn::Errors::MalformedPDF, "Corrupt object stream: #{error.message}" if output.empty?
+
+        output
       ensure
         zstream&.reset # closing an unfinished stream warns otherwise
-        zstream&.close
-      end
-
-      # Truncated or padded streams: keep what inflates before the damage.
-      def partial_inflate(data)
-        zstream = Zlib::Inflate.new
-        output = +"".b
-        0.step(data.bytesize - 1, 1024) do |start|
-          output << zstream.inflate(data.byteslice(start, 1024))
-        rescue Zlib::Error
-          break
-        end
-        output.empty? ? nil : output
-      ensure
-        zstream&.reset
         zstream&.close
       end
 
       def unpredict(data, parameters)
         return data if data.empty? || !parameters.is_a?(Hash) || Reader.integer(parameters[:Predictor]) < 10
 
-        colors = Reader.integer(parameters[:Colors], 1).clamp(1, 32)
-        bits = Reader.integer(parameters[:BitsPerComponent], 8).clamp(1, 16)
-        columns = Reader.integer(parameters[:Columns], 1).clamp(1, data.bytesize)
+        colors = Reader.integer(parameters[:Colors], 1)
+        bits = Reader.integer(parameters[:BitsPerComponent], 8)
+        columns = Reader.integer(parameters[:Columns], 1)
+        raise Prawn::Errors::MalformedPDF, "Bad predictor parameters #{parameters.inspect[0, 100]}" unless PREDICTOR_COLORS.cover?(colors) && PREDICTOR_BITS_PER_COMPONENT.include?(bits) && columns.positive?
+
         pixel_width = [(colors * bits + 7) / 8, 1].max
         row_width = (colors * bits * columns + 7) / 8
+        return +"".b if 1 + row_width > data.bytesize
+
         output = +"".b
         previous = Array.new(row_width, 0)
         position = 0
@@ -420,8 +480,9 @@ module PDF
         @scanner.skip(WHITESPACE)
       end
 
+      # A stray delimiter, ")", ">", "]", "{" or "}", is skipped as viewers do.
       def parse_value
-        skip_whitespace
+        @scanner.skip(STRAY_DELIMITERS)
         case @scanner.peek_byte
         when 47 then Name.new(value: name_bytes)
         when 40 then parse_literal_string
@@ -456,15 +517,13 @@ module PDF
         when "true" then true
         when "false" then false
         when "null" then nil
-        when nil
-          @scanner.pos += 1 # a stray delimiter: ")", ">", "{" or "}"
-          parse_value
         else raise Prawn::Errors::MalformedPDF, "Unexpected #{keyword[0, 20].inspect} at #{@scanner.pos}"
         end
       end
 
       def parse_dictionary
         @scanner.pos += 2
+        nest
         dictionary = {}
         loop do
           skip_whitespace
@@ -483,10 +542,13 @@ module PDF
           dictionary[key] = parse_value
         end
         dictionary
+      ensure
+        @nesting_depth -= 1
       end
 
       def parse_array
         @scanner.pos += 1
+        nest
         array = []
         loop do
           skip_whitespace
@@ -496,6 +558,13 @@ module PDF
           array << parse_value
         end
         array
+      ensure
+        @nesting_depth -= 1
+      end
+
+      def nest
+        @nesting_depth += 1
+        raise LimitExceeded, "Arrays and dictionaries nested deeper than #{MAX_NESTING_DEPTH} levels" if @nesting_depth > MAX_NESTING_DEPTH
       end
 
       def parse_hex_string

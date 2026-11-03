@@ -13,6 +13,9 @@ module PrawnX
       180 => ->(width, height) { [-1.0, 0.0, 0.0, -1.0, width, height] },
       270 => QUARTER_TURN
     }.freeze
+    # References followed to tell whether two objects are the same: a chain deeper than this is copied unshared,
+    # instead of overflowing the stack on a file that links its objects into a list as long as it likes.
+    MAX_DESCRIBED_DEPTH = 32
 
     # page_size: a name from PDF::Core::PageGeometry::SIZES or [width, height] in points; each page is scaled to fit
     # it, keeping its proportions, from the lower left corner. orientation: :portrait or :landscape; a page the other
@@ -64,6 +67,7 @@ module PrawnX
       @copies = {}
       @pending = []
       @content_identifiers = {}
+      @description_depth = 0
       pages = reader.pages.map do |source_reference, page|
         copy = reference(nil)
         if source_reference.is_a?(PDF::Core::Reader::Ref)
@@ -110,14 +114,20 @@ module PrawnX
     # carrier repeats on every label. Pages, and annotations (whose place is their own), are never shared.
     def content_identifier(number)
       return @content_identifiers[number] if @content_identifiers.key?(number)
+      return nil if @description_depth >= MAX_DESCRIBED_DEPTH
 
       @content_identifiers[number] = nil # an object reached again while describing it stays unshared
-      value = @reader.object(number)
-      key = if value.is_a?(PDF::Core::Reader::Stream)
-        description = describe(value.dictionary.except(:Length))
-        [description, value.data] if description
-      elsif !(value.is_a?(Hash) && value.key?(:Rect))
-        describe(value)
+      @description_depth += 1
+      begin
+        value = @reader.object(number)
+        key = if value.is_a?(PDF::Core::Reader::Stream)
+          description = describe(value.dictionary.except(:Length))
+          [description, value.data] if description
+        elsif !(value.is_a?(Hash) && value.key?(:Rect))
+          describe(value)
+        end
+      ensure
+        @description_depth -= 1
       end
       @content_identifiers[number] = key && (@identifiers[key] ||= @identifiers.size)
     end

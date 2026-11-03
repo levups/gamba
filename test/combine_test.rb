@@ -217,6 +217,95 @@ d) Tj"
     assert_empty failures, "seed #{FUZZ_SEED}"
   end
 
+  def test_a_decompression_bomb_is_refused_before_it_fills_memory
+    zeros = Zlib::Deflate.deflate("\0" * 4_000_000) # 4 KB, 100 times as much once inflated as the file holds
+    bombs = {
+      "one filter" => ["/FlateDecode", zeros],
+      "a chain of filters" => ["[/FlateDecode /FlateDecode]", Zlib::Deflate.deflate(zeros)]
+    }
+    bombs.each do |name, (filter, data)|
+      bomb = "<< /Type /ObjStm /N 0 /First 0 /Filter #{filter} /Length #{data.bytesize} >>\nstream\n#{data}\nendstream"
+      source = classic_pdf({4 => stream("BT /F1 24 Tf 72 700 Td (alice) Tj ET"), 6 => bomb})
+      # Offsets shifted: the reader rebuilds the xref by scanning, and opens every object stream it finds.
+      shifted = source.sub("%PDF-1.4\n", "%PDF-1.4\n% inserted after the offsets were counted\n")
+
+      assert_raises(Prawn::Errors::MalformedPDF, "a bomb behind #{name}") { PrawnX.combine([shifted]) }
+    end
+  end
+
+  def test_predictor_parameters_outside_the_specification_are_refused
+    readable = ->(colors, bits) { PDF::Core::Reader.new(packed_catalog_pdf(colors:, bits:)).pages.size }
+
+    assert_equal 1, readable.call(32, 8)
+    assert_equal 0, readable.call(33, 8), "33 colours"
+    assert_equal 0, readable.call(32, 3), "3 bits per component"
+  end
+
+  def test_nesting_deeper_than_any_real_file_is_refused
+    deep_array = "[" * 100_000 + "]" * 100_000
+    deep_dictionary = "<< /A " * 100_000 + ">>" * 100_000
+    [deep_array, deep_dictionary].each do |deep|
+      source = classic_pdf({1 => "<< /Type /Catalog /Pages 2 0 R /Deep #{deep} >>", 4 => stream("BT ET")})
+
+      assert_raises(Prawn::Errors::MalformedPDF) { PrawnX.combine([source]) }
+    end
+  end
+
+  def test_stray_delimiters_are_skipped_however_many
+    source = classic_pdf({1 => "<< /Type /Catalog /Stray #{")" * 100_000} 0 /Pages 2 0 R >>", 4 => stream("BT ET")})
+
+    assert_equal 1, PDF::Core::Reader.new(PrawnX.combine([source])).pages.size
+  end
+
+  def test_a_chain_of_lengths_deeper_than_any_real_file_is_refused
+    chain = (6..10_005).to_h { [it, "<< /Length #{it + 1} 0 R >>\nstream\nx\nendstream"] }
+    source = classic_pdf({4 => "<< /Length 6 0 R >>\nstream\nBT ET\nendstream", 10_006 => "1", **chain})
+
+    assert_raises(Prawn::Errors::MalformedPDF) { PrawnX.combine([source]) }
+  end
+
+  def test_a_long_list_of_objects_is_copied_whole
+    chain = (6..20_005).to_h { [it, "[#{it + 1} 0 R]"] }
+    source = classic_pdf({3 => PAGE.sub(">> >>", ">> >> /Next 6 0 R"), 4 => stream("BT ET"), 20_006 => "[]", **chain})
+    reader = PDF::Core::Reader.new(PrawnX.combine([source]))
+    length = 0
+    link = reader.pages.first[1][:Next]
+    while (list = reader.resolve(link)).is_a?(Array) && !list.empty?
+      length += 1
+      link = list.first
+    end
+
+    assert_equal 20_000, length
+  end
+
+  def test_objects_parsed_over_and_over_are_refused
+    overlapping = "(" + (1000...3000).map { "#{it} 0 obj (" }.join
+    source = classic_pdf({4 => stream("BT /F1 24 Tf 72 700 Td (alice) Tj ET"), 6 => overlapping})
+    shifted = source.sub("%PDF-1.4\n", "%PDF-1.4\n% inserted after the offsets were counted\n")
+
+    assert_raises(Prawn::Errors::MalformedPDF) { PrawnX.combine([shifted]) }
+  end
+
+  def test_an_object_stream_whose_index_misleads_is_read_in_linear_time
+    reader = PDF::Core::Reader.new(packed_catalog_pdf(annotations: 20_000))
+    annotations = Timeout.timeout(2) { reader.resolve(reader.pages.first[1][:Annots]).map { reader.resolve(it) } }
+
+    assert_equal 20_000, annotations.count { it.is_a?(Hash) && it[:Subtype] }
+  end
+
+  def test_a_cross_reference_stream_without_width_is_rebuilt_instead_of_read_forever
+    source = packed_catalog_pdf(xref_widths: "[0 0 0] /Size 999999999999")
+
+    assert_equal 1, Timeout.timeout(5) { PDF::Core::Reader.new(PrawnX.combine([source])).pages.size }
+  end
+
+  def test_loops_in_the_page_tree_and_the_xref_chain_end
+    source = classic_pdf({2 => "<< /Type /Pages /Kids [3 0 R 2 0 R] /Count 2 >>", 4 => stream("BT ET")})
+    looped = source.sub("/Root 1 0 R", "/Root 1 0 R /Prev #{source[/startxref\s+(\d+)/, 1]}")
+
+    assert_equal 1, Timeout.timeout(5) { PDF::Core::Reader.new(PrawnX.combine([looped])).pages.size }
+  end
+
   private
 
   # Flipped bytes, truncations, and 2 or 4 bytes overwritten with extreme values where a parser may trust them.
@@ -234,6 +323,44 @@ d) Tj"
       bytes[random.rand([bytes.bytesize - 2, 1].max), 2] = [[0xFFFF, 0, 0x8000, random.rand(2**16)].sample(random:)].pack("n")
       bytes
     end
+  end
+
+  # A PDF 1.5 file whose catalog, and as many annotations as asked, are packed in object stream 6, compressed
+  # through a PNG predictor of /Colors colors and bits per component, with a cross-reference stream 7. The xref
+  # misplaces each annotation in the object stream, one index too far.
+  def packed_catalog_pdf(colors: 1, bits: 8, annotations: 0, xref_widths: "[1 4 2]")
+    annotation_numbers = (100...(100 + annotations)).to_a
+    packed = {1 => "<< /Type /Catalog /Pages 2 0 R >>"}
+    annotation_numbers.each { packed[it] = "<< /Type /Annot /Subtype /Square /Rect [0 0 10 10] >>" }
+    page = PAGE.sub("/Contents 4 0 R", "/Contents 4 0 R /Annots [#{annotation_numbers.map { "#{it} 0 R" }.join(" ")}]")
+    plain = {2 => "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", 3 => page, 4 => stream("BT ET"),
+             5 => "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"}
+
+    body = +""
+    header = packed.map { |number, value| "#{number} #{body.bytesize}".tap { body << value << "\n" } }.join(" ") + "\n"
+    row_width = (colors * bits * 16 + 7) / 8
+    decoded = (header + body).b
+    decoded << " " * (-decoded.bytesize % row_width)
+    predicted = decoded.bytes.each_slice(row_width).map { [0, *it].pack("C*") }.join
+    data = Zlib::Deflate.deflate(predicted)
+    plain[6] = "<< /Type /ObjStm /N #{packed.size} /First #{header.bytesize} /Filter /FlateDecode " \
+      "/DecodeParms << /Predictor 12 /Colors #{colors} /BitsPerComponent #{bits} /Columns 16 >> /Length #{data.bytesize} >>\n" \
+      "stream\n#{data}\nendstream"
+
+    output = +"%PDF-1.5\n".b
+    offsets = plain.to_h { |number, value| [number, output.bytesize].tap { output << "#{number} 0 obj\n#{value}\nendobj\n".b } }
+    offsets[7] = output.bytesize
+    size = [8, *annotation_numbers.map { it + 1 }].max
+    rows = (0...size).map do |number|
+      if offsets.key?(number) then [1, offsets[number], 0]
+      elsif number == 1 then [2, 6, 0]
+      elsif number.between?(100, 99 + annotations) then [2, 6, 1 + (number - 100 + 1) % annotations]
+      else [0, 0, 0]
+      end
+    end
+    xref = Zlib::Deflate.deflate(rows.map { it.pack("CNn") }.join)
+    output << "7 0 obj\n<< /Type /XRef /Size #{size} /W #{xref_widths} /Root 1 0 R /Filter /FlateDecode /Length #{xref.bytesize} >>\n".b
+    output << "stream\n".b << xref << "\nendstream\nendobj\nstartxref\n#{offsets[7]}\n%%EOF\n".b
   end
 
   def document(name, pages: 1, page_size: "A4")
