@@ -2,6 +2,10 @@
 
 Prawn's API, rewritten for speed: the same pages, pixel for pixel, in lighter files, faster and with less memory.
 
+https://next-gen-gems.github.io/prawnx/
+
+## Installation
+
 ```ruby
 # Gemfile
 gem "prawnx" # instead of prawn, prawn-table and prawn-svg
@@ -9,6 +13,19 @@ gem "prawnx" # instead of prawn, prawn-table and prawn-svg
 
 `pdf.table` and `pdf.svg` work without any other gem; `require "prawn/table"` and `require "prawn-svg"` keep
 working.
+
+PrawnX needs Ruby 3.4 or later, and refuses to load when the prawn gem is in the bundle too.
+
+## Usage
+
+Code written for Prawn runs unchanged:
+
+```ruby
+Prawn::Document.generate("hello.pdf") do
+  text "Hello, World!"
+  table [%w[SKU Qty], %w[A-1 2]]
+end
+```
 
 ## Beyond Prawn
 
@@ -36,7 +53,29 @@ SVG images do not fetch anything from the web unless asked to (`svg data, enable
 0.40 fetches by default, which lets a submitted SVG make the server request any URL. prawn-svg 1.0 plans the same
 default.
 
-## How it is tested
+## Comparing an app's PDFs
+
+`script/capture_pdfs.rb` writes every PDF an app's test suite renders, named after its test. Run the suite under
+Prawn, then under PrawnX, and compare both directories with `Oracle.pdf_differences`:
+
+```sh
+PRAWNX_CAPTURE_DIRECTORY=tmp/prawn RUBYOPT=-r/path/to/prawnx/script/capture_pdfs.rb bin/rails test
+```
+
+## Performance
+
+`bundle exec rake bench` renders each document of `bench/documents` with Prawn 2.5 and with PrawnX, each in its own
+YJIT process, and writes `docs/benchmarks.json`. Median of 20 renders, on Ruby 4.0.9:
+
+| Document | Prawn | PrawnX | Allocations, Prawn → PrawnX | Weight, Prawn → PrawnX |
+|---|---:|---:|---:|---:|
+| Invoice, one page | 22.9 ms | 5.2 ms | 167,104 → 32,601 | 45,076 → 30,741 bytes |
+| Report, 50 pages | 499.8 ms | 201.5 ms | 3,064,282 → 1,932,990 | 209,010 → 166,070 bytes |
+| Catalog, 1,000 table rows | 570.5 ms | 266.9 ms | 3,999,685 → 2,085,019 | 155,369 → 137,109 bytes |
+
+Charts and peak memory: https://next-gen-gems.github.io/prawnx/benchmarks.html
+
+## Development
 
 - An oracle renders every example of Prawn's and prawn-table's manuals and every sample SVG of prawn-svg, with
   Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 and with PrawnX, each in its own process, and
@@ -67,18 +106,11 @@ bundle exec rake corpus:fetch
 bundle exec rake test
 ORACLE_CANDIDATE=prawn bundle exec rake test # Prawn against itself: proves the oracle
 bundle exec rake bench
-```
-
-## Comparing an app's PDFs
-
-`script/capture_pdfs.rb` writes every PDF an app's test suite renders, named after its test. Run the suite under
-Prawn, then under PrawnX, and compare both directories with `Oracle.pdf_differences`:
-
-```sh
-PRAWNX_CAPTURE_DIRECTORY=tmp/prawn RUBYOPT=-r/path/to/prawnx/script/capture_pdfs.rb bin/rails test
+bundle exec rubocop
 ```
 
 ## License
 
-PrawnX is derived from Prawn, PDF::Core and TTFunk, and is licensed like them: under Matz's original terms for
-Ruby, or the GPLv2, or the GPLv3. See `LICENSE`.
+By Level UP Solutions. PrawnX is derived from Prawn, PDF::Core, TTFunk and prawn-table, by Gregory Brown and their
+contributors, and is licensed like them: under Matz's original terms for Ruby, or the GPLv2, or the GPLv3. Its SVG
+support comes from prawn-svg, by Roger Nesbitt, under the MIT license. See `LICENSE`.

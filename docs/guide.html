@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrawnX Guide</title>
+<meta name="description" content="Install PrawnX in place of Prawn, prawn-table and prawn-svg, and use its tables, SVG, fonts, OpenType features, PDF/A-3 and Factur-X.">
+<meta name="theme-color" content="#c2361b">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800&family=Inter+Tight:wght@400;600&family=Fira+Code&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="page">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="./">PrawnX</a>
+    <a href="guide.html" aria-current="page">Guide</a>
+    <a href="compatibility.html">Compatibility</a>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="https://github.com/next-gen-gems/prawnx">GitHub</a>
+  </nav>
+
+  <main id="main">
+    <header>
+      <h1 class="page-title">Guide</h1>
+      <p class="lede">PrawnX answers to Prawn’s API: installing it is swapping gems. This page covers what it brings on top.</p>
+      <ul class="toc">
+        <li><a href="#installation">Installation</a></li>
+        <li><a href="#usage">Drop-in usage</a></li>
+        <li><a href="#tables">Tables</a></li>
+        <li><a href="#svg">SVG</a></li>
+        <li><a href="#fonts">Fonts</a></li>
+        <li><a href="#images">Images</a></li>
+        <li><a href="#pdf-a">PDF/A and Factur-X</a></li>
+        <li><a href="#output">Output</a></li>
+        <li><a href="#servers">Servers that fork</a></li>
+        <li><a href="#comparing">Comparing an app’s PDFs</a></li>
+      </ul>
+    </header>
+
+    <section id="installation" aria-labelledby="installation-title">
+      <h2 id="installation-title">Installation</h2>
+      <div class="prose">
+<pre><code># Gemfile
+gem "prawnx" # instead of prawn, prawn-table and prawn-svg</code></pre>
+        <p>PrawnX needs Ruby 3.4 or later. It depends on <code>css_parser</code>, <code>matrix</code> and <code>rexml</code>, which only its SVG support loads.</p>
+        <p>Remove <code>prawn</code>, <code>prawn-table</code> and <code>prawn-svg</code> from the Gemfile: PrawnX refuses to load next to the prawn gem, with a <code>LoadError</code> saying so, rather than mixing two engines in one process.</p>
+      </div>
+    </section>
+
+    <section id="usage" aria-labelledby="usage-title">
+      <h2 id="usage-title">Drop-in usage</h2>
+      <div class="prose">
+        <p>Code written for Prawn runs as it is. PrawnX provides <code>require "prawn"</code>, <code>require "prawn/table"</code>, <code>require "prawn-svg"</code> and <code>require "prawn/measurement_extensions"</code>, and the <code>Prawn</code> namespace: <code>Prawn::Document</code>, <code>Prawn::Table</code>, <code>Prawn::Errors</code>, <code>Prawn::SVG</code>.</p>
+<pre><code>require "prawn"
+
+Prawn::Document.generate("invoice.pdf", page_size: "A4", info: {Title: "Invoice"}) do
+  font "DejaVuSans.ttf"
+  text "Invoice INV-2026-0001", size: 14, style: :bold
+  table [%w[SKU Qty Price], %w[A-1 2 $10.00]], header: true
+  number_pages "&lt;page&gt;/&lt;total&gt;", at: [bounds.right - 50, 0], width: 50, align: :right
+end</code></pre>
+        <p><code>Prawn::VERSION</code> answers <code>"2.5.0"</code>, the version of the API PrawnX mirrors, because Prawn extensions check it. PrawnX’s own version is <code>PrawnX::VERSION</code>.</p>
+        <p>The contract is Prawn 2.5’s public methods, listed in <code>test/contract/prawn-2.5.0.yml</code>: PrawnX accepts every call Prawn accepts on those, and <code>test/contract/decisions.yml</code> records, method by method, what is in and why the rest is left out.</p>
+      </div>
+    </section>
+
+    <section id="tables" aria-labelledby="tables-title">
+      <h2 id="tables-title">Tables</h2>
+      <div class="prose">
+        <p>The API of prawn-table 0.2.2, built in: <code>table</code>, <code>make_table</code>, <code>cell</code>, <code>make_cell</code>, with their cell styles, headers repeated across pages, column widths, row and column spans, and subtables. No other gem and no <code>require</code> are needed.</p>
+<pre><code>table [%w[SKU Description Qty], *lines], header: true, width: bounds.width, cell_style: {padding: 3} do
+  row(0).font_style = :bold
+  column(2).align = :right
+end</code></pre>
+      </div>
+    </section>
+
+    <section id="svg" aria-labelledby="svg-title">
+      <h2 id="svg-title">SVG</h2>
+      <div class="prose">
+        <p>The API of prawn-svg 0.40.4, built in: <code>svg data, options</code> loads SVG support on first use.</p>
+<pre><code>svg File.read("logo.svg"), width: 120, position: :right</code></pre>
+      </div>
+      <table class="options">
+        <thead><tr><th scope="col">Option</th><th scope="col">What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>at</code>, <code>position</code>, <code>vposition</code></td><td>Where the image goes, as in Prawn’s <code>image</code></td></tr>
+          <tr><td><code>width</code>, <code>height</code></td><td>Its size; the other dimension follows the aspect ratio</td></tr>
+          <tr><td><code>enable_web_requests</code></td><td>Lets the SVG fetch images from <code>http</code> and <code>https</code> URLs. <strong>Off by default</strong>, where prawn-svg 0.40 has it on: see <a href="compatibility.html#svg">Compatibility</a></td></tr>
+          <tr><td><code>enable_file_requests_with_root</code></td><td>Lets the SVG read local files under this directory</td></tr>
+          <tr><td><code>cache_images</code></td><td>Keeps fetched images between calls</td></tr>
+          <tr><td><code>fallback_font_name</code></td><td>The font used when the SVG names one the document does not know</td></tr>
+          <tr><td><code>color_mode</code></td><td><code>:rgb</code> or <code>:cmyk</code></td></tr>
+          <tr><td><code>language</code></td><td>The language <code>&lt;switch&gt;</code> elements match against</td></tr>
+          <tr><td><code>log_warnings</code></td><td>Prints the warnings collected while reading the SVG</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="fonts" aria-labelledby="fonts-title">
+      <h2 id="fonts-title">Fonts</h2>
+      <div class="prose">
+        <p>Prawn’s fonts, unchanged in use: the 14 standard PDF fonts, TrueType files (<code>.ttf</code>), collections (<code>.ttc</code>) and <code>.dfont</code>, <code>font_families.update</code>, and <code>fallback_fonts</code>. OpenType fonts with CFF outlines (<code>.otf</code>) embed like TrueType ones, and render like the font itself.</p>
+        <p>A parsed font is shared by every document of the process, and every thread, until its file changes: a server reads <code>Inter.ttf</code> once, not once per PDF.</p>
+        <h3 id="features">OpenType features</h3>
+        <p>Ligatures and GPOS pair kerning move glyphs away from where Prawn puts them, so they stay off unless asked for, per font:</p>
+<pre><code>font "Inter.ttf", features: %i[liga kern]
+font_families.update("Inter" => {normal: {file: "Inter.ttf", features: %i[liga kern]}})</code></pre>
+        <p><code>liga</code> applies the font’s standard ligatures (GSUB); <code>kern</code> applies its GPOS pair kerning.</p>
+      </div>
+    </section>
+
+    <section id="images" aria-labelledby="images-title">
+      <h2 id="images-title">Images</h2>
+      <div class="prose">
+        <p>JPEG images are embedded as they are; PNG images in every variant Prawn reads, alpha included, are decoded. The same image placed twice in a document is embedded once.</p>
+        <p>A corrupt or hostile file raises <code>Prawn::Errors::UnsupportedImageType</code> or a named font error, never a crash inside a parser: PNG data inflates no further than its header announces. An input fuzzer checks it on flipped bytes, truncations and forged lengths.</p>
+      </div>
+    </section>
+
+    <section id="pdf-a" aria-labelledby="pdf-a-title">
+      <h2 id="pdf-a-title">PDF/A and Factur-X</h2>
+      <div class="prose">
+<pre><code>Prawn::Document.new(pdf_a: true, info: {Title: "Invoice INV-2026-0001"}) do
+  font "Inter.ttf"
+  # …
+  factur_x File.read("factur-x.xml"), profile: :en16931
+end</code></pre>
+        <p><code>pdf_a: true</code> writes a PDF/A-3b document (ISO 19005-3): XMP metadata matching the <code>info</code> hash, an sRGB output intent, a file identifier, and annotations flagged for printing. What PDF/A forbids raises <code>Prawn::Errors::PdfAViolation</code>: a standard PDF font, which cannot be embedded, and encryption.</p>
+        <p><code>factur_x(xml, profile:, filename:, description:)</code> embeds the CII XML of a Factur-X invoice into a PDF/A-3 document, with the relationship the specification gives each profile. PrawnX does not build that XML: it embeds the one the invoicing system produced.</p>
+      </div>
+      <table class="options">
+        <thead><tr><th scope="col">Argument</th><th scope="col">Values</th></tr></thead>
+        <tbody>
+          <tr><td><code>profile</code></td><td><code>:minimum</code>, <code>:basic_wl</code>, <code>:basic</code>, <code>:en16931</code> (default), <code>:extended</code></td></tr>
+          <tr><td><code>filename</code></td><td><code>"factur-x.xml"</code> by default</td></tr>
+          <tr><td><code>description</code></td><td><code>"Factur-X invoice"</code> by default</td></tr>
+        </tbody>
+      </table>
+      <div class="prose">
+        <p>The test suite checks PDF/A documents with veraPDF when it is installed (<code>brew install verapdf</code>).</p>
+      </div>
+    </section>
+
+    <section id="output" aria-labelledby="output-title">
+      <h2 id="output-title">Output</h2>
+      <div class="prose">
+        <p>Whatever does not move a pixel is on by default. Every document is written as PDF 1.5: streams compressed, every other object packed into one compressed object stream, and a compressed cross-reference stream instead of the xref table (ISO 32000-1 §7.5.7, §7.5.8).</p>
+      </div>
+    </section>
+
+    <section id="servers" aria-labelledby="servers-title">
+      <h2 id="servers-title">Servers that fork</h2>
+      <div class="prose">
+        <p>TrueType and SVG support load on first use, so a document of standard fonts never pays for them. Before a server forks its workers, load them once, so every worker shares that memory instead of loading its own copy:</p>
+<pre><code># config/puma.rb, before_fork, or an initializer
+PrawnX.eager_load!</code></pre>
+      </div>
+    </section>
+
+    <section id="comparing" aria-labelledby="comparing-title">
+      <h2 id="comparing-title">Comparing an app’s PDFs</h2>
+      <div class="prose">
+        <p><code>script/capture_pdfs.rb</code> writes every PDF an app’s test suite renders, named after its test. Run the suite under Prawn, then under PrawnX, and compare both directories with <code>Oracle.pdf_differences</code>:</p>
+<pre><code>PRAWNX_CAPTURE_DIRECTORY=tmp/prawn RUBYOPT=-r/path/to/prawnx/script/capture_pdfs.rb bin/rails test</code></pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Next Gen Gems, by Level UP Solutions</p>
+    <nav aria-label="Next Gen Gems">
+      <ul class="family">
+        <li><a href="https://next-gen-gems.github.io/slimx/">SlimX</a></li>
+        <li><a href="https://next-gen-gems.github.io/browserx/">BrowserX</a></li>
+        <li><a href="https://next-gen-gems.github.io/prawnx/" aria-current="page">PrawnX</a></li>
+        <li><a href="https://next-gen-gems.github.io/gretelx/">GretelX</a></li>
+        <li><a href="https://github.com/next-gen-gems/prawnx">Source on GitHub</a></li>
+      </ul>
+    </nav>
+  </footer>
+</div>
+<script src="site.js"></script>
+</body>
+</html>
