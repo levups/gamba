@@ -1,0 +1,46 @@
+module Prawn::SVG::Elements
+  COMMA_WSP_REGEXP = /(?:\s+,?\s*|,\s*)/
+end
+
+require "prawn/svg/elements/call_duplicator"
+require "prawn/svg/elements/bbox_scaling"
+
+%w[base direct_render_base root anchor container switch clip_path mask viewport text text_component text_node text_path line polyline polygon circle ellipse
+  rect path use image gradient pattern marker ignored].each do |filename|
+  require "prawn/svg/elements/#{filename}"
+end
+
+module Prawn::SVG::Elements
+  TAG_CLASS_MAPPING = {
+    g: Prawn::SVG::Elements::Container,
+    symbol: Prawn::SVG::Elements::Container,
+    defs: Prawn::SVG::Elements::Container,
+    a: Prawn::SVG::Elements::Anchor,
+    clipPath: Prawn::SVG::Elements::ClipPath,
+    switch: Prawn::SVG::Elements::Switch,
+    svg: Prawn::SVG::Elements::Viewport,
+    text: Prawn::SVG::Elements::Text,
+    line: Prawn::SVG::Elements::Line,
+    polyline: Prawn::SVG::Elements::Polyline,
+    polygon: Prawn::SVG::Elements::Polygon,
+    circle: Prawn::SVG::Elements::Circle,
+    ellipse: Prawn::SVG::Elements::Ellipse,
+    rect: Prawn::SVG::Elements::Rect,
+    path: Prawn::SVG::Elements::Path,
+    use: Prawn::SVG::Elements::Use,
+    image: Prawn::SVG::Elements::Image,
+    linearGradient: Prawn::SVG::Elements::Gradient,
+    radialGradient: Prawn::SVG::Elements::Gradient,
+    pattern: Prawn::SVG::Elements::Pattern,
+    marker: Prawn::SVG::Elements::Marker,
+    style: Prawn::SVG::Elements::Ignored, # because it is pre-parsed by Document
+    title: Prawn::SVG::Elements::Ignored,
+    desc: Prawn::SVG::Elements::Ignored,
+    metadata: Prawn::SVG::Elements::Ignored,
+    foreignObject: Prawn::SVG::Elements::Ignored,
+    "font-face": Prawn::SVG::Elements::Ignored,
+    filter: Prawn::SVG::Elements::Ignored, # unsupported
+    mask: Prawn::SVG::Elements::Mask,
+    view: Prawn::SVG::Elements::Ignored
+  }.freeze
+end

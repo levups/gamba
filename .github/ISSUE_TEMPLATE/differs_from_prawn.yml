@@ -1,0 +1,26 @@
+name: Differs from Prawn
+description: Code that works with Prawn fails, or renders a different page, with PrawnX
+labels: [bug]
+body:
+  - type: textarea
+    id: script
+    attributes:
+      label: Script
+      description: The smallest Ruby that reproduces it. Attach the fonts or images it needs.
+      render: ruby
+    validations:
+      required: true
+  - type: textarea
+    id: difference
+    attributes:
+      label: What differs
+      description: The error and its backtrace, or what changes on the page. Attach both PDFs when you can.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: PrawnX 1.0.0 (or commit), Prawn 2.5.0, prawn-table 0.2.2, prawn-svg 0.40.4, Ruby 4.0.1
+    validations:
+      required: true

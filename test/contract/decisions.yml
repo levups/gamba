@@ -1,0 +1,104 @@
+# Prawn files these public methods under "Experimental API" or under no YARD group at all. Each one is either part
+# of PrawnX's contract (true) or left out, with the reason. Stable methods are always in, Extension methods and
+# those Prawn's docs mark @private are always out: test/contract_test.rb fails on an undecided method.
+Prawn::Document:
+  "#add_content": PDF::Core internals, raw content stream operators
+  "#add_dest": PDF::Core internals behind dest_* and outline
+  "#add_text_content": PDF::Core internals
+  "#add_to_transformation_stack": PDF::Core internals behind rotate, scale, translate
+  "#annotate": true
+  "#cell": true
+  "#character_spacing": true
+  "#column_box": true
+  "#compression_enabled?": true
+  "#current_transformation_matrix_with_translation": PDF::Core internals behind rotate, scale, translate
+  "#default_kerning": true
+  "#default_kerning=": true
+  "#default_kerning?": true
+  "#default_leading": true
+  "#default_leading=": true
+  "#define_grid": true
+  "#deref": PDF::Core object store
+  "#dest_fit": true
+  "#dest_fit_bounds": true
+  "#dest_fit_bounds_horizontally": true
+  "#dest_fit_bounds_vertically": true
+  "#dest_fit_horizontally": true
+  "#dest_fit_rect": true
+  "#dest_fit_vertically": true
+  "#dest_xyz": true
+  "#dests": PDF::Core object store
+  "#encrypt_document": true
+  "#fallback_fonts": true
+  "#fallback_fonts=": true
+  "#forget_text_rendering_mode!": PDF::Core internals
+  "#graphic_state": PDF::Core internals, read through fill_color, line_width, cap_style…
+  "#grid": true
+  "#horizontal_text_scaling": true
+  "#link_annotation": true
+  "#make_cell": true
+  "#names": PDF::Core object store
+  "#on_page_create": true
+  "#page_match?": true
+  "#process_text_options": text option normalization, internal to text and text_box
+  "#ref": PDF::Core object store
+  "#ref!": PDF::Core object store
+  "#renderer": PDF::Core object store
+  "#repeat": true
+  "#restore_graphics_state": true
+  "#restore_transformation_stack": PDF::Core internals behind rotate, scale, translate
+  "#rise": true
+  "#save_font": true
+  "#save_graphics_state": true
+  "#save_transformation_stack": PDF::Core internals behind rotate, scale, translate
+  "#skip_encoding": font encoding internals
+  "#text_annotation": true
+  "#text_direction": true
+  "#text_direction=": true
+  "#text_rendering_mode": true
+  "#word_spacing": true
+Prawn::Document::ColumnBox:
+  "#bare_column_width": true
+  "#left": true
+  "#left_side": true
+  "#move_past_bottom": true
+  "#right": true
+  "#right_side": true
+  "#width": true
+  "#width_of_column": true
+Prawn::Font:
+  "#add_to_current_page": font embedding internals, called by the text renderer
+  "#ascender": true
+  "#descender": true
+  "#eql?": true
+  "#family": true
+  "#hash": true
+  "#height": true
+  "#height_at": true
+  "#inspect": true
+  "#line_gap": true
+  "#name": true
+  "#normalize_encoding": encoding internals, called by the text renderer
+  "#normalize_encoding!": encoding internals, called by the text renderer
+  "#options": true
+  ".load": true
+Prawn::Text::Box: &text_box
+  "#ascender": true
+  "#at": true
+  "#available_width": true
+  "#descender": true
+  "#everything_printed?": true
+  "#height": true
+  "#leading": true
+  "#line_gap": true
+  "#line_height": true
+  "#nothing_printed?": true
+  "#render": true
+  "#text": true
+  "#wrap": layout internals, called by render
+Prawn::Text::Formatted::Box: *text_box
+Prawn::View:
+  "#document": true
+  "#method_missing": true
+  "#save_as": true
+  "#update": true

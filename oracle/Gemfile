@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+# The reference engine, kept out of the main bundle: PrawnX answers `require "prawn"` too.
+source "https://rubygems.org"
+
+gem "matrix"
+gem "prawn", "2.5.0"
+gem "prawn-table", "0.2.2"
+gem "prawn-svg", "0.40.4"

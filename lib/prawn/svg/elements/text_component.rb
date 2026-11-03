@@ -1,0 +1,352 @@
+module Prawn::SVG
+  class Elements::TextComponent < Elements::DirectRenderBase
+    attr_reader :children, :parent_component
+    attr_reader :x_values, :y_values, :dx, :dy, :rotation, :text_length, :length_adjust
+    attr_reader :font, :fallback_fonts
+    attr_reader :inside_clip_path
+
+    def initialize(document, source, _calls, state, parent_component = nil)
+      if parent_component.nil? && source.name != "text"
+        raise SkipElementError, "attempted to <use> a component inside a text element, this is not supported"
+      end
+
+      super(document, source, [], state)
+      @parent_component = parent_component
+    end
+
+    def parse
+      @inside_clip_path = state.inside_clip_path
+
+      @x_values = parse_wsp("x").map { |n| x(n) }
+      @y_values = parse_wsp("y").map { |n| y(n) }
+      @dx = parse_wsp("dx").map { |n| x_pixels(n) }
+      @dy = parse_wsp("dy").map { |n| y_pixels(n) }
+      @rotation = parse_wsp("rotate").map(&:to_f)
+      @text_length = normalize_length(attributes["textLength"])
+      @length_adjust = attributes["lengthAdjust"]
+
+      @font, @fallback_fonts = select_fonts
+
+      @children = svg_text_children.flat_map do |child|
+        if child.node_type == :text
+          build_text_node(child)
+        else
+          case child.name
+          when "tspan", "tref"
+            build_child(child)
+          when "textPath"
+            build_text_path(child)
+          else
+            warnings << "Unknown tag '#{child.name}' inside text tag; ignoring"
+            []
+          end
+        end
+      end
+    end
+
+    def lay_out(prawn)
+      with_svg_fonts(prawn) do
+        @children.each do |child|
+          child.lay_out(prawn)
+        end
+      end
+
+      if @text_length
+        flexible_width, fixed_width = total_flexible_and_fixed_width
+
+        if flexible_width.positive?
+          target_width = [@text_length - fixed_width, 0].max
+          factor = target_width / flexible_width
+          apply_factor_to_base_width(factor)
+        end
+      end
+    end
+
+    def render_component(prawn, renderer, cursor, translate_x = nil, accumulated_baseline_shift = 0)
+      raise SkipElementQuietly if computed_properties.display == "none"
+
+      add_yield_call do
+        prawn.translate(translate_x, 0) if translate_x
+
+        size = computed_properties.numeric_font_size
+
+        y_offset = dominant_baseline_offset(prawn, size || prawn.font_size) || 0
+
+        with_svg_fonts(prawn) do
+          total_baseline_shift = accumulated_baseline_shift + baseline_shift_offset(prawn, size)
+          y_offset += total_baseline_shift
+
+          children.each do |child|
+            case child
+            when Elements::TextNode
+              child.render(prawn, size, cursor, y_offset)
+            when self.class
+              prawn.save_graphics_state
+              child.render_component(prawn, renderer, cursor, nil, total_baseline_shift)
+              prawn.restore_graphics_state
+            else
+              raise
+            end
+          end
+        end
+      end
+
+      renderer.render_calls(prawn, base_calls)
+    end
+
+    def calculated_width
+      children.reduce(0) { |total, child| total + child.calculated_width }
+    end
+
+    def current_length_adjust_is_scaling?
+      if @text_length
+        @length_adjust == "spacingAndGlyphs"
+      elsif parent_component
+        parent_component.current_length_adjust_is_scaling?
+      else
+        false
+      end
+    end
+
+    # Resolves the effective kerning setting from the SVG 1.1 kerning property and the
+    # SVG 2 font-kerning property. kerning takes precedence when non-default; otherwise
+    # font-kerning is used.
+    def kerning_enabled?
+      if computed_properties.kerning == "auto"
+        computed_properties.font_kerning != "none"
+      else
+        false
+      end
+    end
+
+    def kerning_pixels
+      if computed_properties.kerning == "auto"
+        nil
+      else
+        x_pixels(computed_properties.kerning)
+      end
+    end
+
+    def letter_spacing_pixels
+      if computed_properties.letter_spacing == "normal"
+        nil
+      else
+        x_pixels(computed_properties.letter_spacing)
+      end
+    end
+
+    def word_spacing_pixels
+      if computed_properties.word_spacing == "normal"
+        nil
+      else
+        x_pixels(computed_properties.word_spacing)
+      end
+    end
+
+    protected
+
+    def build_text_node(child)
+      if state.preserve_space
+        text = child.value.tr("\n\t", " ")
+      else
+        text = child.value.tr("\n", "").tr("\t", " ")
+        leading = text[0] == " "
+        trailing = text[-1] == " "
+        text = text.strip.gsub(/ {2,}/, " ")
+      end
+
+      Elements::TextNode.new(self, text, leading, trailing)
+    end
+
+    def build_child(child)
+      component = self.class.new(document, child, [], state.dup, self)
+      component.process
+      component
+    end
+
+    def build_text_path(child)
+      component = Elements::TextPath.new(document, child, [], state.dup, self)
+      component.process
+      return [] unless component.children
+
+      component
+    end
+
+    def svg_text_children
+      text_children.select do |child|
+        child.node_type == :text || (
+          child.node_type == :element &&
+            [SVG_NAMESPACE, ""].include?(child.namespace)
+
+        )
+      end
+    end
+
+    def text_children
+      if name == "tref"
+        reference = find_referenced_element
+        reference ? reference.source.children : []
+      else
+        source.children
+      end
+    end
+
+    def find_referenced_element
+      href = href_attribute
+
+      if href && href[0..0] == "#"
+        element = document.elements_by_id[href[1..]] # rubocop:disable Performance/ArraySemiInfiniteRangeSlice -- String
+        element if element.name == "text"
+      end
+    end
+
+    def select_fonts
+      font_style = :italic if computed_properties.font_style == "italic"
+      font_weight = computed_properties.font_weight
+      font_stretch = computed_properties.font_stretch
+      fonts = []
+
+      font_family_names.each do |name|
+        font = document.font_registry.load(name, font_weight, font_style, font_stretch)
+        next unless font
+        next if fonts.any? { |existing| existing.name == font.name && existing.subfamily == font.subfamily }
+
+        fonts << font
+      end
+
+      font_names = fonts.map(&:name)
+      font_names.uniq!
+      _, *fallback_font_names = font_names
+
+      return [fonts.first, fallback_font_names] if fonts.any?
+
+      warnings << "Font family '#{computed_properties.font_family}' style '#{computed_properties.font_style}' is not a known font, and the fallback font could not be found."
+      []
+    end
+
+    def with_svg_fonts(prawn)
+      prawn.save_font do
+        if font
+          prawn.font(font.name, style: font.subfamily)
+          prawn.fallback_fonts(fallback_fonts)
+        end
+
+        yield
+      end
+    end
+
+    def font_family_names
+      names = CSS::FontFamilyParser.parse(computed_properties.font_family.to_s)
+      names << document.fallback_font_name if document.fallback_font_name
+      names.filter_map do
+        name = it.strip
+        name unless name.empty?
+      end
+    end
+
+    def total_flexible_and_fixed_width
+      flexible = fixed = 0
+      @children.each do |child|
+        child.total_flexible_and_fixed_width.tap do |a, b|
+          flexible += a
+          fixed += b
+        end
+      end
+      [flexible, fixed]
+    end
+
+    def apply_factor_to_base_width(factor)
+      @children.each do |child|
+        if child.is_a?(Elements::TextNode)
+          child.chunks.reject(&:fixed_width).each do |chunk|
+            chunk.fixed_width = chunk.base_width * factor
+          end
+        elsif child.is_a?(self.class)
+          child.apply_factor_to_base_width(factor)
+        else
+          raise
+        end
+      end
+    end
+
+    # overridden from Base, we don't want to call fill/stroke as draw_text does this for us
+    def apply_drawing_call
+    end
+
+    # overridden from Base, transforms can't be applied to tspan elements
+    def transformable?
+      source.name != "tspan"
+    end
+
+    # overridden from Base, we want the id to point to the Text element
+    def add_to_elements_by_id?
+      source.name != "text"
+    end
+
+    def dominant_baseline_offset(prawn, size)
+      baseline = effective_baseline
+      return nil if baseline.nil?
+
+      case baseline
+      when "middle"
+        -FontMetrics.x_height_in_points(prawn, size) / 2.0
+      when "mathematical"
+        -((prawn.font.ascender + prawn.font.descender) / prawn.font_size) * size / 2.0
+      when "central"
+        -((prawn.font.ascender - prawn.font.descender) / prawn.font_size) * size / 2.0
+      when "hanging"
+        -(prawn.font.ascender / prawn.font_size) * size
+      when "text-before-edge", "before-edge"
+        (-(prawn.font.ascender / prawn.font_size) * size) - half_leading(prawn, size)
+      when "text-after-edge", "after-edge", "ideographic"
+        ((prawn.font.descender / prawn.font_size) * size) + half_leading(prawn, size)
+      end
+    end
+
+    def effective_baseline
+      ab = computed_properties.alignment_baseline
+      if ab && ab != "auto" && ab != "baseline"
+        ab
+      else
+        db = computed_properties.dominant_baseline
+        db unless ["auto", "alphabetic"].include?(db)
+      end
+    end
+
+    def baseline_shift_offset(prawn, font_size)
+      value = computed_properties.baseline_shift
+      return 0 if value.nil? || value == "baseline"
+
+      case value
+      when "super"
+        sub_super_offset(prawn, font_size)
+      when "sub"
+        -sub_super_offset(prawn, font_size)
+      when Percentage
+        parent_font_size = parent_component&.computed_properties&.numeric_font_size || font_size
+        value.to_factor * parent_font_size
+      when Length
+        value.to_pixels(nil, font_size)
+      else
+        0
+      end
+    end
+
+    def half_leading(prawn, size)
+      (size - ((prawn.font.ascender + prawn.font.descender) / prawn.font_size * size)) / 2.0
+    end
+
+    def sub_super_offset(prawn, font_size)
+      ascender_ratio = prawn.font.ascender / prawn.font_size
+      ascender_ratio * font_size / 1.2
+    end
+
+    def normalize_length(length)
+      x_pixels(length) if length&.match(/\d/)
+    end
+
+    def parse_wsp(name)
+      (attributes[name] || "").split(COMMA_WSP_REGEXP)
+    end
+  end
+end

@@ -1,0 +1,16 @@
+name: Feature request
+description: Something neither Prawn nor PrawnX does yet
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you need
+      description: The document you are trying to produce, and what stops you today.
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: How you would call it
+      description: The Ruby you would like to write. A link to the specification it follows (PDF, PDF/A, OpenType…) helps.
+      render: ruby

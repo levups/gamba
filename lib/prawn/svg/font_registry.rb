@@ -1,0 +1,315 @@
+module Prawn::SVG
+  class FontRegistry
+    GENERIC_CSS_FONT_MAPPING = {
+      "serif" => "Times-Roman",
+      "sans-serif" => "Helvetica",
+      "cursive" => "Times-Roman",
+      "fantasy" => "Times-Roman",
+      "monospace" => "Courier"
+    }.freeze
+
+    FONT_WEIGHT_FALLBACKS = {
+      thin: :extralight,
+      extralight: :light,
+      light: :normal,
+      normal: nil,
+      medium: :normal,
+      semibold: :bold,
+      bold: :normal,
+      extrabold: :bold,
+      black: :extrabold
+    }.freeze
+
+    FONT_WEIGHTS = FONT_WEIGHT_FALLBACKS.keys.freeze
+
+    FONT_WEIGHT_VALUES = {
+      thin: 100, extralight: 200, light: 300, normal: 400, medium: 500,
+      semibold: 600, bold: 700, extrabold: 800, black: 900
+    }.freeze
+
+    # Font files use various names for the same weight. Map common alternatives
+    # to the canonical weight names used in FONT_WEIGHTS.
+    FONT_WEIGHT_ALIASES = {
+      thin: %i[hairline],
+      extralight: %i[ultralight ultra_light extra_light],
+      semibold: %i[semi_bold demi_bold demibold],
+      extrabold: %i[extra_bold ultra_bold ultrabold],
+      black: %i[heavy]
+    }.freeze
+
+    FONT_STRETCH_MAPPING = {
+      "ultra-condensed" => :ultra_condensed,
+      "extra-condensed" => :extra_condensed,
+      "condensed" => :condensed,
+      "semi-condensed" => :semi_condensed,
+      "normal" => :normal,
+      "semi-expanded" => :semi_expanded,
+      "expanded" => :expanded,
+      "extra-expanded" => :extra_expanded,
+      "ultra-expanded" => :ultra_expanded
+    }.freeze
+
+    FONT_STRETCHES = %i[
+      ultra_condensed extra_condensed condensed semi_condensed normal
+      semi_expanded expanded extra_expanded ultra_expanded
+    ].freeze
+
+    DEFAULT_FONT_PATHS = [
+      "/Library/Fonts",
+      "/System/Library/Fonts",
+      "#{Dir.home}/Library/Fonts",
+      "/usr/share/fonts/truetype",
+      "/mnt/c/Windows/Fonts" # Bash on Ubuntu on Windows
+    ].freeze
+
+    @font_path = DEFAULT_FONT_PATHS.select { |path| Dir.exist?(path) }
+
+    def initialize(font_families)
+      @font_families = font_families
+    end
+
+    def installed_fonts
+      merge_external_fonts
+      @font_families
+    end
+
+    def correctly_cased_font_name(name)
+      merge_external_fonts
+      @font_case_mapping[name.downcase]
+    end
+
+    def load(family, weight = nil, style = nil, stretch = nil)
+      weight = weight_for_css_font_weight(weight) unless FONT_WEIGHTS.include?(weight)
+      stretch = stretch_for_css_font_stretch(stretch)
+
+      CSS::FontFamilyParser.parse(family).detect do |name|
+        name = name.gsub(/\s{2,}/, " ")
+
+        font = find_suitable_font(name, weight, style, stretch)
+        break font if font
+      end
+    end
+
+    def register_font_face(family_name, css_weight, css_style, css_stretch, font_data)
+      merge_external_fonts
+
+      weight = css_weight ? weight_for_css_font_weight(css_weight) : :normal
+      style = %w[italic oblique].include?(css_style) ? :italic : nil
+      stretch = stretch_for_css_font_stretch(css_stretch)
+      effective_stretch = (stretch == :normal) ? nil : stretch
+
+      font = Font.new(family_name, weight, style, effective_stretch)
+      family = (@font_families[family_name] ||= {})
+      family[font.subfamily] = font_data
+      @font_case_mapping[family_name.downcase] = family_name
+    end
+
+    def find_local_font_data(local_name, css_weight, css_style, css_stretch)
+      merge_external_fonts
+
+      name = correctly_cased_font_name(local_name) || local_name
+      name = GENERIC_CSS_FONT_MAPPING[name] if GENERIC_CSS_FONT_MAPPING.key?(name) && !@font_families.key?(name)
+
+      subfamilies = @font_families[name]
+      return unless subfamilies&.any?
+
+      weight = css_weight ? weight_for_css_font_weight(css_weight) : :normal
+      style = %w[italic oblique].include?(css_style) ? :italic : nil
+      stretch = stretch_for_css_font_stretch(css_stretch)
+      effective_stretch = (stretch == :normal) ? nil : stretch
+
+      font = find_suitable_font(name, weight, style, effective_stretch)
+      return unless font
+
+      subfamilies[font.subfamily]
+    end
+
+    private
+
+    def find_suitable_font(name, weight, style, stretch)
+      name = correctly_cased_font_name(name) || name
+
+      name = GENERIC_CSS_FONT_MAPPING[name] if GENERIC_CSS_FONT_MAPPING.key?(name) && !installed_fonts.key?(name)
+
+      return unless (subfamilies = installed_fonts[name])
+      return if subfamilies.empty?
+
+      css_stretch_matching_order(stretch).each do |s|
+        effective_stretch = (s == :normal) ? nil : s
+
+        font = if effective_stretch
+          find_with_css_weight_matching(name, weight, style, effective_stretch)
+        else
+          find_with_weight_fallback(name, weight, style)
+        end
+        return font if font
+
+        next unless style
+
+        font = if effective_stretch
+          find_with_css_weight_matching(name, weight, nil, effective_stretch)
+        else
+          find_with_weight_fallback(name, weight, nil)
+        end
+        return font if font
+      end
+
+      Font.new(name, subfamilies.keys.first, nil)
+    end
+
+    def find_with_weight_fallback(name, weight, style, stretch = nil)
+      current_weight = weight
+      while current_weight
+        font = Font.new(name, current_weight, style, stretch)
+        return font if installed?(font)
+
+        FONT_WEIGHT_ALIASES.fetch(current_weight, []).each do |alias_weight|
+          font = Font.new(name, alias_weight, style, stretch)
+          return font if installed?(font)
+        end
+
+        current_weight = FONT_WEIGHT_FALLBACKS[current_weight]
+      end
+      nil
+    end
+
+    def find_with_css_weight_matching(name, weight, style, stretch)
+      css_weight_matching_order(weight).each do |w|
+        font = Font.new(name, w, style, stretch)
+        return font if installed?(font)
+
+        FONT_WEIGHT_ALIASES.fetch(w, []).each do |alias_weight|
+          font = Font.new(name, alias_weight, style, stretch)
+          return font if installed?(font)
+        end
+      end
+      nil
+    end
+
+    def css_stretch_matching_order(stretch)
+      return [:normal] if stretch.nil? || stretch == :normal
+
+      idx = FONT_STRETCHES.index(stretch) || FONT_STRETCHES.index(:normal)
+      normal_idx = FONT_STRETCHES.index(:normal)
+
+      narrower = FONT_STRETCHES[0...idx].reverse
+      wider = FONT_STRETCHES[(idx + 1)..]
+
+      if idx <= normal_idx
+        [stretch] + narrower + wider
+      else
+        [stretch] + wider + narrower
+      end
+    end
+
+    def css_weight_matching_order(desired)
+      value = FONT_WEIGHT_VALUES[desired] || 400
+      below = FONT_WEIGHTS.select { |w| FONT_WEIGHT_VALUES[w] < value }.sort_by { |w| -FONT_WEIGHT_VALUES[w] }
+      above = FONT_WEIGHTS.select { |w| FONT_WEIGHT_VALUES[w] > value }.sort_by { |w| FONT_WEIGHT_VALUES[w] }
+
+      if value <= 500
+        [desired] + below + above
+      else
+        [desired] + above + below
+      end
+    end
+
+    def installed?(font)
+      subfamilies = installed_fonts[font.name]
+      !subfamilies.nil? && subfamilies.key?(font.subfamily)
+    end
+
+    def weight_for_css_font_weight(weight)
+      case weight
+      when "100" then :thin
+      when "200" then :extralight
+      when "300" then :light
+      when "400", "normal" then :normal
+      when "500" then :medium
+      when "600" then :semibold
+      when "700", "bold" then :bold
+      when "800" then :extrabold
+      when "900" then :black
+      else :normal # rubocop:disable Lint/DuplicateBranch
+      end
+    end
+
+    def stretch_for_css_font_stretch(stretch)
+      return nil if stretch.nil?
+
+      FONT_STRETCH_MAPPING[stretch] || :normal
+    end
+
+    def merge_external_fonts
+      if @font_case_mapping.nil?
+        self.class.load_external_fonts unless self.class.external_font_families
+        @font_families.merge!(self.class.external_font_families) do |_key, v1, _v2|
+          v1
+        end
+        @font_case_mapping = @font_families.keys.each.with_object({}) do |key, result|
+          result[key.downcase] = key
+        end
+        GENERIC_CSS_FONT_MAPPING.each_key do |generic|
+          @font_case_mapping[generic] = generic
+        end
+      end
+    end
+
+    class << self
+      attr_reader :external_font_families, :font_path
+
+      def load_external_fonts
+        @external_font_families = {}
+
+        external_font_paths.each do |filename|
+          ttc = TTC.new(filename)
+          if ttc.fonts.any?
+            ttc.fonts.each do |font|
+              subfamily = (font[:subfamily] || "normal").gsub(/\s+/, "_").downcase.to_sym
+              subfamily = :normal if subfamily == :regular
+              family_hash = (external_font_families[font[:family]] ||= {})
+              font_data = {file: filename, font: font[:index]}
+              family_hash[subfamily] ||= font_data
+              register_by_weight_class(family_hash, font[:weight_class], subfamily, font_data)
+            end
+          else
+            ttf = TTF.new(filename)
+            next unless ttf.family
+
+            subfamily = (ttf.subfamily || "normal").gsub(/\s+/, "_").downcase.to_sym
+            subfamily = :normal if subfamily == :regular
+            family_hash = (external_font_families[ttf.family] ||= {})
+            family_hash[subfamily] ||= filename
+            register_by_weight_class(family_hash, ttf.weight_class, subfamily, family_hash[subfamily])
+          end
+        end
+      end
+
+      private
+
+      WEIGHT_CLASS_TO_SYMBOL = {
+        100 => :thin, 200 => :extralight, 300 => :light, 400 => :normal, 500 => :medium,
+        600 => :semibold, 700 => :bold, 800 => :extrabold, 900 => :black
+      }.freeze
+
+      def register_by_weight_class(family_hash, weight_class, subfamily, font_data)
+        return unless weight_class
+
+        subfamily_str = subfamily.to_s
+        return if subfamily_str.include?("italic") || subfamily_str.include?("oblique") ||
+          subfamily_str.include?("condensed") || subfamily_str.include?("expanded")
+
+        canonical = WEIGHT_CLASS_TO_SYMBOL[weight_class]
+        family_hash[canonical] = font_data if canonical
+      end
+
+      def external_font_paths
+        font_path
+          .uniq
+          .flat_map { |path| Dir["#{path}/**/*"] }
+          .uniq
+          .select { |path| File.file?(path) }
+      end
+    end
+  end
+end

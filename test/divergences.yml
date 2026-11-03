@@ -1,0 +1,37 @@
+# Where PrawnX deliberately differs from Prawn: each entry is a Prawn bug, proven by a specification or by
+# Prawn's own documentation. PrawnX must fix it; the other checks still compare the example with Prawn.
+- bug: Encrypted documents have no /ID in their trailer, so qpdf and strict readers reject them
+  proof: 'ISO 32000-1 §7.5.5, trailer dictionary, ID: "Required if an Encrypt entry is present"'
+  prawn_issue:
+  prawn_writes_invalid_pdf: true
+  examples:
+    - security-encryption-1-bare_encryption
+    - security-encryption-1-simple_password
+    - security-permissions-1-cannot_print
+    - security-permissions-1-no_permissions
+- bug: Built-in fonts measure Ÿ (byte 159) as ÿ, so right-aligned or wrapped text holding it overflows
+  proof: 'ISO 32000-1 Annex D.2: WinAnsiEncoding maps byte 237 octal to Ydieresis, not ydieresis'
+  prawn_issue:
+  examples:
+    - win_ansi_y_dieresis
+  differences:
+    - 'page 1: glyph 0 is ["&#x178;", "Helvetica", 12.0, 568.0, 44.62] instead of ["&#x178;", "Helvetica", 12.0, 570.0, 44.62]'
+    - '/\Apage 1: \d+ pixel rows differ at 150 dpi\z/'
+    - '/\Apage 1: \d+ pixel rows differ at 150 dpi in Poppler\z/'
+- bug: The faces of one font collection share their width cache, so text in one face is measured with another's widths
+  proof: 'Prawn::Font#eql? compares the file name, family and size, which every face of a .ttc shares; Prawn documents each face as a font of its own'
+  prawn_issue:
+  examples:
+    - ttc_faces_measured_apart
+  differences:
+    - 'page 1: glyph 6 is ["R", "DejaVuSans-Bold", 12.0, 522.32, 59.5] instead of ["R", "DejaVuSans-Bold", 12.0, 527.39, 59.5]'
+    - '/\Apage 1: \d+ pixel rows differ at 150 dpi\z/'
+    - '/\Apage 1: \d+ pixel rows differ at 150 dpi in Poppler\z/'
+- bug: TrueType-flavoured subsetting of CFF fonts changes how their glyphs rasterize
+  proof: 'The subset Prawn embeds (through TTFunk) renders differently from the unmodified font program; PrawnX keeps outlines and hints untouched, and renders like the font itself'
+  prawn_issue:
+  examples:
+    - otf_cff_outlines
+  differences:
+    - '/\Apage 1: \d+ pixel rows differ at 150 dpi\z/'
+    - '/\Apage 1: \d+ pixel rows differ at 150 dpi in Poppler\z/'

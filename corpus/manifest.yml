@@ -1,0 +1,18 @@
+# Fetched by `rake corpus:fetch` into corpus/cache, never committed.
+# Prawn's own repositories: their examples run under both engines.
+prawn:
+  repository: prawnpdf/prawn
+  commit: f82783b1d0207abacd642ddd2c0959685cbc4a09 # 2.5.0
+  keep: [manual, data, lib]
+prawn-manual_builder:
+  repository: prawnpdf/prawn-manual_builder
+  commit: 4a7a4250ec37e2b725fd2fd3f1d6048735a1ebc9 # 0.4.0, the version Prawn 2.5.0's manual is built with
+  keep: [data]
+prawn-table:
+  repository: prawnpdf/prawn-table
+  commit: 7016c514809a2510c17b06d88f35613cf8155e66 # 0.2.2
+  keep: [lib, manual]
+prawn-svg:
+  repository: mogest/prawn-svg
+  commit: db5455bd5714320ab4355c882a43dc9bd63eea26 # v0.40.4
+  keep: [spec]
