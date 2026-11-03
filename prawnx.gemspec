@@ -7,9 +7,10 @@ Gem::Specification.new do |spec|
   spec.version = PrawnX::VERSION
   spec.authors = ["Level UP Solutions", "Clément Joubert"]
   spec.summary = "Prawn's API, rewritten for speed: same pages, lighter files"
+  spec.description = "A drop-in replacement for prawn, prawn-table and prawn-svg: the same API and the same pages " \
+                     "as Prawn 2.5, written faster, with fewer allocations and lighter files."
   spec.homepage = "https://github.com/next-gen-gems/prawnx"
   spec.metadata = {
-    "homepage_uri" => spec.homepage,
     "source_code_uri" => spec.homepage,
     "changelog_uri" => "#{spec.homepage}/blob/main/CHANGELOG.md",
     "documentation_uri" => "https://next-gen-gems.github.io/prawnx/",
