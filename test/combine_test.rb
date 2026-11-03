@@ -288,7 +288,8 @@ d) Tj"
 
   def test_an_object_stream_whose_index_misleads_is_read_in_linear_time
     reader = PDF::Core::Reader.new(packed_catalog_pdf(annotations: 20_000))
-    annotations = Timeout.timeout(2) { reader.resolve(reader.pages.first[1][:Annots]).map { reader.resolve(_1) } }
+    # Linear takes 0.4 s on MRI; quadratic, minutes. The margin is for TruffleRuby before its JIT warms up.
+    annotations = Timeout.timeout(10) { reader.resolve(reader.pages.first[1][:Annots]).map { reader.resolve(_1) } }
 
     assert_equal 20_000, annotations.count { _1.is_a?(Hash) && _1[:Subtype] }
   end
