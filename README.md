@@ -16,6 +16,9 @@ working.
 
 PrawnX needs Ruby 3.3 or later, and refuses to load when the prawn gem is in the bundle too.
 
+The gem has its own version, `PrawnX::VERSION`. `Prawn::VERSION` is the version of the Prawn API it reproduces,
+2.5.0, so code that checks Prawn's version keeps working.
+
 ## Usage
 
 Code written for Prawn runs unchanged:
