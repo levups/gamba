@@ -97,11 +97,26 @@ module Prawn
 end
 
 module PrawnX
+  autoload :Combine, ::File.expand_path("prawnx/combine", __dir__)
+
+  # The pages of other PDF files, one after the other in a new one:
+  # PrawnX.combine([label, label], page_size: [288, 432]). See PrawnX::Combine#initialize for the options.
+  def self.combine(sources, page_size: nil, orientation: nil)
+    Combine.new(page_size:, orientation:).call(sources)
+  end
+
   # Loads what PrawnX otherwise loads on first use, SVG support included: call it before a server forks its
   # workers, so they share that memory instead of each loading its own copy.
   def self.eager_load!
-    [TrueType::File, TrueType::Subset, Prawn::Fonts::TTF]
+    [TrueType::File, TrueType::Subset, Prawn::Fonts::TTF, Combine, PDF::Core::Reader]
     require "prawn-svg"
+  end
+end
+
+module PDF
+  module Core
+    autoload :Reader, ::File.expand_path("prawnx/pdf/reader", __dir__)
+    autoload :Decryption, ::File.expand_path("prawnx/pdf/decryption", __dir__)
   end
 end
 
