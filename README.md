@@ -14,7 +14,7 @@ gem "prawnx" # instead of prawn, prawn-table and prawn-svg
 `pdf.table` and `pdf.svg` work without any other gem; `require "prawn/table"` and `require "prawn-svg"` keep
 working.
 
-PrawnX needs Ruby 3.4 or later, and refuses to load when the prawn gem is in the bundle too.
+PrawnX needs Ruby 3.3 or later, and refuses to load when the prawn gem is in the bundle too.
 
 ## Usage
 

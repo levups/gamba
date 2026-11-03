@@ -46,7 +46,7 @@
       <div class="prose">
 <pre><code># Gemfile
 gem "prawnx" # instead of prawn, prawn-table and prawn-svg</code></pre>
-        <p>PrawnX needs Ruby 3.4 or later. It depends on <code>css_parser</code>, <code>matrix</code> and <code>rexml</code>, which only its SVG support loads.</p>
+        <p>PrawnX needs Ruby 3.3 or later. It depends on <code>css_parser</code>, <code>matrix</code> and <code>rexml</code>, which only its SVG support loads.</p>
         <p>Remove <code>prawn</code>, <code>prawn-table</code> and <code>prawn-svg</code> from the Gemfile: PrawnX refuses to load next to the prawn gem, with a <code>LoadError</code> saying so, rather than mixing two engines in one process.</p>
       </div>
     </section>
