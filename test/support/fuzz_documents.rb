@@ -28,8 +28,8 @@ class FuzzDocuments
   private
 
   def statement(depth:)
-    choices = %i[text text formatted text_box move shape table draw_text]
-    choices += %i[bounding_box column_box float indent transparent rotate new_page] if depth < 2
+    choices = %i[text text formatted text_box move shape table draw_text settings]
+    choices += %i[bounding_box column_box float indent transparent blend_mode rotate new_page] if depth < 2
     send(:"#{pick(choices)}_statement", depth:)
   end
 
@@ -100,6 +100,16 @@ class FuzzDocuments
 
   def transparent_statement(depth:)
     "transparent(#{rand(1..9) / 10.0}) do\n#{nested(depth)}\nend"
+  end
+
+  def blend_mode_statement(depth:)
+    "blend_mode(#{pick(%i[Multiply Screen Darken Difference]).inspect}) do\n#{nested(depth)}\nend"
+  end
+
+  # Settings kept until changed again, unlike a shape's colours: blocks crossing a page break must end on them.
+  def settings_statement(depth:)
+    "fill_color #{pick(COLORS).inspect}; stroke_color #{pick(COLORS).inspect}; line_width #{rand(1..4)}; " \
+      "#{pick(["dash(#{rand(1..6)})", "undash", "cap_style :round", "join_style :bevel"])}"
   end
 
   def rotate_statement(depth:)

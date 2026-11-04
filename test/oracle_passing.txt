@@ -249,3 +249,4 @@ blend_mode_across_page_break
 blend_mode_nested_across_page_break
 graphic_settings_across_page_break
 space_in_the_subset_before_it
+subset_tag_bytes_in_a_font_program
