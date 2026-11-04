@@ -39,15 +39,14 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    continue-on-error: ${{ endsWith(matrix.ruby, '-head') }}
     strategy:
       fail-fast: false
       matrix:
-        # Every Ruby the core team still maintains (https://endoflife.date/ruby), ruby-head, then this gem's extra ones.
-        ruby: ["3.3", "3.4", "4.0", ruby-head, truffleruby-head]
+        # Every Ruby the core team still maintains (https://endoflife.date/ruby); the -head ones are in head.
+        ruby: ["3.3", "3.4", "4.0"]
     env:
       BUNDLE_GEMFILE: ${{ matrix.rails.gemfile != 'Gemfile' && matrix.rails.gemfile || '' }}
-    steps:
+    steps: &test-steps
       - name: Check out
         uses: actions/checkout@v7
       - name: Set up Ruby
@@ -96,6 +95,22 @@ jobs:
         run: FUZZ_SEED=$GITHUB_RUN_ID FUZZ_CASES=300 bundle exec ruby -Itest test/fuzz_test.rb
       - name: Fuzz 400 malformed inputs
         run: INPUT_FUZZ_SEED=$GITHUB_RUN_ID INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb
+
+  # Allowed to fail, and truffleruby-head takes twice as long as the others: CI passed doesn't wait for them.
+  head:
+    name: Ruby ${{ matrix.ruby }}${{ matrix.rails && format(' · Rails {0}', matrix.rails.version) || '' }}
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        # ruby-head, then this gem's extra ones.
+        ruby: [ruby-head, truffleruby-head]
+    env:
+      BUNDLE_GEMFILE: ${{ matrix.rails.gemfile != 'Gemfile' && matrix.rails.gemfile || '' }}
+    steps: *test-steps
 
   docs:
     name: Highlighted docs
