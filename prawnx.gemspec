@@ -5,7 +5,7 @@ require_relative "lib/prawnx/version"
 Gem::Specification.new do |spec|
   spec.name = "prawnx"
   spec.version = PrawnX::VERSION
-  spec.authors = ["Level UP Solutions", "Clément Joubert"]
+  spec.authors = ["Level UP Solutions"]
   spec.summary = "Prawn's API, rewritten for speed: same pages, lighter files"
   spec.description = "A drop-in replacement for prawn, prawn-table and prawn-svg: the same API and the same pages " \
                      "as Prawn 2.5, written faster, with fewer allocations and lighter files."
@@ -14,9 +14,10 @@ Gem::Specification.new do |spec|
     "source_code_uri" => spec.homepage,
     "changelog_uri" => "#{spec.homepage}/blob/main/CHANGELOG.md",
     "documentation_uri" => "https://next-gen-gems.github.io/prawnx/",
+    "bug_tracker_uri" => "#{spec.homepage}/issues",
     "rubygems_mfa_required" => "true"
   }
-  spec.licenses = %w[Nonstandard GPL-2.0-only GPL-3.0-only]
+  spec.licenses = %w[Nonstandard GPL-2.0-only GPL-3.0-only MIT]
   spec.required_ruby_version = ">= 3.3"
   spec.add_dependency "css_parser", ">= 1.17.1", "< 4"
   spec.add_dependency "matrix", "~> 0.4"
