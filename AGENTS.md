@@ -58,7 +58,9 @@ Follow `STYLE.md` (naming, method size, comments, dead code): what RuboCop can't
   and **Fixed**, only those with entries. One entry per change users can see, written for them: several PRs may
   make one, CI, refactoring, docs and tests make none. Show it to the user, then `bin/release` commits it with
   the version. No version heading, date or link by hand: `bin/release` writes them.
-- `bin/release patch|minor|major` cuts a release from a green, up-to-date `main` (README, Releasing), and
-  `.github/workflows/release.yml` publishes it. Both are the same in every next-gen-gems gem: change them in all
-  four at once.
+- `main` takes no direct push, ours included: every change, a release too, goes through a pull request that merges
+  itself once the required CI checks are green (`gh pr merge --auto --squash`).
+- `bin/release patch|minor|major` cuts a release from a green, up-to-date `main` through such a pull request, then
+  tags its merge commit (README, Releasing), and `.github/workflows/release.yml` publishes it. Both are the same in
+  every next-gen-gems gem: change them in all four at once.
 - RubyGems trusts the Release workflow (trusted publishing): never `gem push` from a machine.
