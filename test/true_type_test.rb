@@ -54,6 +54,14 @@ class TrueTypeTest < Minitest::Test
     assert_raises(PrawnX::TrueType::Error) { subset.send(:remap_components, truncated_composite) }
   end
 
+  def test_a_simple_glyph_shorter_than_its_contours_raises
+    font = PrawnX::TrueType::File.new(File.binread(FONT))
+    subset = PrawnX::TrueType::Subset.new(font)
+    two_contours_one_end_point = [2, 0, 0, 0, 0].pack("s>5") + [5].pack("n")
+
+    assert_raises(PrawnX::TrueType::Error) { subset.send(:maximum_profile, [], [two_contours_one_end_point], 1) }
+  end
+
   def test_a_kern_subtable_cannot_declare_more_pairs_than_it_holds
     records = [36, 57, -40, 36, 58, 25].pack("n2 s> n2 s>") + [57, 36].pack("n2")
     font = PrawnX::TrueType::File.new(font_with_table("kern", kern_table([3, 12, 1, 6].pack("n4") + records)))
