@@ -1,4 +1,4 @@
-# A 50-page report: embedded TrueType font, a PNG with alpha and a JPEG on every page, justified text.
+# A 101-page report: embedded TrueType font, a PNG with alpha and a JPEG on every page, justified text.
 font_families.update("DejaVuSans" => {normal: "#{DATA_DIRECTORY}/fonts/DejaVuSans.ttf", bold: "#{DATA_DIRECTORY}/fonts/DejaVuSans-Bold.ttf"})
 font "DejaVuSans", size: 10
 paragraph = "A quarterly report gathers sales figures, charts and summary tables from every region: " \
