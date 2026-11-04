@@ -63,6 +63,13 @@ class PngTest < Minitest::Test
     end
   end
 
+  def test_a_width_its_data_never_fills_renders_without_building_a_row_of_that_width
+    # Gray and alpha, as wide as the size limit allows: a per-pixel layout would take 2 GB, too long a String for TruffleRuby.
+    data = png(Zlib::Deflate.deflate("\x00\x7F\xFF"), width: (2**29) - 1, color_type: GRAYSCALE_WITH_ALPHA)
+
+    assert_kind_of String, Prawn::Document.new { image StringIO.new(data), width: 100 }.render
+  end
+
   private
 
   # 8-bit grayscale unless told otherwise: one filter byte, then the samples of each row.

@@ -62,6 +62,7 @@ module Prawn
 
       def save_graphics_state(graphic_state = nil)
         save_transformation_stack
+        @unrestored_graphics_states += 1
         page.stack.push(PDF::Core::GraphicState.new(graphic_state || self.graphic_state))
         add_content("q")
         return unless block_given?
@@ -70,9 +71,18 @@ module Prawn
         restore_graphics_state
       end
 
+      # A page break leaves the blocks still open with states saved on an earlier page, which closed them when it
+      # ended: like Prawn, their restore closes the state open on the new page, and where none is open it has nothing
+      # left to close. Only a restore matching no save at all, on an empty stack, raises.
       def restore_graphics_state
         restore_transformation_stack
-        raise Errors::EmptyGraphicStateStack, "\n You have reached the end of the graphic state stack" if page.stack.empty?
+        saved = @unrestored_graphics_states.positive?
+        @unrestored_graphics_states -= 1 if saved
+        if page.stack.empty?
+          return if saved
+
+          raise Errors::EmptyGraphicStateStack, "\n You have reached the end of the graphic state stack"
+        end
 
         add_content("Q")
         page.stack.pop
@@ -110,6 +120,7 @@ module Prawn
         @root.data[:Pages] = @pages_reference
         @root.data[:ViewerPreferences] = {PrintScaling: :None} if options[:print_scaling] == :none
         @version = 1.3
+        @unrestored_graphics_states = 0
         min_version(1.6) if options[:print_scaling] == :none
         @pages = []
         @page = nil
