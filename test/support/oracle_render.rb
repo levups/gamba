@@ -47,6 +47,8 @@ module PrawnSwitch
   # The settings a new page writes, each with its writer, in the order Prawn writes them.
   GRAPHIC_SETTING_WRITERS = {fill_color: :set_fill_color, stroke_color: :set_stroke_color, line_width: :write_line_width,
                              cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash}.freeze
+  # PrawnX's PDF::Core::GraphicState::DEFAULT_TEXT_STATE, which Prawn's pdf-core lacks.
+  DEFAULT_TEXT_STATE = {text_rendering_mode: :fill, character_spacing: 0, word_spacing: 0, horizontal_text_scaling: 100, rise: 0}.freeze
 
   class << self
     attr_accessor :taken
@@ -54,14 +56,39 @@ module PrawnSwitch
 end
 
 # ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK: like PrawnX, a page break reopens the open transparent and blend_mode blocks,
-# and a block saved on an earlier page writes back, once it ends, the settings in effect before it. Where either
-# happened, <name>.switched: only there may PrawnX differ from plain Prawn (prawn_switch in test/divergences.yml).
+# and a block saved on an earlier page writes back, once it ends, the settings in effect before it. A new page, a block
+# ending on a later page and go_to_page write back the text state in effect. Where any of these happened,
+# <name>.switched: only there may PrawnX differ from plain Prawn (prawn_switch in test/divergences.yml).
 if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
+  # Each state records the text state written in it, as PrawnX's does.
+  PDF::Core::GraphicState.prepend(Module.new do
+    attr_writer :text_state
+
+    def text_state
+      @text_state || PrawnSwitch::DEFAULT_TEXT_STATE
+    end
+
+    def initialize_copy(other)
+      super
+      @text_state = other.text_state
+    end
+  end)
+
   Prawn::Document.prepend(Module.new do
+    PrawnSwitch::DEFAULT_TEXT_STATE.each_key do |setting|
+      define_method(:"update_#{setting}_state") do
+        super()
+        state = renderer.graphic_stack.current_state
+        state.text_state = state.text_state.merge(setting => public_send(setting)).freeze
+      end
+    end
+
     # The block runs here, not in Prawn's renderer, whose restore would bypass this module's.
     def save_graphics_state(graphic_state = nil)
-      open_saves << PrawnSwitch::OpenSave.new(renderer.graphic_stack.current_state, nil)
+      previous = renderer.graphic_stack.current_state
+      open_saves << PrawnSwitch::OpenSave.new(previous, nil)
       super(graphic_state, &nil)
+      renderer.graphic_stack.current_state.text_state = previous&.text_state if graphic_state
       return unless block_given?
 
       yield
@@ -71,7 +98,10 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     def restore_graphics_state
       open_save = open_saves.pop
       super
-      resume_graphic_settings(open_save.previous) if open_save && !renderer.graphic_stack.current_state.equal?(open_save.previous)
+      return unless open_save && !renderer.graphic_stack.current_state.equal?(open_save.previous)
+
+      resume_graphic_settings(open_save.previous)
+      resume_text_state
     end
 
     def transparent(opacity, stroke_opacity = opacity)
@@ -88,6 +118,19 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
         open_saves.last.ext_gstate = -> { blend_mode_dictionary_name(blend_mode) }
         yield
       end
+    end
+
+    # Only start_new_page calls it, once the new page's state is a copy of the last page's.
+    def use_graphic_settings(*)
+      renderer.graphic_stack.current_state&.text_state = PrawnSwitch::DEFAULT_TEXT_STATE
+      super
+      resume_text_state
+    end
+
+    # Content drawn on a page again, or flowing onto one that exists, is laid out with the text state in effect.
+    def go_to_page(*)
+      super
+      resume_text_state
     end
 
     def start_new_page(options = {})
@@ -120,6 +163,17 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
       state = graphic_state
       PrawnSwitch::GRAPHIC_SETTING_WRITERS.each_key { |setting| state.public_send(:"#{setting}=", previous.public_send(setting).dup) }
       differing.each_value { |writer| send(writer) }
+    end
+
+    def resume_text_state
+      current = renderer.graphic_stack.current_state&.text_state || PrawnSwitch::DEFAULT_TEXT_STATE
+      current.each do |setting, written|
+        value = public_send(setting)
+        next if value == written || value == :unknown
+
+        PrawnSwitch.taken = true
+        send(:"update_#{setting}_state")
+      end
     end
   end)
 end

@@ -150,7 +150,7 @@ module Prawn
       raise ArgumentError, "mode must be between one of #{MODES.keys.join(", ")} (#{mode})" unless MODES.key?(mode)
       return yield if text_rendering_mode == mode
 
-      wrap_and_restore(:@text_rendering_mode, mode, -> { "\n#{MODES[text_rendering_mode]} Tr" }, &)
+      wrap_and_restore(:text_rendering_mode, :@text_rendering_mode, mode, &)
     end
 
     def forget_text_rendering_mode!
@@ -161,28 +161,28 @@ module Prawn
       return @character_spacing || 0 if amount.nil?
       return yield if character_spacing == amount
 
-      wrap_and_restore(:@character_spacing, amount, -> { "\n#{PDF::Core.real(character_spacing)} Tc" }, &)
+      wrap_and_restore(:character_spacing, :@character_spacing, amount, &)
     end
 
     def word_spacing(amount = nil, &)
       return @word_spacing || 0 if amount.nil?
       return yield if word_spacing == amount
 
-      wrap_and_restore(:@word_spacing, amount, -> { "\n#{PDF::Core.real(word_spacing)} Tw" }, &)
+      wrap_and_restore(:word_spacing, :@word_spacing, amount, &)
     end
 
     def horizontal_text_scaling(amount = nil, &)
       return @horizontal_text_scaling || 100 if amount.nil?
       return yield if horizontal_text_scaling == amount
 
-      wrap_and_restore(:@horizontal_text_scaling, amount, -> { "\n#{PDF::Core.real(horizontal_text_scaling)} Tz" }, &)
+      wrap_and_restore(:horizontal_text_scaling, :@horizontal_text_scaling, amount, &)
     end
 
     def rise(amount = nil, &)
       return @rise || 0 if amount.nil?
       return yield if rise == amount
 
-      wrap_and_restore(:@rise, amount, -> { "\n#{PDF::Core.real(rise)} Ts" }, &)
+      wrap_and_restore(:rise, :@rise, amount, &)
     end
 
     def add_text_content(text, x, y, options)
@@ -257,15 +257,41 @@ module Prawn
       self.y -= amount
     end
 
-    def wrap_and_restore(variable, value, operator)
+    def wrap_and_restore(setting, variable, value)
       original_value = instance_variable_get(variable)
       instance_variable_set(variable, value)
-      add_content(operator.call)
+      write_text_state(setting, value)
       begin
         yield
       ensure
         instance_variable_set(variable, original_value)
-        add_content(operator.call)
+        write_text_state(setting, public_send(setting))
+      end
+    end
+
+    # Writes a text state parameter, and records it in the graphic state it now belongs to.
+    def write_text_state(setting, value)
+      add_content(
+        case setting
+        when :text_rendering_mode then "\n#{MODES[value]} Tr"
+        when :character_spacing then "\n#{PDF::Core.real(value)} Tc"
+        when :word_spacing then "\n#{PDF::Core.real(value)} Tw"
+        when :horizontal_text_scaling then "\n#{PDF::Core.real(value)} Tz"
+        when :rise then "\n#{PDF::Core.real(value)} Ts"
+        end
+      )
+      page.stack.last.public_send(PDF::Core::GraphicState::TEXT_STATE_WRITERS[setting], value)
+    end
+
+    # The text state parameters are part of the graphic state (ISO 32000-1 §9.3.1): a new page starts without them, and
+    # a restore closing a state opened on the page returns to that state's. Write back those of the blocks still open
+    # that the current state lacks. A text rendering mode forgotten by forget_text_rendering_mode! is unknown: none.
+    def resume_text_state
+      current = page.stack.last
+      PDF::Core::GraphicState::DEFAULT_TEXT_STATE.each do |setting, default|
+        written = current ? current.public_send(setting) : default
+        value = public_send(setting)
+        write_text_state(setting, value) unless value == written || value == :unknown
       end
     end
 
