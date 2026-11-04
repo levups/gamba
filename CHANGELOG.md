@@ -4,7 +4,8 @@
 
 **Fixed**
 - A PNG with transparency and a huge width no longer lays out its pixels before its size is checked: a few
-  hundred bytes cost gigabytes of memory, or `ArgumentError` on TruffleRuby, before the expected refusal.
+  hundred bytes cost gigabytes of memory, or `ArgumentError` on TruffleRuby, before the expected refusal. Its
+  channels split 1,024 pixels at a time, so a wide image needs little beyond its own samples.
 
 ## [1.0.0] — 2026-11-04
 

@@ -86,6 +86,8 @@ module Prawn
       # Compressed input fed at a time: at zlib's highest ratio, 4 KB inflate to about 4 MB before the size check.
       INFLATE_CHUNK_BYTES = 4096
       MAXIMUM_IMAGE_BYTES = 1 << 30
+      # Pixels split at a time: the unpack layout and its integers stay a few kilobytes, whatever the width.
+      ALPHA_SPLIT_CHUNK_PIXELS = 1024
       # The bit depths the PNG specification allows for each color type.
       BIT_DEPTHS = {GRAYSCALE => [1, 2, 4, 8, 16], TRUE_COLOR => [8, 16], INDEXED => [1, 2, 4, 8],
                     GRAYSCALE_ALPHA => [8, 16], TRUE_COLOR_ALPHA => [8, 16]}.freeze
@@ -224,22 +226,34 @@ module Prawn
       # the neighbouring pixels, which stays at the same relative place once the channels are apart.
       def split_alpha_channel
         sample_bytes = bits / 8
-        color_bytes = colors * sample_bytes
-        row_bytes = (width * (color_bytes + sample_bytes)) + 1
+        pixel_bytes = (colors + 1) * sample_bytes
+        row_bytes = (width * pixel_bytes) + 1
         row_count = img_data.bytesize / row_bytes
+        chunk_pixels = [width, ALPHA_SPLIT_CHUNK_PIXELS].min
+        chunk_count, remainder_pixels = width.divmod(chunk_pixels)
+        chunk_layouts = alpha_split_layouts(sample_bytes, chunk_pixels)
+        remainder_layouts = alpha_split_layouts(sample_bytes, remainder_pixels)
         color = +"".b
         alpha = +"".b
-        return [color, alpha] if row_count.zero?
-
-        color_layout = "C#{color_bytes}x#{sample_bytes}" * width
-        alpha_layout = "x#{color_bytes}C#{sample_bytes}" * width
         row_count.times do |row_index|
           start = row_index * row_bytes
           filter = img_data.getbyte(start)
-          img_data.unpack(color_layout, offset: start + 1).pack("C*", buffer: color << filter)
-          img_data.unpack(alpha_layout, offset: start + 1).pack("C*", buffer: alpha << filter)
+          color << filter
+          alpha << filter
+          chunk_count.times { split_pixels(start + 1 + (_1 * chunk_pixels * pixel_bytes), chunk_layouts, color, alpha) }
+          split_pixels(start + 1 + (chunk_count * chunk_pixels * pixel_bytes), remainder_layouts, color, alpha) if remainder_pixels.positive?
         end
         [color, alpha]
+      end
+
+      def alpha_split_layouts(sample_bytes, pixels)
+        color_bytes = colors * sample_bytes
+        ["C#{color_bytes}x#{sample_bytes}" * pixels, "x#{color_bytes}C#{sample_bytes}" * pixels]
+      end
+
+      def split_pixels(offset, (color_layout, alpha_layout), color, alpha)
+        img_data.unpack(color_layout, offset:).pack("C*", buffer: color)
+        img_data.unpack(alpha_layout, offset:).pack("C*", buffer: alpha)
       end
 
       # Palette indices and their opacity: indices only mean something once the rows are unfiltered.
