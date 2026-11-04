@@ -70,6 +70,7 @@ module Prawn
         new_graphic_state&.color_space = {}
         last_blend_mode = new_graphic_state&.blend_mode
         new_graphic_state&.blend_mode = nil
+        new_graphic_state&.reset_text_state
         page_options[:graphic_state] = new_graphic_state
       end
 
@@ -78,6 +79,7 @@ module Prawn
       generate_margin_box
       @bounding_box = @margin_box if last_page && (last_page.size != page.size || last_page.layout != page.layout)
       use_graphic_settings
+      resume_text_state
       return if options[:orphan]
 
       insert_page(page, @page_number)
@@ -113,6 +115,7 @@ module Prawn
       @page = pages[page_number - 1]
       generate_margin_box
       @y = @bounding_box.absolute_top
+      resume_text_state
     end
 
     def y=(new_y)

@@ -76,3 +76,11 @@
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
     - gradients_across_page_break
+- bug: Text rendering mode, character spacing, word spacing, horizontal scaling and rise blocks whose text flows onto the next page draw that page without them
+  proof: 'Prawn documents text_rendering_mode, character_spacing, word_spacing, horizontal_text_scaling and rise as setting their parameter for the block they are given, and lays the text out with it, but ISO 32000-1 §9.3.1 makes the text state part of the graphics state, which §8.4.1 resets at the start of each page''s content stream: Prawn::Document#start_new_page never writes them again, so the new page is drawn plain, its lines overflowing or falling short. PrawnX writes the text state of the blocks still open on the new page, before its header, after a block that ends on a later page, the text state its Q drops, and on a page reached through go_to_page (text flowing onto a page that exists, page numbers, repeaters), the text state in effect, not the one left there'
+  prawn_issue:
+  prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
+  examples:
+    - text_state_across_page_break
+    - text_state_around_block_across_page_break
+    - text_state_page_numbers
