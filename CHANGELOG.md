@@ -5,8 +5,6 @@
 **Fixed**
 - Nested blocks saving the graphics state (`transparent`, `rotate`…) that cross a page break no longer raise
   `EmptyGraphicStateStack` when they end together, where Prawn raises.
-- A `transparent` block whose content crosses a page break keeps its opacity on the next page, where Prawn draws
-  that page opaque; nested blocks keep theirs in order, and the page's header and background stay opaque.
 - A PNG with an alpha channel whose header announces a width its data never fills renders instead of
   building a per-pixel layout of that width (`ArgumentError: argument too big` on TruffleRuby).
 
