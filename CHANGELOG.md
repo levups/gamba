@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+**Fixed**
+- Nested blocks saving the graphics state (`transparent`, `rotate`…) that cross a page break no longer raise
+  `EmptyGraphicStateStack` when they end together, where Prawn raises.
+
 ## [1.0.0] — 2026-11-04
 
 First release under next-gen-gems: Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 in one gem, rewritten for
