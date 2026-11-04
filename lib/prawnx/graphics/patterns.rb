@@ -23,7 +23,8 @@ module Prawn
       def set_gradient(type, *, **)
         gradient = parse_gradient_arguments(*, **)
         name = "SP#{gradient_registry_key(gradient)}"
-        reference = page.resources.dig(:Pattern, name) || ((@gradient_registry ||= {})[name] ||= create_gradient_pattern(gradient))
+        reference = (@gradient_registry ||= {})[name] ||= create_gradient_pattern(gradient)
+        Color::OPERATOR_BY_TYPE.fetch(type) { raise ArgumentError, "unknown type '#{type}'" }
         write_pattern(type, {name:, reference:})
       end
 

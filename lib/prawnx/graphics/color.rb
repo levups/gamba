@@ -92,28 +92,41 @@ module Prawn
         add_content("/#{color_space} #{operator}")
       end
 
+      # A pattern paints until a colour of the same type replaces it. One the page's resources hold is recorded, to
+      # paint with on the next page.
       def set_color(type, color, options = {})
         operator = OPERATOR_BY_TYPE.fetch(type) { raise ArgumentError, "unknown type '#{type}'" }
         if options[:pattern]
-          write_pattern(type, {name: color, reference: page.resources.dig(:Pattern, color)})
+          reference = page.dictionary.data[:Resources]&.dig(:Pattern, color)
+          set_color_space(type, :Pattern)
+          add_content("/#{color} #{operator}")
+          record_pattern(type, reference && {name: color, reference:})
         else
           set_color_space(type, color_space(color))
           write_color(color_to_s(color), operator)
-          track_pattern(type, nil)
+          state = graphic_state
+          (type == :fill) ? state.fill_pattern &&= nil : state.stroke_pattern &&= nil
         end
       end
 
-      # Paints with a pattern, {name:, reference:}, until a colour of the same type replaces it.
+      # A pattern, {name:, reference:}, on this page's resources too.
       def write_pattern(type, pattern)
-        operator = OPERATOR_BY_TYPE.fetch(type) { raise ArgumentError, "unknown type '#{type}'" }
-        (page.resources[:Pattern] ||= {})[pattern[:name]] ||= pattern[:reference] if pattern[:reference]
+        (page.resources[:Pattern] ||= {})[pattern[:name]] ||= pattern[:reference]
         set_color_space(type, :Pattern)
-        add_content("/#{pattern[:name]} #{operator}")
-        track_pattern(type, pattern)
+        add_content("/#{pattern[:name]} #{OPERATOR_BY_TYPE.fetch(type)}")
+        record_pattern(type, pattern)
       end
 
-      def track_pattern(type, pattern)
+      def record_pattern(type, pattern)
         (type == :fill) ? graphic_state.fill_pattern = pattern : graphic_state.stroke_pattern = pattern
+      end
+
+      def write_fill_paint
+        (pattern = graphic_state.fill_pattern) ? write_pattern(:fill, pattern) : set_fill_color
+      end
+
+      def write_stroke_paint
+        (pattern = graphic_state.stroke_pattern) ? write_pattern(:stroke, pattern) : set_stroke_color
       end
 
       def set_fill_color(color = nil)

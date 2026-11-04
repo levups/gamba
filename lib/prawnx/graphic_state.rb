@@ -33,6 +33,15 @@ module PDF::Core
       end
     end
 
+    # What fills or strokes: the pattern's name, else the colour.
+    def fill_paint
+      fill_pattern ? fill_pattern[:name] : fill_color
+    end
+
+    def stroke_paint
+      stroke_pattern ? stroke_pattern[:name] : stroke_color
+    end
+
     def dup
       GraphicState.new(self)
     end

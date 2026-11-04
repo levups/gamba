@@ -200,6 +200,36 @@ class GraphicStateTest < Minitest::Test
     assert_valid(pdf)
   end
 
+  def test_a_page_header_setting_its_own_blend_mode_keeps_it
+    document = Prawn::Document.new do
+      on_page_create { blend_mode(:Screen) }
+      text "Alice"
+      start_new_page
+      text "Bob"
+      blend_mode(:Multiply)
+      start_new_page
+      text "Carol"
+    end
+
+    document.render
+
+    assert_equal ["q", "/BMScreen gs", "Bob", "/BMMultiply gs", "Q"], operators(document.pages[1])
+    assert_equal ["q", "/BMScreen gs", "Carol", "Q"], operators(document.pages[2])
+  end
+
+  def test_a_soft_mask_sets_the_blend_mode_back_to_normal
+    document = Prawn::Document.new do
+      blend_mode(:Multiply)
+      soft_mask { fill_rectangle [0, 100], 100, 100 }
+      start_new_page
+      text "Bob"
+    end
+
+    document.render
+
+    assert_equal ["q", "Bob", "Q"], operators(document.pages[1])
+  end
+
   def test_gradients_set_as_fill_and_stroke_hold_on_the_next_page
     document = Prawn::Document.new do
       fill_color "cc0000"

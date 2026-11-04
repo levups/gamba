@@ -69,6 +69,8 @@ module Prawn
         @soft_mask_registry[registry_key] = name
       end
       add_content("/#{@soft_mask_registry[registry_key]} gs")
+      # Its ExtGState sets the blend mode back to Normal.
+      graphic_state.blend_mode = nil
     end
   end
 end

@@ -9,13 +9,13 @@ module Prawn
       # ExtGState its block sets, {name:, reference:}, if any.
       OpenSave = Struct.new(:previous, :ext_gstate)
       DEFAULT_GRAPHIC_STATE = PDF::Core::GraphicState.new.freeze
-      # The settings a new page writes, each with its writer, in the order Prawn writes them; a pattern replaces its
-      # colour.
-      GRAPHIC_SETTING_WRITERS = {fill_color: :set_fill_color, stroke_color: :set_stroke_color, line_width: :write_line_width,
-                                 cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash}.freeze
-      # What a block ending on a later page writes back, in that order.
-      RESUMED_SETTINGS = [*GRAPHIC_SETTING_WRITERS.keys, :blend_mode].freeze
-      NORMAL_BLEND_MODE = "BMNormal"
+      # The settings a block ending on a later page writes back, each with its writer, in the order Prawn writes them
+      # on a new page, then the blend mode.
+      GRAPHIC_SETTING_WRITERS = {fill_paint: :write_fill_paint, stroke_paint: :write_stroke_paint, line_width: :write_line_width,
+                                 cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash,
+                                 blend_mode: :write_blend_mode}.freeze
+      # What these writers read from the state.
+      RESUMED_STATE = %i[fill_color fill_pattern stroke_color stroke_pattern line_width cap_style join_style dash blend_mode].freeze
 
       attr_reader :page, :pages, :pages_reference
 
@@ -150,17 +150,11 @@ module Prawn
       def write_ext_gstate(ext_gstate)
         page.ext_gstates[ext_gstate[:name]] = ext_gstate[:reference]
         add_content("/#{ext_gstate[:name]} gs")
-        graphic_state.blend_mode = ext_gstate if ext_gstate[:reference].data.key?(:BM)
+        graphic_state.blend_mode = (ext_gstate[:name] == "BMNormal") ? nil : ext_gstate if ext_gstate[:reference].data.key?(:BM)
       end
 
-      # The blend mode in effect on the page just closed, reset to Normal by the new one (ISO 32000-1 §8.4.1): once
-      # the blocks still open are reopened, set it again if they leave another one.
-      def resume_blend_mode(blend_mode)
-        write_ext_gstate(blend_mode) unless same_blend_mode?(graphic_state.blend_mode, blend_mode)
-      end
-
-      def same_blend_mode?(blend_mode, other)
-        (blend_mode&.fetch(:name) || NORMAL_BLEND_MODE) == (other&.fetch(:name) || NORMAL_BLEND_MODE)
+      def write_blend_mode
+        write_ext_gstate(graphic_state.blend_mode || blend_mode_ext_gstate(:Normal))
       end
 
       # A block that saved its state on an earlier page ends on this one, where the state it returns to is the new
@@ -169,35 +163,12 @@ module Prawn
       def resume_graphic_settings(previous)
         previous ||= DEFAULT_GRAPHIC_STATE
         current = page.stack.last || DEFAULT_GRAPHIC_STATE
-        differing = RESUMED_SETTINGS.reject { |setting| same_setting?(setting, current, previous) }
+        differing = GRAPHIC_SETTING_WRITERS.reject { |setting, _writer| current.public_send(setting) == previous.public_send(setting) }
         return if differing.empty?
 
         state = graphic_state
-        GRAPHIC_SETTING_WRITERS.each_key { |setting| state.public_send(:"#{setting}=", previous.public_send(setting).dup) }
-        differing.each { |setting| resume_setting(setting, previous) }
-      end
-
-      # A pattern paints in place of its colour, whatever that is.
-      def same_setting?(setting, current, previous)
-        case setting
-        when :fill_color then same_paint?(current.fill_pattern, current.fill_color, previous.fill_pattern, previous.fill_color)
-        when :stroke_color then same_paint?(current.stroke_pattern, current.stroke_color, previous.stroke_pattern, previous.stroke_color)
-        when :blend_mode then same_blend_mode?(current.blend_mode, previous.blend_mode)
-        else current.public_send(setting) == previous.public_send(setting)
-        end
-      end
-
-      def same_paint?(pattern, color, previous_pattern, previous_color)
-        previous_pattern ? pattern == previous_pattern : pattern.nil? && color == previous_color
-      end
-
-      def resume_setting(setting, previous)
-        case setting
-        when :fill_color then previous.fill_pattern ? write_pattern(:fill, previous.fill_pattern) : set_fill_color
-        when :stroke_color then previous.stroke_pattern ? write_pattern(:stroke, previous.stroke_pattern) : set_stroke_color
-        when :blend_mode then write_ext_gstate(previous.blend_mode || blend_mode_ext_gstate(:Normal))
-        else send(GRAPHIC_SETTING_WRITERS.fetch(setting))
-        end
+        RESUMED_STATE.each { |setting| state.public_send(:"#{setting}=", previous.public_send(setting).dup) }
+        differing.each_value { |writer| send(writer) }
       end
 
       def initialize_internals(options)
