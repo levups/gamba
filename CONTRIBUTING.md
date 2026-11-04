@@ -24,9 +24,9 @@ release. A pull request that makes a gem run on JRuby or TruffleRuby without slo
 - A bug fix comes with a test that fails without it; a new behaviour with tests of its own.
 - A performance change states its numbers (before, after, Ruby version, with and without YJIT) and proves the
   output did not change.
-- Code follows [STYLE.md](STYLE.md) and the repository's RuboCop config.
 - Code follows [STYLE.md](STYLE.md) and the RuboCop config (`bundle exec rubocop`).
-- One change per pull request. Add a line under `## [Unreleased]` in `CHANGELOG.md`.
+- One change per pull request, titled for users: the changelog is written from it when releasing. Leave
+  `CHANGELOG.md` alone: pull requests editing it conflict with each other.
 
 Using an AI assistant is fine, as long as you have read and understood every line you submit and answer the review
 yourself. Say so in the description.
