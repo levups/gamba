@@ -22,12 +22,9 @@ module Prawn
 
       def set_gradient(type, *, **)
         gradient = parse_gradient_arguments(*, **)
-        patterns = page.resources[:Pattern] ||= {}
         name = "SP#{gradient_registry_key(gradient)}"
-        patterns[name] ||= (@gradient_registry ||= {})[name] ||= create_gradient_pattern(gradient)
-        operator = Color::OPERATOR_BY_TYPE.fetch(type) { raise ArgumentError, "unknown type '#{type}'" }
-        set_color_space(type, :Pattern)
-        add_content("/#{name} #{operator}")
+        reference = page.resources.dig(:Pattern, name) || ((@gradient_registry ||= {})[name] ||= create_gradient_pattern(gradient))
+        write_pattern(type, {name:, reference:})
       end
 
       def parse_gradient_arguments(*arguments, from: nil, to: nil, r1: nil, r2: nil, stops: nil, apply_transformations: nil)

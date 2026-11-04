@@ -132,18 +132,125 @@ class GraphicStateTest < Minitest::Test
     assert_valid(pdf)
   end
 
-  def test_a_blend_mode_without_a_block_reopens_nothing
+  def test_a_blend_mode_set_without_a_block_holds_on_the_next_page
+    document = Prawn::Document.new do
+      blend_mode(:Multiply)
+      text "Alice"
+      start_new_page
+      text "Bob"
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "/BMMultiply gs", "Bob", "Q"], operators(document.pages[1])
+    assert_equal ["BMMultiply"], document.pages[1].resources[:ExtGState].keys
+    assert_valid(pdf)
+  end
+
+  def test_a_blend_mode_set_without_a_block_inside_one_holds_until_the_block_ends
     document = Prawn::Document.new do
       save_graphics_state do
         blend_mode(:Multiply)
         start_new_page
         text "Bob"
       end
+      text "Carol"
     end
 
     document.render
 
-    assert_equal ["q", "Bob", "Q"], operators(document.pages[1])
+    assert_equal ["q", "/BMMultiply gs", "Bob", "Q", "q", "Carol", "Q"], operators(document.pages[1])
+  end
+
+  def test_a_blend_mode_set_inside_a_blend_mode_block_is_set_after_it_on_the_next_page
+    document = Prawn::Document.new do
+      blend_mode(:Screen) do
+        blend_mode(:Multiply)
+        start_new_page
+        text "Bob"
+      end
+      text "Carol"
+    end
+
+    document.render
+
+    assert_equal ["q", "/BMScreen gs", "/BMMultiply gs", "Bob", "Q", "q", "Carol", "Q"], operators(document.pages[1])
+  end
+
+  def test_a_blend_mode_set_before_a_block_crossing_a_page_break_follows_it
+    document = Prawn::Document.new do
+      blend_mode(:Multiply)
+      transparent(0.5) do
+        fill_color "0000cc"
+        save_graphics_state do
+          start_new_page
+          text "Bob"
+        end
+        text "Carol"
+      end
+      text "Dave"
+    end
+
+    pdf = document.render
+
+    # The new page sets the blend mode in the innermost block, and each block ending there sets it in the one around.
+    assert_equal ["q", "/DeviceRGB cs", "0.0 0.0 0.8 scn", "/Tr1 gs", "q", "/BMMultiply gs", "Bob", "Q", "/BMMultiply gs", "Carol", "Q",
+      "q", "/BMMultiply gs", "Dave", "Q"], operators(document.pages[1])
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_gradients_set_as_fill_and_stroke_hold_on_the_next_page
+    document = Prawn::Document.new do
+      fill_color "cc0000"
+      fill_gradient [0, 0], [100, 0], "ff0000", "0000ff"
+      stroke_gradient from: [0, 0], to: [0, 100], stops: %w[00ff00 000000]
+      text "Alice"
+      start_new_page
+      text "Bob"
+    end
+    fill_gradient, stroke_gradient = document.pages[0].resources[:Pattern].keys
+    fill_color = document.fill_color
+
+    pdf = document.render
+
+    assert_equal ["q", "/Pattern cs", "/#{fill_gradient} scn", "/Pattern CS", "/#{stroke_gradient} SCN", "Bob", "Q"], operators(document.pages[1])
+    assert_equal [fill_gradient, stroke_gradient], document.pages[1].resources[:Pattern].keys
+    assert_equal "cc0000", fill_color
+    assert_valid(pdf)
+  end
+
+  def test_a_colour_set_after_a_gradient_replaces_it_on_the_next_page
+    document = Prawn::Document.new do
+      fill_gradient [0, 0], [100, 0], "ff0000", "0000ff"
+      fill_color "cc0000"
+      start_new_page
+      text "Bob"
+    end
+
+    document.render
+
+    assert_equal ["q", "/DeviceRGB cs", "0.8 0.0 0.0 scn", "Bob", "Q"], operators(document.pages[1])
+    assert_nil document.pages[1].resources[:Pattern]
+  end
+
+  def test_a_gradient_set_before_a_block_crossing_a_page_break_follows_it
+    document = Prawn::Document.new do
+      fill_gradient [0, 0], [100, 0], "ff0000", "0000ff"
+      save_graphics_state do
+        fill_color "009900"
+        start_new_page
+        text "Bob"
+      end
+      text "Carol"
+    end
+    gradient = document.pages[0].resources[:Pattern].keys.first
+
+    pdf = document.render
+
+    assert_equal ["q", "/DeviceRGB cs", "0.0 0.6 0.0 scn", "Bob", "Q", "q", "/Pattern cs", "/#{gradient} scn", "Carol", "Q"],
+      operators(document.pages[1])
+    assert_valid(pdf)
   end
 
   def test_the_settings_before_a_block_crossing_a_page_break_follow_it

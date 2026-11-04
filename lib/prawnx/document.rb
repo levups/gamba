@@ -68,6 +68,8 @@ module Prawn
       if last_page
         new_graphic_state = last_page.graphic_state&.dup
         new_graphic_state&.color_space = {}
+        last_blend_mode = new_graphic_state&.blend_mode
+        new_graphic_state&.blend_mode = nil
         page_options[:graphic_state] = new_graphic_state
       end
 
@@ -84,6 +86,7 @@ module Prawn
       @y = @bounding_box.absolute_top
       float { @on_page_create&.call(self) }
       reopen_ext_gstate_blocks
+      resume_blend_mode(last_blend_mode)
     end
 
     def delete_page(index)
@@ -216,9 +219,16 @@ module Prawn
 
     private
 
+    # A gradient set as the fill or stroke stays it on the new page, in place of the colour Prawn writes.
     def use_graphic_settings(override_settings = false)
-      set_fill_color if current_fill_color != "000000" || override_settings
-      set_stroke_color if current_stroke_color != "000000" || override_settings
+      fill_pattern = graphic_state.fill_pattern
+      stroke_pattern = graphic_state.stroke_pattern
+      if fill_pattern then write_pattern(:fill, fill_pattern)
+      elsif current_fill_color != "000000" || override_settings then set_fill_color
+      end
+      if stroke_pattern then write_pattern(:stroke, stroke_pattern)
+      elsif current_stroke_color != "000000" || override_settings then set_stroke_color
+      end
       write_line_width if line_width != 1 || override_settings
       write_stroke_cap_style if cap_style != :butt || override_settings
       write_stroke_join_style if join_style != :miter || override_settings

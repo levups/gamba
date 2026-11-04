@@ -95,12 +95,25 @@ module Prawn
       def set_color(type, color, options = {})
         operator = OPERATOR_BY_TYPE.fetch(type) { raise ArgumentError, "unknown type '#{type}'" }
         if options[:pattern]
-          set_color_space(type, :Pattern)
-          add_content("/#{color} #{operator}")
+          write_pattern(type, {name: color, reference: page.resources.dig(:Pattern, color)})
         else
           set_color_space(type, color_space(color))
           write_color(color_to_s(color), operator)
+          track_pattern(type, nil)
         end
+      end
+
+      # Paints with a pattern, {name:, reference:}, until a colour of the same type replaces it.
+      def write_pattern(type, pattern)
+        operator = OPERATOR_BY_TYPE.fetch(type) { raise ArgumentError, "unknown type '#{type}'" }
+        (page.resources[:Pattern] ||= {})[pattern[:name]] ||= pattern[:reference] if pattern[:reference]
+        set_color_space(type, :Pattern)
+        add_content("/#{pattern[:name]} #{operator}")
+        track_pattern(type, pattern)
+      end
+
+      def track_pattern(type, pattern)
+        (type == :fill) ? graphic_state.fill_pattern = pattern : graphic_state.stroke_pattern = pattern
       end
 
       def set_fill_color(color = nil)

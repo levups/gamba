@@ -6,6 +6,9 @@ module PDF::Core
     UNDASHED = {dash: nil, space: nil, phase: 0}.freeze
 
     attr_accessor :color_space, :dash, :cap_style, :join_style, :line_width, :fill_color, :stroke_color
+    # What Prawn's state leaves out: the pattern painting in place of each colour since a gradient was set, and the
+    # blend mode's ExtGState, {name:, reference:} each, nil for none and for Normal.
+    attr_accessor :fill_pattern, :stroke_pattern, :blend_mode
 
     def initialize(previous_state = nil)
       if previous_state
@@ -16,6 +19,9 @@ module PDF::Core
         @cap_style = previous_state.cap_style
         @join_style = previous_state.join_style
         @line_width = previous_state.line_width
+        @fill_pattern = previous_state.fill_pattern
+        @stroke_pattern = previous_state.stroke_pattern
+        @blend_mode = previous_state.blend_mode
       else
         @color_space = {}
         @fill_color = "000000"

@@ -95,13 +95,19 @@ module Prawn
     module BlendMode
       def blend_mode(blend_mode = :Normal)
         min_version(1.4)
-        @blend_mode_dictionary_registry ||= {}
-        name = "BM#{Array(blend_mode).join}"
-        ext_gstate = @blend_mode_dictionary_registry[name] ||= {name:, reference: ref!(Type: :ExtGState, BM: blend_mode)}
+        ext_gstate = blend_mode_ext_gstate(blend_mode)
         return ext_gstate_block(ext_gstate) { yield } if block_given?
 
         write_ext_gstate(ext_gstate)
         nil
+      end
+
+      private
+
+      def blend_mode_ext_gstate(blend_mode)
+        @blend_mode_dictionary_registry ||= {}
+        name = "BM#{Array(blend_mode).join}"
+        @blend_mode_dictionary_registry[name] ||= {name:, reference: ref!(Type: :ExtGState, BM: blend_mode)}
       end
     end
 
