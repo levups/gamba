@@ -47,7 +47,20 @@
 - bug: A transparent block whose content crosses a page break draws the next page opaque
   proof: 'Prawn documents Prawn::Graphics::Transparency#transparent as setting the opacity of the content within the block, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, opaque: Prawn::Document#start_new_page never sets the opacity again. PrawnX reopens the blocks still open on the new page, once its header and background are drawn, the outermost in the page''s own state and the others in a state each, with their ExtGState; each block''s end closes its own state, and q and Q stay balanced on every page'
   prawn_issue:
-  prawn_switch: ORACLE_REOPEN_TRANSPARENCY
+  prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
     - transparency_across_page_break
     - transparency_nested_across_page_break
+- bug: A blend_mode block whose content crosses a page break draws the next page in the normal blend mode
+  proof: 'Prawn documents Prawn::Graphics::BlendMode#blend_mode as setting the blend mode, restored after the block it is given, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, blend mode Normal (§11.3.5): Prawn::Document#start_new_page never sets it again. PrawnX reopens the blocks still open on the new page as for transparent ones, in order, with their ExtGState'
+  prawn_issue:
+  prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
+  examples:
+    - blend_mode_across_page_break
+    - blend_mode_nested_across_page_break
+- bug: Colours, line width, dash, cap and join styles set before a block whose content crosses a page break are lost once it ends
+  proof: 'Prawn documents Prawn::Document#save_graphics_state as restoring the graphic state after the block, and ISO 32000-1 §8.4.2 has Q restore the state q saved. A block saved on an earlier page ends on the new page by closing that page''s own state, so what follows draws in the default state, black with 1-point solid lines. PrawnX writes back, after such a block ends, the settings in effect before it that the state it returns to lacks, as Prawn writes them on a new page'
+  prawn_issue:
+  prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
+  examples:
+    - graphic_settings_across_page_break

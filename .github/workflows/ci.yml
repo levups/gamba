@@ -38,16 +38,15 @@ jobs:
     name: Ruby ${{ matrix.ruby }}${{ matrix.rails && format(' · Rails {0}', matrix.rails.version) || '' }}
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    continue-on-error: ${{ endsWith(matrix.ruby, '-head') }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        # Every Ruby the core team still maintains (https://endoflife.date/ruby), ruby-head, then this gem's extra ones.
-        ruby: ["3.3", "3.4", "4.0", ruby-head, truffleruby-head]
+        # Every Ruby the core team still maintains (https://endoflife.date/ruby); the -head ones are in head.
+        ruby: ["3.3", "3.4", "4.0"]
     env:
       BUNDLE_GEMFILE: ${{ matrix.rails.gemfile != 'Gemfile' && matrix.rails.gemfile || '' }}
-    steps:
+    steps: &test-steps
       - name: Check out
         uses: actions/checkout@v7
       - name: Set up Ruby
@@ -55,20 +54,31 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-      - name: Install the PDF tools
-        run: sudo apt-get update && sudo apt-get install --yes mupdf-tools poppler-utils qpdf
-      - name: Set up Java for Mustang, the Factur-X validator
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "21"
-      - name: Cache the corpus and Mustang
+      - name: Cache the corpus, Mustang and the PDF tools' packages
         uses: actions/cache@v6
         with:
           path: |
             corpus/cache
             ~/.cache/prawnx-tools
+            ~/.cache/apt-archives
           key: prawnx-${{ runner.os }}-${{ hashFiles('corpus/manifest.yml', '.github/workflows/ci.yml') }}
+      # 2026-11-04: Azure's Ubuntu mirror stalls for minutes on libmupdf (34 MB), which cancelled whole jobs: the
+      # packages come from the cache, and a stalled attempt is cut after 90 seconds and resumed.
+      - name: Install the PDF tools
+        timeout-minutes: 6
+        run: |
+          mkdir -p ~/.cache/apt-archives/partial
+          for attempt in 1 2 3; do
+            sudo timeout 90 apt-get update && sudo timeout 90 apt-get install --yes \
+              -o Dir::Cache::Archives="$HOME/.cache/apt-archives" mupdf-tools poppler-utils qpdf && break
+            test "$attempt" -lt 3 || exit 1
+          done
+          sudo chown -R "$USER" ~/.cache/apt-archives
+      - name: Set up Java for Mustang, the Factur-X validator
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Install Prawn, the oracle
         run: BUNDLE_GEMFILE=oracle/Gemfile bundle install
       - name: Fetch the corpus
@@ -85,6 +95,22 @@ jobs:
         run: FUZZ_SEED=$GITHUB_RUN_ID FUZZ_CASES=300 bundle exec ruby -Itest test/fuzz_test.rb
       - name: Fuzz 400 malformed inputs
         run: INPUT_FUZZ_SEED=$GITHUB_RUN_ID INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb
+
+  # Allowed to fail, and truffleruby-head takes twice as long as the others: CI passed doesn't wait for them.
+  head:
+    name: Ruby ${{ matrix.ruby }}${{ matrix.rails && format(' · Rails {0}', matrix.rails.version) || '' }}
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        # ruby-head, then this gem's extra ones.
+        ruby: [ruby-head, truffleruby-head]
+    env:
+      BUNDLE_GEMFILE: ${{ matrix.rails.gemfile != 'Gemfile' && matrix.rails.gemfile || '' }}
+    steps: *test-steps
 
   docs:
     name: Highlighted docs

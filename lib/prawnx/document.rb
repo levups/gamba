@@ -83,7 +83,7 @@ module Prawn
       canvas { image(@background, scale: @background_scale, at: bounds.top_left) } if @background
       @y = @bounding_box.absolute_top
       float { @on_page_create&.call(self) }
-      reopen_transparent_blocks
+      reopen_ext_gstate_blocks
     end
 
     def delete_page(index)

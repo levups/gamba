@@ -43,53 +43,83 @@ end
 
 # Whether a switch below changed what Prawn draws for the example being rendered.
 module PrawnSwitch
+  OpenSave = Struct.new(:previous, :ext_gstate)
+  # The settings a new page writes, each with its writer, in the order Prawn writes them.
+  GRAPHIC_SETTING_WRITERS = {fill_color: :set_fill_color, stroke_color: :set_stroke_color, line_width: :write_line_width,
+                             cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash}.freeze
+
   class << self
     attr_accessor :taken
   end
 end
 
-# ORACLE_REOPEN_TRANSPARENCY: like PrawnX, a page break reopens the blocks still open when one of them is transparent,
-# the outermost in the new page's own state, each with its opacity. An example where it did is marked <name>.switched:
-# only there may PrawnX differ from Prawn without this switch (prawn_switch in test/divergences.yml).
-if ENV["ORACLE_REOPEN_TRANSPARENCY"]
+# ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK: like PrawnX, a page break reopens the open transparent and blend_mode blocks,
+# and a block saved on an earlier page writes back, once it ends, the settings in effect before it. Where either
+# happened, <name>.switched: only there may PrawnX differ from plain Prawn (prawn_switch in test/divergences.yml).
+if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
   Prawn::Document.prepend(Module.new do
-    def save_graphics_state(*)
-      open_opacities << nil
-      return super unless block_given?
+    # The block runs here, not in Prawn's renderer, whose restore would bypass this module's.
+    def save_graphics_state(graphic_state = nil)
+      open_saves << PrawnSwitch::OpenSave.new(renderer.graphic_stack.current_state, nil)
+      super(graphic_state, &nil)
+      return unless block_given?
 
-      super.tap { open_opacities.pop }
+      yield
+      restore_graphics_state
     end
 
     def restore_graphics_state
-      open_opacities.pop
+      open_save = open_saves.pop
       super
+      resume_graphic_settings(open_save.previous) if open_save && !renderer.graphic_stack.current_state.equal?(open_save.previous)
     end
 
     def transparent(opacity, stroke_opacity = opacity)
       super do
-        open_opacities[-1] = [opacity.clamp(0.0, 1.0), stroke_opacity.clamp(0.0, 1.0)]
+        open_saves.last.ext_gstate = -> { opacity_dictionary_name(opacity.clamp(0.0, 1.0), stroke_opacity.clamp(0.0, 1.0)) }
+        yield
+      end
+    end
+
+    def blend_mode(blend_mode = :Normal)
+      return super unless block_given?
+
+      super do
+        open_saves.last.ext_gstate = -> { blend_mode_dictionary_name(blend_mode) }
         yield
       end
     end
 
     def start_new_page(options = {})
       super
-      return if options[:orphan] || open_opacities.none?
+      return if options[:orphan] || open_saves.none?(&:ext_gstate)
 
       PrawnSwitch.taken = true
-      outermost, *inner = open_opacities
-      renderer.add_content("/#{opacity_dictionary_name(*outermost)} gs") if outermost
-      inner.each do |opacities|
+      outermost, *inner = open_saves
+      renderer.add_content("/#{outermost.ext_gstate.call} gs") if outermost.ext_gstate
+      inner.each do |open_save|
         renderer.graphic_stack.save_graphic_state
         renderer.add_content("q")
-        renderer.add_content("/#{opacity_dictionary_name(*opacities)} gs") if opacities
+        renderer.add_content("/#{open_save.ext_gstate.call} gs") if open_save.ext_gstate
       end
     end
 
     private
 
-    def open_opacities
-      @open_opacities ||= []
+    def open_saves
+      @open_saves ||= []
+    end
+
+    def resume_graphic_settings(previous)
+      previous ||= PDF::Core::GraphicState.new
+      current = renderer.graphic_stack.current_state || PDF::Core::GraphicState.new
+      differing = PrawnSwitch::GRAPHIC_SETTING_WRITERS.reject { |setting, _writer| current.public_send(setting) == previous.public_send(setting) }
+      return if differing.empty?
+
+      PrawnSwitch.taken = true
+      state = graphic_state
+      PrawnSwitch::GRAPHIC_SETTING_WRITERS.each_key { |setting| state.public_send(:"#{setting}=", previous.public_send(setting).dup) }
+      differing.each_value { |writer| send(writer) }
     end
   end)
 end

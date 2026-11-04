@@ -85,42 +85,23 @@ module Prawn
         min_version(1.4)
         opacity = opacity.clamp(0.0, 1.0)
         stroke_opacity = stroke_opacity.clamp(0.0, 1.0)
-        save_graphics_state
-        @unrestored_graphics_states[-1] = [opacity, stroke_opacity]
-        add_content("/#{opacity_dictionary_name(opacity, stroke_opacity)} gs")
-        yield
-        restore_graphics_state
-      end
-
-      private
-
-      def opacity_dictionary_name(opacity, stroke_opacity)
         @opacity_dictionary_registry ||= {}
-        entry = @opacity_dictionary_registry["#{opacity}_#{stroke_opacity}"] ||=
+        ext_gstate = @opacity_dictionary_registry["#{opacity}_#{stroke_opacity}"] ||=
           {name: "Tr#{@opacity_dictionary_registry.length + 1}", reference: ref!(Type: :ExtGState, CA: stroke_opacity, ca: opacity)}
-        page.ext_gstates[entry[:name]] = entry[:reference]
-        entry[:name]
+        ext_gstate_block(ext_gstate) { yield }
       end
     end
 
     module BlendMode
       def blend_mode(blend_mode = :Normal)
         min_version(1.4)
-        save_graphics_state if block_given?
-        add_content("/#{blend_mode_dictionary_name(blend_mode)} gs")
-        return unless block_given?
-
-        yield
-        restore_graphics_state
-      end
-
-      private
-
-      def blend_mode_dictionary_name(blend_mode)
         @blend_mode_dictionary_registry ||= {}
         name = "BM#{Array(blend_mode).join}"
-        page.ext_gstates[name] = @blend_mode_dictionary_registry[name] ||= ref!(Type: :ExtGState, BM: blend_mode)
-        name
+        ext_gstate = @blend_mode_dictionary_registry[name] ||= {name:, reference: ref!(Type: :ExtGState, BM: blend_mode)}
+        return ext_gstate_block(ext_gstate) { yield } if block_given?
+
+        write_ext_gstate(ext_gstate)
+        nil
       end
     end
 
