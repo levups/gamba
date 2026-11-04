@@ -12,7 +12,7 @@ class Prawn::SVG::Elements::Image < Prawn::SVG::Elements::Base
     end
   end
 
-  ImageData = Struct.new(:dimensions, :document)
+  ImageData = Data.define(:dimensions, :document)
 
   def parse
     require_attributes "width", "height"

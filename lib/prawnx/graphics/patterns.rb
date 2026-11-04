@@ -6,8 +6,8 @@ module Prawn
   module Graphics
     # Axial and radial gradients, as shading patterns (ISO 32000-1 §8.7.4.5).
     module Patterns
-      GradientStop = Struct.new(:position, :color)
-      Gradient = Struct.new(:type, :apply_transformations, :stops, :from, :to, :r1, :r2)
+      GradientStop = Data.define(:position, :color)
+      Gradient = Data.define(:type, :apply_transformations, :stops, :from, :to, :r1, :r2)
       IDENTITY_MATRIX = [1, 0, 0, 1, 0, 0].freeze
 
       def fill_gradient(*, **)

@@ -1,6 +1,4 @@
 class Prawn::SVG::Elements::Circle < Prawn::SVG::Elements::Base
-  USE_NEW_CIRCLE_CALL = Prawn::Document.method_defined?(:circle)
-
   def parse
     require_attributes "r"
 
@@ -12,11 +10,7 @@ class Prawn::SVG::Elements::Circle < Prawn::SVG::Elements::Base
   end
 
   def apply
-    if USE_NEW_CIRCLE_CALL
-      add_call "circle", [@x, @y], @r
-    else
-      add_call "circle_at", [@x, @y], radius: @r
-    end
+    add_call "circle", [@x, @y], @r
   end
 
   def bounding_box

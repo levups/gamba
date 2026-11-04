@@ -1,6 +1,4 @@
 class Prawn::SVG::Elements::Ellipse < Prawn::SVG::Elements::Base
-  USE_NEW_ELLIPSE_CALL = Prawn::Document.method_defined?(:ellipse)
-
   def parse
     require_attributes "rx", "ry"
 
@@ -13,7 +11,7 @@ class Prawn::SVG::Elements::Ellipse < Prawn::SVG::Elements::Base
   end
 
   def apply
-    add_call USE_NEW_ELLIPSE_CALL ? "ellipse" : "ellipse_at", [@x, @y], @rx, @ry
+    add_call "ellipse", [@x, @y], @rx, @ry
   end
 
   def bounding_box
