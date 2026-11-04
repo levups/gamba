@@ -8,7 +8,7 @@ const METRICS = [
 const ENGINE_NAMES = { prawn: "Prawn", prawnx: "PrawnX" };
 const DOCUMENT_DESCRIPTIONS = {
   invoice: "A one-page invoice: an embedded TrueType font, a JPEG letterhead, a ten-line table.",
-  report: "A 50-page report: an embedded TrueType font, a PNG with alpha and a JPEG on every page, justified text.",
+  report: "A 101-page report: an embedded TrueType font, a PNG with alpha and a JPEG on every page, justified text.",
   catalog: "A long catalog: a thousand table rows over many pages, the header repeated on each one."
 };
 
@@ -61,7 +61,14 @@ const strongest = (ratios) => ratios.reduce((strongest, entry) => entry.ratio > 
 
 function measuredOn(benchmarks) {
   const ruby = benchmarks.ruby.split(" (")[0].replace("ruby", "Ruby");
-  return `Measured on ${ruby} with YJIT, each engine in its own process, median of ${benchmarks.iterations} renders.`;
+  return `Measured on ${ruby} with YJIT, median of ${benchmarks.processes} fresh processes per engine, each timing ${benchmarks.iterations} renders.`;
+}
+
+function memoryTile(memory, tile) {
+  const lower = memory.filter((entry) => entry.ratio > 1);
+  const peak = (entry) => `${formatNumber(entry.prawnx)} MB instead of ${formatNumber(entry.prawn)} MB`;
+  if (lower.length === memory.length) return tile(formatPercent(1 - 1 / weakest(memory).ratio), "less peak memory, at the least", `The ${strongest(memory).name}: ${peak(strongest(memory))}`);
+  return tile(`${lower.length} of ${memory.length}`, "documents with less peak memory", `The ${strongest(memory).name}: ${peak(strongest(memory))}; the ${weakest(memory).name}: ${peak(weakest(memory))}`);
 }
 
 function renderHome(benchmarks) {
@@ -80,7 +87,7 @@ function renderHome(benchmarks) {
     tile(formatRatio(weakest(speed).ratio), "faster, at the least", `The ${fastest.name}: ${formatSeconds(fastest.prawnx)} instead of ${formatSeconds(fastest.prawn)}, ${formatRatio(fastest.ratio)} faster`),
     tile(formatRatio(weakest(allocations).ratio), "fewer allocations, at the least", `The ${strongest(allocations).name}: ${formatNumber(strongest(allocations).prawnx)} objects instead of ${formatNumber(strongest(allocations).prawn)}`),
     tile(formatPercent(1 - 1 / weakest(weight).ratio), "lighter files, at the least", `The ${strongest(weight).name}: ${formatBytes(strongest(weight).prawnx)} instead of ${formatBytes(strongest(weight).prawn)}, the same pixels`),
-    tile(formatPercent(1 - 1 / weakest(memory).ratio), "less peak memory, at the least", `The ${strongest(memory).name}: ${formatNumber(strongest(memory).prawnx)} MB instead of ${formatNumber(strongest(memory).prawn)} MB`));
+    memoryTile(memory, tile));
   fill("#tiles-note", `${measuredOn(benchmarks)} Each headline is the weakest of the three documents on the benchmarks page.`);
 }
 

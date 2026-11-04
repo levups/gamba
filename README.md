@@ -1,6 +1,6 @@
 # PrawnX
 
-Prawn's API, rewritten for speed: the same pages, pixel for pixel, in lighter files, faster and with less memory.
+Prawn's API, rewritten for speed: the same pages, pixel for pixel, in lighter files, faster.
 
 https://next-gen-gems.github.io/prawnx/
 
@@ -78,14 +78,15 @@ PRAWNX_CAPTURE_DIRECTORY=tmp/prawn RUBYOPT=-r/path/to/prawnx/script/capture_pdfs
 
 ## Performance
 
-`bundle exec rake bench` renders each document of `bench/documents` with Prawn 2.5 and with PrawnX, each in its own
-YJIT process, and writes `docs/benchmarks.json`. Median of 20 renders, on Ruby 4.0.9:
+`bundle exec rake bench` renders each document of `bench/documents` with Prawn 2.5 and with PrawnX in 7 fresh YJIT
+processes each, taking turns, and writes `docs/benchmarks.json`. Each process times 20 renders; the table shows the
+median of the 7 processes, on Ruby 4.0.9:
 
 | Document | Prawn | PrawnX | Allocations, Prawn → PrawnX | Weight, Prawn → PrawnX |
 |---|---:|---:|---:|---:|
-| Invoice, one page | 22.9 ms | 5.2 ms | 167,104 → 32,601 | 45,076 → 30,741 bytes |
-| Report, 50 pages | 499.8 ms | 201.5 ms | 3,064,282 → 1,932,990 | 209,010 → 166,070 bytes |
-| Catalog, 1,000 table rows | 570.5 ms | 266.9 ms | 3,999,685 → 2,085,019 | 155,369 → 137,109 bytes |
+| Invoice, one page | 22.1 ms | 4.5 ms | 163,881 → 31,366 | 38,766 → 28,992 bytes |
+| Report, 101 pages | 559.4 ms | 216.0 ms | 3,350,853 → 2,089,008 | 207,815 → 164,924 bytes |
+| Catalog, 1,000 table rows | 544.9 ms | 265.6 ms | 3,979,977 → 2,078,343 | 147,731 → 134,082 bytes |
 
 Charts and peak memory: https://next-gen-gems.github.io/prawnx/benchmarks.html
 
