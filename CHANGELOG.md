@@ -7,6 +7,8 @@
   `EmptyGraphicStateStack` when they end together, where Prawn raises.
 - A PNG with an alpha channel whose header announces a width its data never fills renders instead of
   building a per-pixel layout of that width (`ArgumentError: argument too big` on TruffleRuby).
+- Fonts with a format 6 or 10 cmap map each character to its glyph as Prawn does, and GPOS kerning reads format 1
+  class definitions: the glyph arrays were indexed by a bit of each glyph instead of its position.
 
 ## [1.0.0] — 2026-11-04
 
