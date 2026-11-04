@@ -2,13 +2,30 @@
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-11-04
+
+Text layout up to 26% faster, page breaks that keep what the page was drawing with, and corrupted fonts and
+PNGs refused cleanly instead of crashing.
+
+**Faster**
+- Text-heavy documents render 15% faster without JIT and 26% faster with YJIT, with 62% fewer allocations;
+  catalogs and invoices 6% faster without JIT and 8% with YJIT (Ruby 4.0, similar on 3.3). Same PDFs, byte for
+  byte.
+
 **Fixed**
+- A `transparent` or `blend_mode` block whose content crosses a page break keeps its opacity and blend mode on
+  the next page, and the colours, line width, dash, cap and join styles set before it still apply once it ends,
+  where Prawn draws opaque, in the Normal blend mode, then black with thin solid lines.
 - Nested blocks saving the graphics state (`transparent`, `rotate`…) that cross a page break no longer raise
   `EmptyGraphicStateStack` when they end together, where Prawn raises.
-- A PNG with an alpha channel whose header announces a width its data never fills renders instead of
-  building a per-pixel layout of that width (`ArgumentError: argument too big` on TruffleRuby).
-- A `transparent` block whose content crosses a page break keeps its opacity on the next page, where Prawn draws
-  it opaque.
+- A space is encoded in the font subset of the character before it, as Prawn does: the text operators match
+  Prawn's again, and so does the text extracted from the PDF.
+- TrueType fonts with a format 6 or 10 cmap map every character to its glyph, as in Prawn, and opt-in GPOS
+  kerning reads format 1 class definitions correctly.
+- A corrupted font (`unitsPerEm` of zero, a table too short, a truncated glyph) raises
+  `PrawnX::TrueType::Error` instead of `FloatDomainError`, `ArgumentError` or nil metrics.
+- A PNG with an alpha channel no longer takes gigabytes of memory on very wide rows, nor fails with
+  `ArgumentError: argument too big` on TruffleRuby when its data fills no row.
 
 ## [1.0.0] — 2026-11-04
 
@@ -27,5 +44,6 @@ speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
   place of combine_pdf.
 - `PrawnX::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
 
-[Unreleased]: https://github.com/next-gen-gems/prawnx/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/next-gen-gems/prawnx/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/next-gen-gems/prawnx/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/next-gen-gems/prawnx/releases/tag/v1.0.0
