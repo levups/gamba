@@ -73,6 +73,8 @@ module Prawn
         previous = graphic_state ? page.stack.last : self.graphic_state
         @unrestored_graphics_states << OpenSave.new(previous, nil)
         page.stack.push(PDF::Core::GraphicState.new(graphic_state || previous))
+        # A state given, as a dynamic repeater gives the one it was created in, still inherits the page's text state.
+        page.stack.last.copy_text_state(previous) if graphic_state
         add_content("q")
         return unless block_given?
 

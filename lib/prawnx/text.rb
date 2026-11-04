@@ -277,19 +277,19 @@ module Prawn
         when :character_spacing then "\n#{PDF::Core.real(value)} Tc"
         when :word_spacing then "\n#{PDF::Core.real(value)} Tw"
         when :horizontal_text_scaling then "\n#{PDF::Core.real(value)} Tz"
-        else "\n#{PDF::Core.real(value)} Ts"
+        when :rise then "\n#{PDF::Core.real(value)} Ts"
         end
       )
-      state = page.stack.last
-      state.text_state = state.text_state.merge(setting => value).freeze
+      page.stack.last.public_send(PDF::Core::GraphicState::TEXT_STATE_WRITERS[setting], value)
     end
 
     # The text state parameters are part of the graphic state (ISO 32000-1 §9.3.1): a new page starts without them, and
     # a restore closing a state opened on the page returns to that state's. Write back those of the blocks still open
     # that the current state lacks. A text rendering mode forgotten by forget_text_rendering_mode! is unknown: none.
     def resume_text_state
-      current = page.stack.last&.text_state || PDF::Core::GraphicState::DEFAULT_TEXT_STATE
-      current.each do |setting, written|
+      current = page.stack.last
+      PDF::Core::GraphicState::DEFAULT_TEXT_STATE.each do |setting, default|
+        written = current ? current.public_send(setting) : default
         value = public_send(setting)
         write_text_state(setting, value) unless value == written || value == :unknown
       end

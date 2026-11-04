@@ -22,6 +22,7 @@ class FuzzDocuments
     lines = [FONT_SETUP]
     lines << (pick([true, false]) ? 'font "DejaVu"' : 'font "Helvetica"')
     rand(3..9).times { lines << statement(depth: 0) }
+    lines << 'number_pages "<page> / <total>", at: [0, 0]' if rand < 0.3
     lines.join("\n")
   end
 

@@ -277,6 +277,49 @@ class GraphicStateTest < Minitest::Test
     assert_equal ["q", "3.0 Tc", "Bob", "Q", "q", "3.0 Tc", "Carol", "0.0 Tc", "Q"], operators(document.pages[1])
   end
 
+  def test_text_flowing_onto_an_existing_page_keeps_the_text_state_of_its_block
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      character_spacing(2) do
+        go_to_page(2)
+        text "Bob"
+      end
+    end
+
+    document.render
+
+    assert_equal ["q", "2.0 Tc", "Bob", "0.0 Tc", "Q"], operators(document.pages[1])
+  end
+
+  def test_page_numbers_drawn_after_a_block_ended_on_a_later_page_do_not_take_its_text_state
+    document = Prawn::Document.new do
+      text_rendering_mode(:invisible) do
+        text "Alice"
+        start_new_page
+        text "Bob"
+      end
+      number_pages "<page>", at: [0, 0]
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "3 Tr", "Alice", "0 Tr", "1", "Q"], operators(document.pages[0])
+    assert_equal ["q", "3 Tr", "Bob", "0 Tr", "2", "Q"], operators(document.pages[1])
+    assert_valid(pdf)
+  end
+
+  def test_a_state_given_to_a_save_inherits_the_text_state_of_the_page
+    document = Prawn::Document.new
+    given = nil
+    document.character_spacing(2) { given = document.graphic_state.dup }
+    recorded = nil
+
+    document.save_graphics_state(given) { recorded = document.graphic_state.character_spacing }
+
+    assert_equal [2, 0], [given.character_spacing, recorded]
+  end
+
   def test_a_forgotten_text_rendering_mode_is_not_written_on_the_next_page
     document = Prawn::Document.new do
       forget_text_rendering_mode!

@@ -47,6 +47,7 @@ module PrawnSwitch
   # The settings a new page writes, each with its writer, in the order Prawn writes them.
   GRAPHIC_SETTING_WRITERS = {fill_color: :set_fill_color, stroke_color: :set_stroke_color, line_width: :write_line_width,
                              cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash}.freeze
+  # PrawnX's PDF::Core::GraphicState::DEFAULT_TEXT_STATE, which Prawn's pdf-core lacks.
   DEFAULT_TEXT_STATE = {text_rendering_mode: :fill, character_spacing: 0, word_spacing: 0, horizontal_text_scaling: 100, rise: 0}.freeze
 
   class << self
@@ -55,8 +56,8 @@ module PrawnSwitch
 end
 
 # ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK: like PrawnX, a page break reopens the open transparent and blend_mode blocks,
-# and a block saved on an earlier page writes back, once it ends, the settings in effect before it. A new page, and a
-# block ending on a later page, write back the text state of the blocks still open. Where any of these happened,
+# and a block saved on an earlier page writes back, once it ends, the settings in effect before it. A new page, a block
+# ending on a later page and go_to_page write back the text state in effect. Where any of these happened,
 # <name>.switched: only there may PrawnX differ from plain Prawn (prawn_switch in test/divergences.yml).
 if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
   # Each state records the text state written in it, as PrawnX's does.
@@ -84,8 +85,10 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
 
     # The block runs here, not in Prawn's renderer, whose restore would bypass this module's.
     def save_graphics_state(graphic_state = nil)
-      open_saves << PrawnSwitch::OpenSave.new(renderer.graphic_stack.current_state, nil)
+      previous = renderer.graphic_stack.current_state
+      open_saves << PrawnSwitch::OpenSave.new(previous, nil)
       super(graphic_state, &nil)
+      renderer.graphic_stack.current_state.text_state = previous&.text_state if graphic_state
       return unless block_given?
 
       yield
@@ -120,6 +123,12 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     # Only start_new_page calls it, once the new page's state is a copy of the last page's.
     def use_graphic_settings(*)
       renderer.graphic_stack.current_state&.text_state = PrawnSwitch::DEFAULT_TEXT_STATE
+      super
+      resume_text_state
+    end
+
+    # Content drawn on a page again, or flowing onto one that exists, is laid out with the text state in effect.
+    def go_to_page(*)
       super
       resume_text_state
     end

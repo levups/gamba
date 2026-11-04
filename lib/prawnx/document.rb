@@ -68,7 +68,7 @@ module Prawn
       if last_page
         new_graphic_state = last_page.graphic_state&.dup
         new_graphic_state&.color_space = {}
-        new_graphic_state&.text_state = PDF::Core::GraphicState::DEFAULT_TEXT_STATE
+        new_graphic_state&.reset_text_state
         page_options[:graphic_state] = new_graphic_state
       end
 
@@ -107,6 +107,7 @@ module Prawn
       @page = pages[page_number - 1]
       generate_margin_box
       @y = @bounding_box.absolute_top
+      resume_text_state
     end
 
     def y=(new_y)
