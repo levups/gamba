@@ -87,3 +87,16 @@ jobs:
           ruby-version: "4.0"
           bundler-cache: true
       - run: bundle exec rake docs:highlight:check
+
+  # The one check main's ruleset requires, so the Rubies, Rails and jobs above can change without touching it.
+  # Every other job belongs in needs: bin/x-gems-ci-check in levups/oss checks it.
+  passed:
+    name: CI passed
+    if: always()
+    needs: [rubocop, test, docs]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: echo "$NEEDS" | jq --exit-status 'all(.[]; .result == "success")'
+        env:
+          NEEDS: ${{ toJSON(needs) }}
