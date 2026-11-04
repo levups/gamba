@@ -177,7 +177,7 @@ module PrawnX
         format = table.unpack1("@#{offset} n")
         if format == 1
           start, count = table.unpack("@#{offset + 2} n2")
-          table.unpack("@#{offset + 6} n#{count}").each { classes[start + _1[1]] = _1[0] }
+          table.unpack("@#{offset + 6} n#{count}").each_with_index { |glyph_class, index| classes[start + index] = glyph_class }
         else
           count = table.unpack1("@#{offset + 2} n")
           table.unpack("@#{offset + 4} n#{count * 3}").each_slice(3) { |first, last, value| (first..last).each { classes[_1] = value } }

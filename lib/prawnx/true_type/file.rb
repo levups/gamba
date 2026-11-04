@@ -329,11 +329,11 @@ module PrawnX
         when 6
           first_code, count = cmap.unpack("@#{offset + 6} n2")
           count = [count, (cmap.bytesize - offset - 10) / 2].min
-          cmap.unpack("@#{offset + 10} n#{count}").each { glyph_by_code[first_code + _1[1]] = _1[0] }
+          cmap.unpack("@#{offset + 10} n#{count}").each_with_index { |glyph, index| glyph_by_code[first_code + index] = glyph }
         when 10
           first_code, count = cmap.unpack("@#{offset + 12} N2")
           count = [count, (cmap.bytesize - offset - 20) / 2].min
-          cmap.unpack("@#{offset + 20} n#{count}").each { glyph_by_code[first_code + _1[1]] = _1[0] }
+          cmap.unpack("@#{offset + 20} n#{count}").each_with_index { |glyph, index| glyph_by_code[first_code + index] = glyph }
         when 12
           group_count = [cmap.unpack1("@#{offset + 12} N"), (cmap.bytesize - offset - 16) / 12].min
           cmap.unpack("@#{offset + 16} N#{group_count * 3}").each_slice(3) do |start_code, end_code, start_glyph|
