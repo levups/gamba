@@ -35,3 +35,9 @@
   differences:
     - '/\Apage 1: \d+ pixel rows differ at 150 dpi\z/'
     - '/\Apage 1: \d+ pixel rows differ at 150 dpi in Poppler\z/'
+- bug: Blocks saving the graphics state, still open at a page break, raise EmptyGraphicStateStack once one saves on the emptied stack
+  proof: 'Prawn::Document#start_new_page gives the new page a stack of one state, so blocks still open restore states it never saved: the inner one pops the page''s own state, the next block saves a single state on the empty stack, and the outer one finds nothing to restore. PrawnX reopens the page''s state first, as before any content, and keeps q and Q balanced on every page'
+  prawn_issue:
+  prawn_raises: PDF::Core::Errors::EmptyGraphicStateStack
+  examples:
+    - graphic_state_saved_on_emptied_stack

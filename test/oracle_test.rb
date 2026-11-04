@@ -27,7 +27,11 @@ class OracleTest < Minitest::Test
         divergence = DIVERGENCE_BY_EXAMPLE[name]
         skip "Prawn bug, see test/divergences.yml: #{divergence["bug"]}" if CANDIDATE == "prawn" && divergence
 
-        differences = Oracle.differences(reference, candidate, name)
+        differences = if divergence&.key?("prawn_raises")
+          Oracle.fixed_crash_differences(reference, candidate, name, divergence["prawn_raises"])
+        else
+          Oracle.differences(reference, candidate, name)
+        end
         expected_differences = divergence&.fetch("differences", nil) || []
         if passing_names.include?(name)
           assert expected?(differences, expected_differences),
