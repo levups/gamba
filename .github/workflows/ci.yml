@@ -63,14 +63,17 @@ jobs:
             ~/.cache/prawnx-tools
             ~/.cache/apt-archives
           key: prawnx-${{ runner.os }}-${{ hashFiles('corpus/manifest.yml', '.github/workflows/ci.yml') }}
-      # 2026-11-04: Azure's Ubuntu mirror stalled 15 minutes on libmupdf (34 MB), cancelling the job: the packages
-      # come from the cache, and a stalled mirror fails the step in minutes instead of the whole job.
+      # 2026-11-04: Azure's Ubuntu mirror stalls for minutes on libmupdf (34 MB), which cancelled whole jobs: the
+      # packages come from the cache, and a stalled attempt is cut after 90 seconds and resumed.
       - name: Install the PDF tools
-        timeout-minutes: 5
+        timeout-minutes: 6
         run: |
           mkdir -p ~/.cache/apt-archives/partial
-          sudo apt-get update
-          sudo apt-get install --yes -o Dir::Cache::Archives="$HOME/.cache/apt-archives" mupdf-tools poppler-utils qpdf
+          for attempt in 1 2 3; do
+            sudo timeout 90 apt-get update && sudo timeout 90 apt-get install --yes \
+              -o Dir::Cache::Archives="$HOME/.cache/apt-archives" mupdf-tools poppler-utils qpdf && break
+            test "$attempt" -lt 3 || exit 1
+          done
           sudo chown -R "$USER" ~/.cache/apt-archives
       - name: Set up Java for Mustang, the Factur-X validator
         uses: actions/setup-java@v6
