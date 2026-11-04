@@ -184,7 +184,12 @@ module PrawnX
 
         simple = glyphs.select { |glyph| glyph.bytesize >= 10 && glyph.unpack1("s>") >= 0 }
         contours = simple.map { _1.unpack1("s>") }
-        points = simple.zip(contours).map! { |glyph, count| count.zero? ? 0 : glyph.unpack1("@#{10 + ((count - 1) * 2)} n") + 1 }
+        points = simple.zip(contours).map! do |glyph, count|
+          next 0 if count.zero?
+          raise Error, "Truncated simple glyph" if glyph.bytesize < 10 + (count * 2)
+
+          glyph.unpack1("@#{10 + ((count - 1) * 2)} n") + 1
+        end
         maxp[6, 4] = [points.max || 0, contours.max || 0].pack("n2")
         maxp
       end
