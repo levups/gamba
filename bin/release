@@ -85,7 +85,9 @@ target = Gem::Version.new(
 tag = "v#{target}"
 
 # The tree, the branch, the tags and CI.
-abort "Uncommitted changes:\n#{run("git", "status", "--short")}" unless run("git", "status", "--porcelain").empty?
+# CHANGELOG.md alone may be uncommitted: the notes written for this release, committed with the version.
+uncommitted = run("git", "status", "--short", "--", ".", ":(exclude)#{CHANGELOG}")
+abort "Uncommitted changes:\n#{uncommitted}" unless uncommitted.empty?
 branch = run("git", "branch", "--show-current").strip
 abort "On #{branch}: releases are cut from main" unless branch == "main"
 run("git", "fetch", "--quiet", "--tags", "origin", "main")
