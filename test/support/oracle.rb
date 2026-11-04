@@ -189,12 +189,13 @@ module Oracle
 
   # MuPDF hints some glyphs differently whether a font's subset tag is valid or not, and Prawn's lowercase hexadecimal
   # tags are not ("exactly six uppercase letters", ISO 32000-1 §9.6.4): both documents get the same tag before drawing.
-  # Streams stay compressed, so no byte of a font program can be mistaken for a tag.
+  # Only names after /BaseFont or /FontName change: compressed stream data can hold a tag's bytes by chance, and
+  # rewriting them there would corrupt that stream.
   def self.with_neutral_subset_tags(pdf, path)
     _output, status = Open3.capture2e("qpdf", "--qdf", "--object-streams=disable", "--stream-data=preserve", pdf, path)
     return pdf unless status.success? || status.exitstatus == QPDF_WARNINGS_EXIT_STATUS
 
-    File.binwrite(path, File.binread(path).gsub(%r{/[0-9A-Za-z]{6}\+}n, "/AAAAAA+"))
+    File.binwrite(path, File.binread(path).gsub(%r{(/(?:BaseFont|FontName)\s*)/[0-9A-Za-z]{6}\+}n, '\1/AAAAAA+'))
     path
   end
 
