@@ -29,8 +29,8 @@ bundle exec rubocop             # Standard's rules + every rubocop-performance c
 bundle exec rake bench          # Prawn vs PrawnX on bench/documents, writes docs/benchmarks.json
 ```
 
-CI (`.github/workflows/ci.yml`) runs RuboCop, then Ruby 3.3, 3.4, 4.0, ruby-head, truffleruby-head and macOS, with
-the oracle, the suite and both fuzzers on a fresh seed.
+CI (`.github/workflows/ci.yml`) runs RuboCop, then Ruby 3.3, 3.4, 4.0, ruby-head and truffleruby-head, with the
+oracle, the suite and both fuzzers on a fresh seed; not on drafts. No macOS job: we run the tests on Macs.
 
 ## Traps
 
