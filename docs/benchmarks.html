@@ -59,7 +59,7 @@
 <pre><code class="language-sh">bundle <span class="nb">install</span> <span class="o">&amp;&amp;</span> <span class="nv">BUNDLE_GEMFILE</span><span class="o">=</span>oracle/Gemfile bundle <span class="nb">install
 </span>bundle <span class="nb">exec </span>rake corpus:fetch  <span class="c"># Prawn's fonts and images, into corpus/cache</span>
 bundle <span class="nb">exec </span>rake bench         <span class="c"># BENCH_ITERATIONS=20 by default</span></code></pre>
-        <p><code>bench/compare.rb</code> renders each document of <code>bench/documents/</code> with Prawn, from its own bundle in <code>oracle/Gemfile</code>, and with PrawnX, each in its own YJIT process. It measures the median render time, the objects one render allocates, the file’s weight and the process’s peak memory, and writes <code>docs/benchmarks.json</code>, which every page of this site reads.</p>
+        <p><code>bench/compare.rb</code> renders each document of <code>bench/documents/</code> with Prawn, from its own bundle in <code>oracle/Gemfile</code>, and with PrawnX, in 7 fresh YJIT processes per engine that take turns. Each process measures the median of 20 renders, the objects one render allocates, the file’s weight and its peak memory; the site shows the median of the 7 processes, as <code>docs/benchmarks.json</code> records it. Peak memory varies by about 20% from one process to the next, which one process cannot show. It writes <code>docs/benchmarks.json</code>, which every page of this site reads.</p>
       </div>
     </section>
   </main>
