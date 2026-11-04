@@ -241,4 +241,5 @@ text-win_ansi_charset-1
 ttc_faces_measured_apart
 win_ansi_y_dieresis
 table_cells_laid_out_again
+graphic_state_restored_across_page_break
 graphic_state_saved_on_emptied_stack

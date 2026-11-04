@@ -43,11 +43,11 @@ module Oracle
     Dir[File.join(ROOT, "corpus/cache/prawn-table/manual/table/*.rb")].sort.select { File.read(_1).include?("Example.generate(filename)") }
   end
 
-  def self.render(engine, paths, directory)
+  def self.render(engine, paths, directory, environment = {})
     FileUtils.rm_rf(directory)
     settings = ENGINES.fetch(engine)
     command = ["bundle", "exec", "ruby", *settings[:load_path], RENDER_SCRIPT, directory, *paths]
-    _output, errors, status = Bundler.with_unbundled_env { Open3.capture3({"BUNDLE_GEMFILE" => settings[:gemfile]}, *command) }
+    _output, errors, status = Bundler.with_unbundled_env { Open3.capture3(environment.merge("BUNDLE_GEMFILE" => settings[:gemfile]), *command) }
     Rendering.new(engine:, directory:, failure: (errors.lines.last&.chomp unless status.success?))
   end
 

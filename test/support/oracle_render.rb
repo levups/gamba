@@ -24,6 +24,23 @@ Prawn::Document.prepend(Module.new do
   end
 end)
 
+# ORACLE_PAST_GRAPHIC_STATE_CRASH: like PrawnX, Prawn lets a restore end without anything to close on an emptied
+# stack while a save is still open, to tell what a document raises further on.
+if ENV["ORACLE_PAST_GRAPHIC_STATE_CRASH"]
+  PDF::Core::Renderer.prepend(Module.new do
+    def save_graphics_state(*)
+      @unrestored_graphics_states = (@unrestored_graphics_states || 0) + 1
+      super
+    end
+
+    def restore_graphics_state
+      saved = @unrestored_graphics_states.to_i.positive?
+      @unrestored_graphics_states -= 1 if saved
+      super unless saved && graphic_stack.empty?
+    end
+  end)
+end
+
 CACHE_DIRECTORY = File.expand_path("../../corpus/cache", __dir__)
 MANUAL_DIRECTORY = File.join(CACHE_DIRECTORY, "prawn/manual/")
 
