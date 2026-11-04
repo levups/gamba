@@ -43,6 +43,9 @@ module PrawnX
       def encode_codepoints(codepoints, glyph_by_code)
         parts = []
         codepoints.each do |codepoint|
+          # Every subset holds a space at code 32: like TTFunk, a space stays in the subset of the character before it.
+          next parts.last[1] << SPACE if codepoint == SPACE && !parts.empty?
+
           index, code = @location_by_cluster[codepoint] ||= code_for([glyph_by_code[codepoint], codepoint])
           append(parts, index, code)
         end

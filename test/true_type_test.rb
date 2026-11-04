@@ -65,6 +65,14 @@ class TrueTypeTest < Minitest::Test
     assert_raises(PrawnX::TrueType::Error) { PrawnX::TrueType::File.new(font_with_table("kern", kern_table([3].pack("n")))) }
   end
 
+  # Prawn's encoding, through TTFunk: every subset holds a space, which stays in the subset of the character before it.
+  def test_a_space_stays_in_the_subset_of_the_character_before_it
+    font = Prawn::Document.new.font(FONT)
+
+    assert_equal [[1, "! "], [0, "tea "], [1, "!"]], font.encode_text("€ tea €")
+    assert_equal [[0, " "], [1, "! "]], font.encode_text(" € ", kerning: true)
+  end
+
   private
 
   # A "kern" feature for "latn" with one class pair adjustment: glyphs 36, 37 and 38 are classes 1, 2 and 3
