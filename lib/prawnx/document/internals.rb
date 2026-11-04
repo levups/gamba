@@ -9,9 +9,13 @@ module Prawn
       # ExtGState its block sets, {name:, reference:}, if any.
       OpenSave = Struct.new(:previous, :ext_gstate)
       DEFAULT_GRAPHIC_STATE = PDF::Core::GraphicState.new.freeze
-      # The settings a new page writes, each with its writer, in the order Prawn writes them.
-      GRAPHIC_SETTING_WRITERS = {fill_color: :set_fill_color, stroke_color: :set_stroke_color, line_width: :write_line_width,
-                                 cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash}.freeze
+      # The settings a block ending on a later page writes back, each with its writer, in the order Prawn writes them
+      # on a new page, then the blend mode.
+      GRAPHIC_SETTING_WRITERS = {fill_paint: :write_fill_paint, stroke_paint: :write_stroke_paint, line_width: :write_line_width,
+                                 cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash,
+                                 blend_mode: :write_blend_mode}.freeze
+      # What these writers read from the state.
+      RESUMED_STATE = %i[fill_color fill_pattern stroke_color stroke_pattern line_width cap_style join_style dash blend_mode].freeze
 
       attr_reader :page, :pages, :pages_reference
 
@@ -151,6 +155,11 @@ module Prawn
       def write_ext_gstate(ext_gstate)
         page.ext_gstates[ext_gstate[:name]] = ext_gstate[:reference]
         add_content("/#{ext_gstate[:name]} gs")
+        graphic_state.blend_mode = (ext_gstate[:name] == "BMNormal") ? nil : ext_gstate if ext_gstate[:reference].data.key?(:BM)
+      end
+
+      def write_blend_mode
+        write_ext_gstate(graphic_state.blend_mode || blend_mode_ext_gstate(:Normal))
       end
 
       # A block that saved its state on an earlier page ends on this one, where the state it returns to is the new
@@ -163,7 +172,7 @@ module Prawn
         return if differing.empty?
 
         state = graphic_state
-        GRAPHIC_SETTING_WRITERS.each_key { |setting| state.public_send(:"#{setting}=", previous.public_send(setting).dup) }
+        RESUMED_STATE.each { |setting| state.public_send(:"#{setting}=", previous.public_send(setting).dup) }
         differing.each_value { |writer| send(writer) }
       end
 

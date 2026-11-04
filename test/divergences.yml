@@ -64,6 +64,18 @@
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
     - graphic_settings_across_page_break
+- bug: A blend mode set without a block is lost on the next page
+  proof: 'Prawn documents Prawn::Graphics::BlendMode#blend_mode as setting the blend mode, restored afterwards only when given a block, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, blend mode Normal (§11.3.5): Prawn::Document#start_new_page writes the colours and line settings in effect again, never the blend mode. PrawnX sets the blend mode in effect again on the new page, after reopening the blocks still open, unless the page''s header set one, and after a block that ends on a later page, the one in effect before it'
+  prawn_issue:
+  prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
+  examples:
+    - blend_mode_lasting_across_page_break
+- bug: A gradient set as the fill or stroke colour is lost on the next page, which paints with the colour set before it
+  proof: 'Prawn documents Prawn::Graphics::Patterns#fill_gradient and #stroke_gradient as setting the fill and stroke gradient, which ISO 32000-1 §8.6.6.2 makes the current colour, a pattern (Table 52, §8.4.1), until another replaces it; Prawn::Document#start_new_page writes the current colours again on the new page, but Prawn''s graphic state never records the gradient, so the new page paints with the colour set before it. PrawnX records the gradient in the graphic state, without changing what fill_color and stroke_color return, and paints with it on the new page and after a block that ends on a later page'
+  prawn_issue:
+  prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
+  examples:
+    - gradients_across_page_break
 - bug: Text rendering mode, character spacing, word spacing, horizontal scaling and rise blocks whose text flows onto the next page draw that page without them
   proof: 'Prawn documents text_rendering_mode, character_spacing, word_spacing, horizontal_text_scaling and rise as setting their parameter for the block they are given, and lays the text out with it, but ISO 32000-1 §9.3.1 makes the text state part of the graphics state, which §8.4.1 resets at the start of each page''s content stream: Prawn::Document#start_new_page never writes them again, so the new page is drawn plain, its lines overflowing or falling short. PrawnX writes the text state of the blocks still open on the new page, before its header, after a block that ends on a later page, the text state its Q drops, and on a page reached through go_to_page (text flowing onto a page that exists, page numbers, repeaters), the text state in effect, not the one left there'
   prawn_issue:
