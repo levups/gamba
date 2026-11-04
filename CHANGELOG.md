@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-11-04
+
 First release under next-gen-gems: Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 in one gem, rewritten for
 speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
 
@@ -16,3 +18,6 @@ speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
 - `PrawnX.combine(sources, page_size:, orientation:)` puts the pages of PDFs written elsewhere in one file, in
   place of combine_pdf.
 - `PrawnX::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
+
+[Unreleased]: https://github.com/next-gen-gems/prawnx/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/next-gen-gems/prawnx/releases/tag/v1.0.0
