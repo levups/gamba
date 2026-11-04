@@ -215,6 +215,80 @@ class GraphicStateTest < Minitest::Test
     assert_equal "000000", fill_color
   end
 
+  def test_text_state_blocks_hold_on_the_next_page_and_end_as_they_began
+    document = Prawn::Document.new do
+      text_rendering_mode(:stroke) do
+        character_spacing(3) do
+          word_spacing(2) do
+            horizontal_text_scaling(70) do
+              rise(4) do
+                text "Alice"
+                start_new_page
+                text "Bob"
+              end
+            end
+          end
+        end
+      end
+      text "Carol"
+    end
+
+    pdf = document.render
+
+    # The fragment's own word spacing, 0 unless justified, surrounds Bob as on any page.
+    assert_equal ["q", "1 Tr", "3.0 Tc", "2.0 Tw", "70.0 Tz", "4.0 Ts", "0.0 Tw", "Bob", "2.0 Tw",
+      "0.0 Ts", "100.0 Tz", "0.0 Tw", "0.0 Tc", "0 Tr", "Carol", "Q"], operators(document.pages[1])
+    assert_valid(pdf)
+  end
+
+  def test_a_block_ending_on_a_later_page_writes_back_the_text_state_of_the_blocks_around_it
+    document = Prawn::Document.new do
+      character_spacing(3) do
+        transparent(0.5) do
+          start_new_page
+          text "Bob"
+        end
+        text "Carol"
+      end
+      text "Dave"
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "3.0 Tc", "/Tr1 gs", "Bob", "Q", "q", "3.0 Tc", "Carol", "0.0 Tc", "Dave", "Q"], operators(document.pages[1])
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_a_save_ending_on_a_later_page_inside_a_text_state_block_writes_it_back
+    document = Prawn::Document.new do
+      character_spacing(3) do
+        save_graphics_state do
+          character_spacing(1) { text "Alice" }
+          start_new_page
+          text "Bob"
+        end
+        text "Carol"
+      end
+    end
+
+    document.render
+
+    assert_equal ["q", "3.0 Tc", "Bob", "Q", "q", "3.0 Tc", "Carol", "0.0 Tc", "Q"], operators(document.pages[1])
+  end
+
+  def test_a_forgotten_text_rendering_mode_is_not_written_on_the_next_page
+    document = Prawn::Document.new do
+      forget_text_rendering_mode!
+      start_new_page
+      draw_text "Bob", at: [0, 0]
+    end
+
+    document.render
+
+    assert_equal ["q", "Bob", "Q"], operators(document.pages[1])
+  end
+
   def test_a_page_break_without_a_transparent_block_open_reopens_nothing
     document = Prawn::Document.new do
       save_graphics_state do
@@ -231,11 +305,11 @@ class GraphicStateTest < Minitest::Test
 
   private
 
-  # The page's graphics state, ExtGState and graphic settings operators, with its text in place of the operators
+  # The page's graphics state, ExtGState, graphic settings and text state operators, with its text in place of the operators
   # drawing it.
   def operators(page)
     page.content.stream.lines.map(&:chomp).filter_map do |line|
-      next line if line.match?(/\A(?:q|Q|\/\w+ gs|.* (?:cs|CS|scn|SCN|w|J|j|d))\z/)
+      next line if line.match?(/\A(?:q|Q|\/\w+ gs|.* (?:cs|CS|scn|SCN|w|J|j|d|Tr|Tc|Tw|Tz|Ts))\z/)
 
       [line.scan(/<(\h+)>/).join].pack("H*") if line.end_with?(" TJ")
     end

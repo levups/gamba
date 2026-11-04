@@ -93,7 +93,10 @@ module Prawn
           add_content("Q")
           page.stack.pop
         end
-        resume_graphic_settings(open_save.previous) if open_save && !page.stack.last.equal?(open_save.previous)
+        return unless open_save && !page.stack.last.equal?(open_save.previous)
+
+        resume_graphic_settings(open_save.previous)
+        resume_text_state
       end
 
       def trailer

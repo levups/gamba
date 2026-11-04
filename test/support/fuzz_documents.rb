@@ -29,7 +29,7 @@ class FuzzDocuments
 
   def statement(depth:)
     choices = %i[text text formatted text_box move shape table draw_text settings]
-    choices += %i[bounding_box column_box float indent transparent blend_mode rotate new_page] if depth < 2
+    choices += %i[bounding_box column_box float indent transparent blend_mode text_state rotate new_page] if depth < 2
     send(:"#{pick(choices)}_statement", depth:)
   end
 
@@ -104,6 +104,15 @@ class FuzzDocuments
 
   def blend_mode_statement(depth:)
     "blend_mode(#{pick(%i[Multiply Screen Darken Difference]).inspect}) do\n#{nested(depth)}\nend"
+  end
+
+  # Text state blocks: text flowing out of one onto a new page must keep it there.
+  def text_state_statement(depth:)
+    setting = pick([
+      "text_rendering_mode(#{pick(%i[stroke fill_stroke invisible]).inspect})", "character_spacing(#{rand(1..4)})",
+      "word_spacing(#{rand(1..6)})", "horizontal_text_scaling(#{rand(60..140)})", "rise(#{rand(-4..4)})"
+    ])
+    "#{setting} do\n#{nested(depth)}\nend"
   end
 
   # Settings kept until changed again, unlike a shape's colours: blocks crossing a page break must end on them.

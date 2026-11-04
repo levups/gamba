@@ -68,6 +68,7 @@ module Prawn
       if last_page
         new_graphic_state = last_page.graphic_state&.dup
         new_graphic_state&.color_space = {}
+        new_graphic_state&.text_state = PDF::Core::GraphicState::DEFAULT_TEXT_STATE
         page_options[:graphic_state] = new_graphic_state
       end
 
@@ -76,6 +77,7 @@ module Prawn
       generate_margin_box
       @bounding_box = @margin_box if last_page && (last_page.size != page.size || last_page.layout != page.layout)
       use_graphic_settings
+      resume_text_state
       return if options[:orphan]
 
       insert_page(page, @page_number)
