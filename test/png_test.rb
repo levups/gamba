@@ -27,6 +27,14 @@ class PngTest < Minitest::Test
     assert_match(/invalid bit depth/, error.message)
   end
 
+  def test_a_width_its_data_never_fills_renders_without_building_a_row_of_that_width
+    # Gray and alpha, as wide as the size limit allows: a per-pixel layout would take 2 GB, too long a String for TruffleRuby.
+    data = "\x89PNG\r\n\x1A\n".b + chunk("IHDR", [(2**29) - 1, 1, 8, 4, 0, 0, 0].pack("NNCCCCC")) +
+      chunk("IDAT", Zlib::Deflate.deflate("\x00\x7F\xFF")) + chunk("IEND", "")
+
+    assert_kind_of String, Prawn::Document.new { image StringIO.new(data), width: 100 }.render
+  end
+
   private
 
   # A 1x1 grayscale image, 8 bits per sample: one filter byte and one sample per row.
