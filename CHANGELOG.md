@@ -2,11 +2,6 @@
 
 ## [Unreleased]
 
-**Fixed**
-- A PNG with transparency and a huge width no longer lays out its pixels before its size is checked: a few
-  hundred bytes cost gigabytes of memory, or `ArgumentError` on TruffleRuby, before the expected refusal. Its
-  channels split 1,024 pixels at a time, so a wide image needs little beyond its own samples.
-
 ## [1.0.0] — 2026-11-04
 
 First release under next-gen-gems: Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 in one gem, rewritten for
