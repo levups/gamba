@@ -2,4 +2,3 @@
 
 - [ ] Tests cover the change (a bug fix comes with a test that fails without it)
 - [ ] Output unchanged, or every difference is intended and listed above
-- [ ] `CHANGELOG.md` has a line under `## [Unreleased]`
