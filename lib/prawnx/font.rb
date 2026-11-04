@@ -156,6 +156,11 @@ module Prawn
       height_at(size)
     end
 
+    # The string in the font's encoding, only to be measured: TTF reads a UTF-8 string as it is, without a copy.
+    def measured_string(string)
+      normalize_encoding(string)
+    end
+
     def add_to_current_page(subset)
       @references[subset] ||= register(subset)
       @document.page.fonts[identifier_for(subset)] = @references[subset]
@@ -202,12 +207,22 @@ module Prawn
 
     def width_of(string, options)
       font = options[:style] ? @document.find_font(@document.font.family, style: options[:style]) : @document.font
-      encoded_string = font.normalize_encoding(string)
-      by_size = @width_by_string_by_settings[font]
-      width_by_string = (by_size[[@document.font_size, options[:size], options[:kerning]]] ||= {})
-      width = width_by_string[encoded_string] ||= font.compute_width_of(encoded_string, options)
+      encoded_string = font.measured_string(string)
+      width = width_by_string(font, @document.font_size, options[:size], options[:kerning])[encoded_string] ||=
+        font.compute_width_of(encoded_string, options)
       character_count = @document.font.character_count(encoded_string)
       character_count.positive? ? width + (@document.character_spacing * (character_count - 1)) : width
+    end
+
+    private
+
+    # The table of the last settings stays at hand: the words of a paragraph are all measured with the same ones.
+    def width_by_string(font, font_size, size, kerning)
+      unless font.equal?(@last_font) && font_size.eql?(@last_font_size) && size.eql?(@last_size) && kerning.eql?(@last_kerning)
+        @last_font, @last_font_size, @last_size, @last_kerning = font, font_size, size, kerning
+        @last_width_by_string = @width_by_string_by_settings[font][[font_size, size, kerning]] ||= {}
+      end
+      @last_width_by_string
     end
   end
 end

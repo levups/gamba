@@ -175,6 +175,10 @@ module Prawn
         text.encode(::Encoding::UTF_8)
       end
 
+      def measured_string(string)
+        (string.encoding == ::Encoding::UTF_8) ? string : normalize_encoding(string)
+      end
+
       def glyph_present?(character)
         cmap[character.codepoints.first].positive?
       end
