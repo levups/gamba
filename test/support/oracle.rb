@@ -66,6 +66,23 @@ module Oracle
     pdf_differences(File.join(reference.directory, "#{name}.pdf"), File.join(candidate.directory, "#{name}.pdf"))
   end
 
+  # Where Prawn crashes on a bug of test/divergences.yml (prawn_raises), the candidate writes a valid PDF instead.
+  def self.fixed_crash_differences(reference, candidate, name, error_class)
+    return ["Prawn no longer raises #{error_class}"] unless self.error_class(reference, name) == error_class
+
+    candidate_error = read_if_present(candidate.directory, "#{name}.error")
+    return ["#{candidate.engine} raises #{candidate_error.lines.first.chomp}"] if candidate_error
+
+    pdf = File.join(candidate.directory, "#{name}.pdf")
+    return ["no PDF written"] unless File.exist?(pdf)
+
+    [invalidity(pdf)].compact.map { "invalid PDF: #{_1}" }
+  end
+
+  def self.error_class(rendering, name)
+    read_if_present(rendering.directory, "#{name}.error")&.[](/\A\w+(?:::\w+)*/)
+  end
+
   def self.pdf_differences(reference_pdf, candidate_pdf)
     return ["no PDF written"] unless File.exist?(candidate_pdf)
 
