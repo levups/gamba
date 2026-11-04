@@ -5,6 +5,11 @@ module Prawn
     # The document's objects, pages and graphic state stack: what Prawn splits between PDF::Core's renderer and its
     # document state.
     module Internals
+      # A save not yet restored: the state in effect before it (nil on an empty stack, the default one), and the
+      # ExtGState its block sets, {name:, reference:}, if any.
+      OpenSave = Struct.new(:previous, :ext_gstate)
+      DEFAULT_GRAPHIC_STATE = PDF::Core::GraphicState.new.freeze
+
       attr_reader :page, :pages, :pages_reference
 
       def ref(data)
@@ -62,8 +67,9 @@ module Prawn
 
       def save_graphics_state(graphic_state = nil)
         save_transformation_stack
-        @unrestored_graphics_states << nil
-        page.stack.push(PDF::Core::GraphicState.new(graphic_state || self.graphic_state))
+        previous = graphic_state ? page.stack.last : self.graphic_state
+        @unrestored_graphics_states << OpenSave.new(previous, nil)
+        page.stack.push(PDF::Core::GraphicState.new(graphic_state || previous))
         add_content("q")
         return unless block_given?
 
@@ -72,21 +78,19 @@ module Prawn
       end
 
       # A page break leaves the blocks still open with states saved on an earlier page, which closed them when it
-      # ended: like Prawn, their restore closes the state open on the new page (or one reopened for a transparent
-      # block), and where none is open it has nothing left to close. Only a restore matching no save at all, on an
+      # ended: like Prawn, their restore closes the state open on the new page (or one reopened for a block with an
+      # ExtGState), and where none is open it has nothing left to close. Only a restore matching no save at all, on an
       # empty stack, raises.
       def restore_graphics_state
         restore_transformation_stack
-        saved = !@unrestored_graphics_states.empty?
-        @unrestored_graphics_states.pop
+        open_save = @unrestored_graphics_states.pop
         if page.stack.empty?
-          return if saved
-
-          raise Errors::EmptyGraphicStateStack, "\n You have reached the end of the graphic state stack"
+          raise Errors::EmptyGraphicStateStack, "\n You have reached the end of the graphic state stack" unless open_save
+        else
+          add_content("Q")
+          page.stack.pop
         end
-
-        add_content("Q")
-        page.stack.pop
+        resume_graphic_settings(open_save.previous) if open_save && !page.stack.last.equal?(open_save.previous)
       end
 
       def trailer
@@ -113,19 +117,54 @@ module Prawn
         page.content_stream << "q\n"
       end
 
-      # The blocks still open saved their states on the page just closed. When one is transparent, the new page reopens
-      # them in order, the outermost in the page's own state, so each block's restore closes its own state; otherwise
-      # the page stays as Prawn writes it.
-      def reopen_transparent_blocks
-        return if @unrestored_graphics_states.none?
+      # The blocks still open saved their states on the page just closed. When one sets an ExtGState (opacity, blend
+      # mode), the new page reopens them in order, the outermost in the page's own state, so each block's restore
+      # closes its own state; otherwise the page stays as Prawn writes it.
+      def reopen_ext_gstate_blocks
+        return if @unrestored_graphics_states.none?(&:ext_gstate)
 
         outermost, *inner = @unrestored_graphics_states
-        add_content("/#{opacity_dictionary_name(*outermost)} gs") if outermost
-        inner.each do |opacities|
+        write_ext_gstate(outermost.ext_gstate) if outermost.ext_gstate
+        inner.each do |open_save|
           page.stack.push(PDF::Core::GraphicState.new(graphic_state))
           add_content("q")
-          add_content("/#{opacity_dictionary_name(*opacities)} gs") if opacities
+          write_ext_gstate(open_save.ext_gstate) if open_save.ext_gstate
         end
+      end
+
+      # Sets an ExtGState of the registries, {name:, reference:}, in the current state of the page.
+      def write_ext_gstate(ext_gstate)
+        page.ext_gstates[ext_gstate[:name]] = ext_gstate[:reference]
+        add_content("/#{ext_gstate[:name]} gs")
+      end
+
+      # A block that saved its state on an earlier page ends on this one, where the state it returns to is the new
+      # page's (the default one once that is closed), not the one in effect before the block: Prawn draws what follows
+      # in black. Write back the settings that differ, as Prawn writes them on a new page.
+      def resume_graphic_settings(previous)
+        previous ||= DEFAULT_GRAPHIC_STATE
+        current = page.stack.last || DEFAULT_GRAPHIC_STATE
+        fill = current.fill_color != previous.fill_color
+        stroke = current.stroke_color != previous.stroke_color
+        width = current.line_width != previous.line_width
+        cap = current.cap_style != previous.cap_style
+        join = current.join_style != previous.join_style
+        dash = current.dash != previous.dash
+        return unless fill || stroke || width || cap || join || dash
+
+        state = graphic_state
+        state.fill_color = previous.fill_color.dup
+        state.stroke_color = previous.stroke_color.dup
+        state.line_width = previous.line_width
+        state.cap_style = previous.cap_style
+        state.join_style = previous.join_style
+        state.dash = previous.dash.dup
+        set_fill_color if fill
+        set_stroke_color if stroke
+        write_line_width if width
+        write_stroke_cap_style if cap
+        write_stroke_join_style if join
+        write_stroke_dash if dash
       end
 
       def initialize_internals(options)
@@ -136,7 +175,7 @@ module Prawn
         @root.data[:Pages] = @pages_reference
         @root.data[:ViewerPreferences] = {PrintScaling: :None} if options[:print_scaling] == :none
         @version = 1.3
-        # One entry per save not yet restored, document-wide: the opacities of a transparent block, nil for others.
+        # One entry per save not yet restored, document-wide.
         @unrestored_graphics_states = []
         min_version(1.6) if options[:print_scaling] == :none
         @pages = []

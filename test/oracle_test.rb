@@ -20,9 +20,10 @@ class OracleTest < Minitest::Test
 
     candidate = Oracle.render(CANDIDATE, Oracle.example_files, File.join(OUTPUT_DIRECTORY, CANDIDATE))
     # Prawn fixing a bug as PrawnX does, through a switch of test/support/oracle_render.rb (prawn_switch), for the
-    # examples of that bug only.
-    switched_by_example = DIVERGENCES.select { _1.key?("prawn_switch") }.flat_map do |divergence|
-      switch, names = divergence.values_at("prawn_switch", "examples")
+    # examples of the bugs it fixes only.
+    names_by_switch = DIVERGENCES.select { _1.key?("prawn_switch") }.group_by { _1["prawn_switch"] }
+      .transform_values { |divergences| divergences.flat_map { _1["examples"] } }
+    switched_by_example = names_by_switch.flat_map do |switch, names|
       paths = names.map { File.join(Oracle::EXAMPLES_DIRECTORY, "#{_1}.rb") }
       switched = Oracle.render("prawn", paths, File.join(OUTPUT_DIRECTORY, switch.downcase), switch => "1")
       raise "Prawn cannot render with #{switch}: #{switched.failure}" if switched.failure

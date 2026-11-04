@@ -12,8 +12,11 @@ in the next-gen-gems organization.
 - Prawn's public API, listed in `test/contract/prawn-2.5.0.yml`, keeps working; exceptions are settled in
   `test/contract/decisions.yml`.
 - Pages stay identical to Prawn's for valid documents: what would move pixels (ligatures, kerning, PDF/A) is opt-in.
-  Prawn's bugs (crashes, invalid PDFs) are never reproduced: each one goes in `test/divergences.yml` with its proof,
-  and the oracle and the fuzzer accept it from there.
+  Prawn's bugs are never reproduced: a crash, an invalid PDF, and also behaviour contradicting Prawn's own
+  documentation or the PDF specification (a `transparent` block drawing opaque past a page break: Prawn documents it
+  for the block's content, ISO 32000-1 §8.4.1). Each fix is a declared divergence: an entry of
+  `test/divergences.yml` with its proof (the oracle and the fuzzer accept it from there), a row of
+  `docs/compatibility.html`, and a **Fixed** entry of the changelog at release.
 - `Prawn::VERSION` stays `2.5.0` (the API reproduced); `PrawnX::VERSION` is the gem's.
 
 ## Commands

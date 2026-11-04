@@ -95,6 +95,126 @@ class GraphicStateTest < Minitest::Test
     assert_equal ["q", "Header", "/Tr1 gs", "Bob", "Q"], operators(document.pages[1])
   end
 
+  def test_a_blend_mode_block_keeps_its_blend_mode_on_the_next_page
+    document = Prawn::Document.new do
+      blend_mode(:Multiply) do
+        text "Alice"
+        start_new_page
+        text "Bob"
+      end
+      text "Carol"
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "/BMMultiply gs", "Bob", "Q", "q", "Carol", "Q"], operators(document.pages[1])
+    assert_equal ["BMMultiply"], document.pages[1].resources[:ExtGState].keys
+    assert_valid(pdf)
+  end
+
+  def test_nested_transparent_and_blend_mode_blocks_reopen_in_order
+    document = Prawn::Document.new do
+      blend_mode(:Screen) do
+        transparent(0.5) do
+          blend_mode(:Multiply) do
+            text "Alice"
+            start_new_page
+            text "Bob"
+          end
+        end
+      end
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "/BMScreen gs", "q", "/Tr1 gs", "q", "/BMMultiply gs", "Bob", "Q", "Q", "Q"], operators(document.pages[1])
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_a_blend_mode_without_a_block_reopens_nothing
+    document = Prawn::Document.new do
+      save_graphics_state do
+        blend_mode(:Multiply)
+        start_new_page
+        text "Bob"
+      end
+    end
+
+    document.render
+
+    assert_equal ["q", "Bob", "Q"], operators(document.pages[1])
+  end
+
+  def test_the_settings_before_a_block_crossing_a_page_break_follow_it
+    document = Prawn::Document.new do
+      fill_color "cc0000"
+      stroke_color "0000cc"
+      line_width 4
+      dash 6
+      cap_style :round
+      join_style :bevel
+      save_graphics_state do
+        fill_color "009900"
+        undash
+        text "Alice"
+        start_new_page
+        text "Bob"
+      end
+      text "Carol"
+    end
+    settings = [document.fill_color, document.stroke_color, document.line_width, document.cap_style, document.join_style, document.dashed?]
+
+    pdf = document.render
+
+    assert_equal ["q", "/DeviceRGB cs", "0.0 0.6 0.0 scn", "/DeviceRGB CS", "0.0 0.0 0.8 SCN", "4 w", "1 J", "2 j", "Bob", "Q",
+      "q", "/DeviceRGB cs", "0.8 0.0 0.0 scn", "/DeviceRGB CS", "0.0 0.0 0.8 SCN", "4 w", "1 J", "2 j", "[6.0 6.0] 0.0 d", "Carol", "Q"],
+      operators(document.pages[1])
+    assert_equal ["cc0000", "0000cc", 4, :round, :bevel, true], settings
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_each_block_crossing_a_page_break_ends_on_the_colour_set_before_it
+    document = Prawn::Document.new do
+      fill_color "cc0000"
+      transparent(0.5) do
+        fill_color "0000cc"
+        save_graphics_state do
+          fill_color "009900"
+          start_new_page
+          text "Bob"
+        end
+        text "Carol"
+      end
+      text "Dave"
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "/DeviceRGB cs", "0.0 0.6 0.0 scn", "/Tr1 gs", "q", "Bob", "Q", "0.0 0.0 0.8 scn", "Carol", "Q",
+      "q", "/DeviceRGB cs", "0.8 0.0 0.0 scn", "Dave", "Q"], operators(document.pages[1])
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_a_block_crossing_a_page_break_in_the_default_state_writes_nothing_back
+    document = Prawn::Document.new do
+      save_graphics_state do
+        fill_color "009900"
+        start_new_page
+        text "Bob"
+      end
+      text "Carol"
+    end
+    fill_color = document.fill_color
+
+    document.render
+
+    assert_equal ["q", "/DeviceRGB cs", "0.0 0.6 0.0 scn", "Bob", "Q", "q", "Carol", "Q"], operators(document.pages[1])
+    assert_equal "000000", fill_color
+  end
+
   def test_a_page_break_without_a_transparent_block_open_reopens_nothing
     document = Prawn::Document.new do
       save_graphics_state do
@@ -111,10 +231,11 @@ class GraphicStateTest < Minitest::Test
 
   private
 
-  # The page's graphics state and ExtGState operators, with its text in place of the operators drawing it.
+  # The page's graphics state, ExtGState and graphic settings operators, with its text in place of the operators
+  # drawing it.
   def operators(page)
     page.content.stream.lines.map(&:chomp).filter_map do |line|
-      next line if line.match?(/\A(?:q|Q|\/Tr\d+ gs)\z/)
+      next line if line.match?(/\A(?:q|Q|\/\w+ gs|.* (?:cs|CS|scn|SCN|w|J|j|d))\z/)
 
       [line.scan(/<(\h+)>/).join].pack("H*") if line.end_with?(" TJ")
     end
