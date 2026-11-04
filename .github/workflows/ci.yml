@@ -35,7 +35,7 @@ jobs:
         run: bundle exec rubocop --format github
 
   test:
-    name: Ruby ${{ matrix.ruby }}${{ matrix.gemfile != 'Gemfile' && format(', {0}', matrix.gemfile) || '' }}
+    name: Ruby ${{ matrix.ruby }}${{ matrix.rails && format(' · Rails {0}', matrix.rails.version) || '' }}
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -45,9 +45,8 @@ jobs:
       matrix:
         # Every Ruby the core team still maintains (https://endoflife.date/ruby), ruby-head, then this gem's extra ones.
         ruby: ["3.3", "3.4", "4.0", ruby-head, truffleruby-head]
-        gemfile: [Gemfile]
     env:
-      BUNDLE_GEMFILE: ${{ matrix.gemfile != 'Gemfile' && matrix.gemfile || '' }}
+      BUNDLE_GEMFILE: ${{ matrix.rails.gemfile != 'Gemfile' && matrix.rails.gemfile || '' }}
     steps:
       - name: Check out
         uses: actions/checkout@v7
