@@ -65,6 +65,21 @@ class TrueTypeTest < Minitest::Test
     assert_raises(PrawnX::TrueType::Error) { PrawnX::TrueType::File.new(font_with_table("kern", kern_table([3].pack("n")))) }
   end
 
+  def test_a_units_per_em_of_zero_raises
+    head = PrawnX::TrueType::File.new(File.binread(FONT)).table("head").dup
+    head[18, 2] = [0].pack("n")
+
+    assert_raises(PrawnX::TrueType::Error) { PrawnX::TrueType::File.new(font_with_table("head", head)) }
+  end
+
+  # Each is one byte short of the fields read at fixed offsets.
+  def test_tables_too_short_for_their_fields_raise
+    font = PrawnX::TrueType::File.new(File.binread(FONT))
+    {"head" => 53, "hhea" => 35, "maxp" => 5, "OS/2" => 67, "post" => 15}.each do |tag, size|
+      assert_raises(PrawnX::TrueType::Error, tag) { PrawnX::TrueType::File.new(font_with_table(tag, font.table(tag).byteslice(0, size))) }
+    end
+  end
+
   private
 
   # A "kern" feature for "latn" with one class pair adjustment: glyphs 36, 37 and 38 are classes 1, 2 and 3

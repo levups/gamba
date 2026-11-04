@@ -12,6 +12,8 @@ module PrawnX
       COLLECTION_TAG = "ttcf".b
       UNICODE_CMAP_FORMATS = [4, 6, 10, 12].freeze
       REQUIRED_TABLES = %w[head hhea maxp hmtx cmap].freeze
+      # The bytes each table must hold for the fields read at fixed offsets: shorter, they would read as nil.
+      MINIMUM_TABLE_SIZES = {"head" => 54, "hhea" => 36, "maxp" => 6, "OS/2" => 68, "post" => 16}.freeze
       # Reading past the data a malformed font declares raises these: they become a TrueType::Error.
       MALFORMED_FONT_ERRORS = [ArgumentError, TypeError, RangeError, NoMethodError, FloatDomainError].freeze
       MAXIMUM_CODE_POINT = 0x10FFFF
@@ -176,9 +178,13 @@ module PrawnX
         @location_by_tag.each do |tag, (offset, length)|
           raise Error, "Malformed font: the #{tag} table lies outside the file" if offset + length > @bytes.bytesize
         end
+        MINIMUM_TABLE_SIZES.each do |tag, size|
+          raise Error, "Malformed font: its #{tag} table is too short" if table?(tag) && table(tag).bytesize < size
+        end
         raise Error, "Malformed font: no glyphs" unless glyph_count.positive?
+        # Glyph units scale to text space by 1000 / unitsPerEm: zero would make every metric infinite.
+        raise Error, "Malformed font: its unitsPerEm is zero" if header.units_per_em.zero?
 
-        header
         advance_widths
         read_unicode_cmap
         kerning_by_glyph_key
