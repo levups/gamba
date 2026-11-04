@@ -27,9 +27,12 @@ module Prawn
         Arcfour.new(object_key(key, identifier, generation)).encrypt(string)
       end
 
-      # The key of one object: the document key extended with its number and generation (algorithm 1).
-      def self.object_key(key, identifier, generation)
-        Digest::MD5.digest(key + [identifier].pack("V")[0, 3] + [generation].pack("V")[0, 2])[0, key.bytesize + 5]
+      # The key of one object: the document key extended with its number and generation (algorithm 1), and with
+      # "sAlT" for AES-128, which only PDF::Core::Decryption reads.
+      def self.object_key(key, identifier, generation, salt = nil)
+        seed = key + [identifier].pack("V")[0, 3] + [generation].pack("V")[0, 2]
+        seed << salt if salt
+        Digest::MD5.digest(seed)[0, key.bytesize + 5]
       end
 
       def self.pad_password(password)

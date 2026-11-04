@@ -4,6 +4,10 @@ module PDF
   # PDF syntax: numbers, names, strings, arrays and dictionaries, as ISO 32000-1 §7.3 writes them.
   module Core
     Name = Data.define(:value)
+    # A real number read from another file, written back exactly as it was read.
+    Real = Data.define(:source) do
+      def to_f = source.to_f
+    end
 
     # Objects that build their dictionary when the document is written, once every reference they hold is known.
     module Serializable
@@ -13,11 +17,21 @@ module PDF
 
     DELIMITER_OR_IRREGULAR_BYTES = ((0..32).to_a + [35, 37, 40, 41, 47, 60, 62, 91, 93, 123, 125] + (127..255).to_a).freeze
     LITERAL_STRING_ESCAPES = {"(" => "\\(", ")" => "\\)", "\\" => "\\\\", "\r" => "\\r"}.freeze
+    REGULAR_NAME = %r{\A[!-~&&[^#%()<>\[\]{}/]]*\z}
+    # Dictionary keys read from other files are symbols too: past a size no document of ours reaches, stop caching.
+    NAME_CACHE_LIMIT = 10_000
     NAME_BY_SYMBOL = Hash.new do |cache, symbol|
-      cache[symbol] = (+"/").concat(*symbol.to_s.b.each_byte.map { DELIMITER_OR_IRREGULAR_BYTES.include?(_1) ? format("#%02X", _1) : _1.chr }).freeze
+      name = escape_name(symbol.to_s).freeze
+      (cache.size < NAME_CACHE_LIMIT) ? cache[symbol] = name : name
     end
 
     module_function
+
+    def escape_name(name)
+      return "/#{name}" if name.match?(REGULAR_NAME)
+
+      (+"/").concat(*name.b.each_byte.map { DELIMITER_OR_IRREGULAR_BYTES.include?(_1) ? format("#%02X", _1) : _1.chr })
+    end
 
     # Five decimals, trailing zeros dropped but one: 1 is "1.0", 0.5 is "0.5", 1/3 is "0.33333".
     def real(number)
@@ -46,7 +60,9 @@ module PDF
       when false then "false"
       when Numeric then number(value)
       when Symbol then NAME_BY_SYMBOL[value]
-      when Name then NAME_BY_SYMBOL[value.value.to_sym]
+      # Names read from other files are escaped every time: caching them would keep every font subset name forever.
+      when Name then escape_name(value.value)
+      when Real then value.source
       when LiteralString then "(#{value.gsub(/[\\\r()]/, LITERAL_STRING_ESCAPES)})"
       when ByteString then "<#{value.unpack1("H*")}>"
       when Time then "(#{value.strftime("D:%Y%m%d%H%M%S%z").chop.chop}'00')"

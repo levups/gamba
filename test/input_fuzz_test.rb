@@ -55,6 +55,9 @@ class InputFuzzTest < Minitest::Test
   rescue Timeout::Error
     "took more than #{SECONDS_PER_CASE} s"
   rescue StandardError, NoMemoryError, SystemStackError => exception
+    # Prawn's own error for a JPEG of 2 or 5+ channels, kept as is.
+    return if exception.instance_of?(ArgumentError) && exception.message == "JPG uses an unsupported number of channels"
+
     "#{exception.class}: #{exception.message[0, 100]} at #{exception.backtrace.first}"
   end
 end
