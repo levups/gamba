@@ -102,10 +102,10 @@ module Prawn
           # Words are read one at a time: a line stops long before the end of its paragraph.
           scanner = StringScanner.new(fragment)
           while (segment = scanner.scan(breaks.scan_pattern))
-            segment_width = (segment == breaks.zero_width_space) ? 0 : @document.width_of(segment, kerning: @kerning)
+            segment_width = (segment == breaks.zero_width_space) ? 0 : @document.width_of(segment, @width_options)
             if @accumulated_width + segment_width <= @width
               @accumulated_width += segment_width
-              @accumulated_width -= @document.width_of(breaks.soft_hyphen, kerning: @kerning) if segment[-1] == breaks.soft_hyphen
+              @accumulated_width -= @document.width_of(breaks.soft_hyphen, @width_options) if breaks.soft_hyphen && segment.end_with?(breaks.soft_hyphen)
               @fragment_output << segment
             else
               @line_contains_more_than_one_word = false if @accumulated_width.zero? && @line_contains_more_than_one_word
@@ -124,7 +124,8 @@ module Prawn
 
         def initialize_line(options)
           @document = options[:document]
-          @kerning = options[:kerning]
+          # Shared by every word measured on the line: passing kerning: to each call built a hash per word.
+          @width_options = {kerning: options[:kerning]}
           @width = options[:width]
           @disable_wrap_by_char = options[:disable_wrap_by_char]
           @accumulated_width = 0

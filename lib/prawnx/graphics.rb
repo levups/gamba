@@ -15,11 +15,13 @@ module Prawn
     KAPPA = 4.0 * ((Math.sqrt(2) - 1.0) / 3.0)
 
     def move_to(*point)
-      add_content("#{PDF::Core.real_params(map_to_absolute(point))} m")
+      x, y = map_to_absolute(point)
+      add_content("#{PDF::Core.real(x)} #{PDF::Core.real(y)} m")
     end
 
     def line_to(*point)
-      add_content("#{PDF::Core.real_params(map_to_absolute(point))} l")
+      x, y = map_to_absolute(point)
+      add_content("#{PDF::Core.real(x)} #{PDF::Core.real(y)} l")
     end
 
     def curve_to(destination, options = {})
@@ -185,8 +187,10 @@ module Prawn
       add_content("#{graphic_state.line_width} w")
     end
 
+    # Called with x, y or [x, y] for every point drawn: those two shapes skip the copy flatten makes.
     def map_to_absolute(*point)
-      x, y = point.flatten
+      point = point[0] if point.size == 1 && point[0].is_a?(Array)
+      x, y = (point.size == 2 && point[0].is_a?(Numeric) && point[1].is_a?(Numeric)) ? point : point.flatten
       [@bounding_box.absolute_left + x, @bounding_box.absolute_bottom + y]
     end
 
