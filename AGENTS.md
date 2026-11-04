@@ -41,6 +41,10 @@ truffleruby-head and macOS, with the oracle, the suite and both fuzzers on a fre
   pin internals in tests.
 - `.claude/hooks/rubocop.sh` autocorrects each Ruby file after an edit.
 
+## Code style
+
+Follow `STYLE.md` (naming, method size, comments, dead code): what RuboCop can't settle.
+
 ## Changelog and releases
 
 - Every user-visible change adds its line under `## [Unreleased]` in `CHANGELOG.md`, in the same PR. A release
