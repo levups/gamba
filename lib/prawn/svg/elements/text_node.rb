@@ -74,7 +74,7 @@ module Prawn::SVG
         text_to_draw = remaining ? remaining_text[0..0] : remaining_text
 
         kerning = component.kerning_enabled?
-        opts = {size: component.computed_properties.numeric_font_size, kerning: kerning}
+        opts = {size: component.computed_properties.numeric_font_size, kerning:}
 
         fallback_fonts = component.fallback_fonts
         font_runs = fallback_fonts&.any? ? split_into_font_runs(prawn, text_to_draw, fallback_fonts) : nil
@@ -129,7 +129,7 @@ module Prawn::SVG
         end
 
         kerning = component.kerning_enabled?
-        opts = {size: size, at: [cursor.x, cursor.y + (y_offset || 0)], kerning: kerning}
+        opts = {size:, at: [cursor.x, cursor.y + (y_offset || 0)], kerning:}
         opts[:rotate] = chunk.rotate if chunk.rotate
 
         scaling =
@@ -201,11 +201,11 @@ module Prawn::SVG
           if font_name
             prawn.font(font_name) do
               prawn.draw_text(run_text, **run_opts)
-              x += prawn.width_of(run_text, size: opts[:size], kerning: kerning)
+              x += prawn.width_of(run_text, size: opts[:size], kerning:)
             end
           else
             prawn.draw_text(run_text, **run_opts)
-            x += prawn.width_of(run_text, size: opts[:size], kerning: kerning)
+            x += prawn.width_of(run_text, size: opts[:size], kerning:)
           end
         end
       end

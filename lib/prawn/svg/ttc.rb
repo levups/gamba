@@ -27,7 +27,7 @@ class Prawn::SVG::TTC
         next unless family
 
         weight_class = Prawn::SVG::TTF.read_weight_class(f, offset)
-        @fonts << {family: family, subfamily: subfamily, index: index, weight_class: weight_class}
+        @fonts << {family:, subfamily:, index:, weight_class:}
       end
     end
   rescue Errno::ENOENT

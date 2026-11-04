@@ -10,18 +10,18 @@ module Prawn
       Gradient = Struct.new(:type, :apply_transformations, :stops, :from, :to, :r1, :r2)
       IDENTITY_MATRIX = [1, 0, 0, 1, 0, 0].freeze
 
-      def fill_gradient(*arguments, **options)
-        set_gradient(:fill, *arguments, **options)
+      def fill_gradient(*, **)
+        set_gradient(:fill, *, **)
       end
 
-      def stroke_gradient(*arguments, **options)
-        set_gradient(:stroke, *arguments, **options)
+      def stroke_gradient(*, **)
+        set_gradient(:stroke, *, **)
       end
 
       private
 
-      def set_gradient(type, *arguments, **options)
-        gradient = parse_gradient_arguments(*arguments, **options)
+      def set_gradient(type, *, **)
+        gradient = parse_gradient_arguments(*, **)
         patterns = page.resources[:Pattern] ||= {}
         name = "SP#{gradient_registry_key(gradient)}"
         patterns[name] ||= (@gradient_registry ||= {})[name] ||= create_gradient_pattern(gradient)

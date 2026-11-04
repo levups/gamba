@@ -7,10 +7,10 @@ module Prawn
       @document ||= Document.new
     end
 
-    def method_missing(method_name, *arguments, **options, &)
+    def method_missing(method_name, ...)
       return super unless document.respond_to?(method_name)
 
-      document.public_send(method_name, *arguments, **options, &)
+      document.public_send(method_name, ...)
     end
 
     def respond_to_missing?(method_name, include_all = false)

@@ -71,7 +71,7 @@ module Prawn::SVG
         advances = kerned_advances(prawn, text_node, chunk.text, size)
 
         chunk.text.each_char.with_index do |char, i|
-          char_width = text_node.width_of_text(prawn, char, nil, {size: size, kerning: false})
+          char_width = text_node.width_of_text(prawn, char, nil, {size:, kerning: false})
           advance = advances[i]
 
           midpoint = current_distance + (char_width / 2.0)
@@ -87,7 +87,7 @@ module Prawn::SVG
           py_svg = mid_y_svg - (half_width * Math.sin(angle_rad))
           py = document.sizing.output_height - py_svg
 
-          draw_opts = {size: size, at: [px, py + (y_offset || 0)]}
+          draw_opts = {size:, at: [px, py + (y_offset || 0)]}
           draw_opts[:rotate] = -angle
 
           render_mode = calculate_text_rendering_mode(text_node.component)
@@ -107,8 +107,8 @@ module Prawn::SVG
     # with the following character. The advance is the character's own width
     # plus any kerning adjustment with its neighbour.
     def kerned_advances(prawn, text_node, text, size)
-      opts_no_kern = {size: size, kerning: false}
-      opts_kern = {size: size, kerning: true}
+      opts_no_kern = {size:, kerning: false}
+      opts_kern = {size:, kerning: true}
 
       text.each_char.with_index.map do |char, i|
         char_width = text_node.width_of_text(prawn, char, nil, opts_no_kern)

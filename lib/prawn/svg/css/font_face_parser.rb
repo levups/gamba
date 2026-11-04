@@ -53,12 +53,12 @@ module Prawn::SVG::CSS
           return unless url
 
           format = extract_format(parts[1])
-          {type: :url, url: url, format: format}
+          {type: :url, url:, format:}
         when "local"
           name = first[1][0]
           return unless name
 
-          {type: :local, name: name}
+          {type: :local, name:}
         end
       end
 

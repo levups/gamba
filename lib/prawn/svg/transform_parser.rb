@@ -24,7 +24,7 @@ module Prawn::SVG::TransformParser
         angle, x, y = arguments.collect(&:to_f)
         angle = angle * Math::PI / 180.0
 
-        rotation = rotation_matrix(angle, space: space)
+        rotation = rotation_matrix(angle, space:)
 
         case arguments.length
         when 1

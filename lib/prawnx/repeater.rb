@@ -2,8 +2,8 @@
 
 module Prawn
   class Document
-    def repeat(page_filter, options = {}, &block)
-      repeaters << Repeater.new(self, page_filter, options.fetch(:dynamic, false), &block)
+    def repeat(page_filter, options = {}, &)
+      repeaters << Repeater.new(self, page_filter, options.fetch(:dynamic, false), &)
     end
 
     def number_pages(string, options = {})

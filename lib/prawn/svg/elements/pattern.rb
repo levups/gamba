@@ -36,11 +36,11 @@ class Prawn::SVG::Elements::Pattern < Prawn::SVG::Elements::Base
     return nil if content_calls.nil?
 
     {
-      tile_x: tile_x,
+      tile_x:,
       tile_y: tile_y_bottom,
       tile_width: tile_w,
       tile_height: tile_h,
-      transform: transform,
+      transform:,
       calls: content_calls
     }
   end
