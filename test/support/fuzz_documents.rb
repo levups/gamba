@@ -5,7 +5,7 @@
 class FuzzDocuments
   WORDS = %w[
     quarterly report widget gadget figures summary charts tables sales region office layout canvas column
-    contrast lumens setting delivery returns warranty raised café résumé naïve façade crème brûlée déjà cliché
+    garden lantern setting delivery returns warranty raised café résumé naïve façade crème brûlée déjà cliché
     3.1.4 1,299.00 € VAT it's, don't — « quotes » ; points : commas ! questions ? A Ta Va AV To Yo fi fl office
   ].freeze
   COLORS = %w[000000 ff0000 00aa00 0000ff 555555 cc8800].freeze
