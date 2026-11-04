@@ -1,5 +1,7 @@
 # Where PrawnX deliberately differs from Prawn: each entry is a Prawn bug, proven by a specification or by
-# Prawn's own documentation. PrawnX must fix it; the other checks still compare the example with Prawn.
+# Prawn's own documentation. PrawnX must fix it; the other checks still compare the example with Prawn. Where
+# prawn_switch names a switch of test/support/oracle_render.rb, its examples compare with Prawn fixing the bug that
+# way, and so do fuzz documents where Prawn, switched, took it.
 - bug: Encrypted documents have no /ID in their trailer, so qpdf and strict readers reject them
   proof: 'ISO 32000-1 §7.5.5, trailer dictionary, ID: "Required if an Encrypt entry is present"'
   prawn_issue:
@@ -42,3 +44,10 @@
   examples:
     - graphic_state_restored_across_page_break
     - graphic_state_saved_on_emptied_stack
+- bug: A transparent block whose content crosses a page break draws the next page opaque
+  proof: 'Prawn documents Prawn::Graphics::Transparency#transparent as setting the opacity of the content within the block, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, opaque: Prawn::Document#start_new_page never sets the opacity again. PrawnX reopens the blocks still open on the new page, once its header and background are drawn, the outermost in the page''s own state and the others in a state each, with their ExtGState; each block''s end closes its own state, and q and Q stay balanced on every page'
+  prawn_issue:
+  prawn_switch: ORACLE_REOPEN_TRANSPARENCY
+  examples:
+    - transparency_across_page_break
+    - transparency_nested_across_page_break

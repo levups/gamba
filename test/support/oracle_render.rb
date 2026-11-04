@@ -41,6 +41,59 @@ if ENV["ORACLE_PAST_GRAPHIC_STATE_CRASH"]
   end)
 end
 
+# Whether a switch below changed what Prawn draws for the example being rendered.
+module PrawnSwitch
+  class << self
+    attr_accessor :taken
+  end
+end
+
+# ORACLE_REOPEN_TRANSPARENCY: like PrawnX, a page break reopens the blocks still open when one of them is transparent,
+# the outermost in the new page's own state, each with its opacity. An example where it did is marked <name>.switched:
+# only there may PrawnX differ from Prawn without this switch (prawn_switch in test/divergences.yml).
+if ENV["ORACLE_REOPEN_TRANSPARENCY"]
+  Prawn::Document.prepend(Module.new do
+    def save_graphics_state(*)
+      open_opacities << nil
+      return super unless block_given?
+
+      super.tap { open_opacities.pop }
+    end
+
+    def restore_graphics_state
+      open_opacities.pop
+      super
+    end
+
+    def transparent(opacity, stroke_opacity = opacity)
+      super do
+        open_opacities[-1] = [opacity.clamp(0.0, 1.0), stroke_opacity.clamp(0.0, 1.0)]
+        yield
+      end
+    end
+
+    def start_new_page(options = {})
+      super
+      return if options[:orphan] || open_opacities.none?
+
+      PrawnSwitch.taken = true
+      outermost, *inner = open_opacities
+      renderer.add_content("/#{opacity_dictionary_name(*outermost)} gs") if outermost
+      inner.each do |opacities|
+        renderer.graphic_stack.save_graphic_state
+        renderer.add_content("q")
+        renderer.add_content("/#{opacity_dictionary_name(*opacities)} gs") if opacities
+      end
+    end
+
+    private
+
+    def open_opacities
+      @open_opacities ||= []
+    end
+  end)
+end
+
 CACHE_DIRECTORY = File.expand_path("../../corpus/cache", __dir__)
 MANUAL_DIRECTORY = File.join(CACHE_DIRECTORY, "prawn/manual/")
 
@@ -113,6 +166,7 @@ end
 
 def render(example, output_directory)
   output = File.join(output_directory, example.name.tr("/#", "--"))
+  PrawnSwitch.taken = false
   if example.options[:standalone]
     Dir.mktmpdir do |directory|
       Dir.chdir(directory) { example.block.call }
@@ -126,6 +180,8 @@ def render(example, output_directory)
   end
 rescue StandardError, ScriptError => exception
   File.write("#{output}.error", "#{exception.class}: #{exception.message}\n#{exception.backtrace.first(5).join("\n")}")
+ensure
+  FileUtils.touch("#{output}.switched") if PrawnSwitch.taken
 end
 
 output_directory, *paths = ARGV

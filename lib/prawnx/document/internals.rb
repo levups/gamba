@@ -62,7 +62,7 @@ module Prawn
 
       def save_graphics_state(graphic_state = nil)
         save_transformation_stack
-        @unrestored_graphics_states += 1
+        @unrestored_graphics_states << nil
         page.stack.push(PDF::Core::GraphicState.new(graphic_state || self.graphic_state))
         add_content("q")
         return unless block_given?
@@ -72,12 +72,13 @@ module Prawn
       end
 
       # A page break leaves the blocks still open with states saved on an earlier page, which closed them when it
-      # ended: like Prawn, their restore closes the state open on the new page, and where none is open it has nothing
-      # left to close. Only a restore matching no save at all, on an empty stack, raises.
+      # ended: like Prawn, their restore closes the state open on the new page (or one reopened for a transparent
+      # block), and where none is open it has nothing left to close. Only a restore matching no save at all, on an
+      # empty stack, raises.
       def restore_graphics_state
         restore_transformation_stack
-        saved = @unrestored_graphics_states.positive?
-        @unrestored_graphics_states -= 1 if saved
+        saved = !@unrestored_graphics_states.empty?
+        @unrestored_graphics_states.pop
         if page.stack.empty?
           return if saved
 
@@ -112,6 +113,21 @@ module Prawn
         page.content_stream << "q\n"
       end
 
+      # The blocks still open saved their states on the page just closed. When one is transparent, the new page reopens
+      # them in order, the outermost in the page's own state, so each block's restore closes its own state; otherwise
+      # the page stays as Prawn writes it.
+      def reopen_transparent_blocks
+        return if @unrestored_graphics_states.none?
+
+        outermost, *inner = @unrestored_graphics_states
+        add_content("/#{opacity_dictionary_name(*outermost)} gs") if outermost
+        inner.each do |opacities|
+          page.stack.push(PDF::Core::GraphicState.new(graphic_state))
+          add_content("q")
+          add_content("/#{opacity_dictionary_name(*opacities)} gs") if opacities
+        end
+      end
+
       def initialize_internals(options)
         @objects = []
         @info = ref!({Creator: "PrawnX", Producer: "PrawnX"}.merge(options[:info] || {}))
@@ -120,7 +136,8 @@ module Prawn
         @root.data[:Pages] = @pages_reference
         @root.data[:ViewerPreferences] = {PrintScaling: :None} if options[:print_scaling] == :none
         @version = 1.3
-        @unrestored_graphics_states = 0
+        # One entry per save not yet restored, document-wide: the opacities of a transparent block, nil for others.
+        @unrestored_graphics_states = []
         min_version(1.6) if options[:print_scaling] == :none
         @pages = []
         @page = nil
