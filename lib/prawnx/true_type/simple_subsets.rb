@@ -4,7 +4,8 @@ module PrawnX
   module TrueType
     # Characters of a TrueType font split into simple fonts of single-byte codes, laid out as Prawn lays them
     # (through TTFunk) so every reader renders them the same way: the first subset codes characters in Mac Roman,
-    # keeping space at 32 for word spacing; the next ones take 223 characters each, from code 33.
+    # the next ones take 223 characters each, from code 33. Every subset holds the space at 32, for word spacing: like
+    # TTFunk, a space stays in the subset of the character before it.
     class SimpleSubsets
       Subset = Struct.new(:code_by_cluster, :glyph_by_code, :next_code) do
         def full?
@@ -33,7 +34,11 @@ module PrawnX
       def encode(clusters)
         parts = []
         clusters.each do |glyph, codes|
-          append(parts, *(@location_by_cluster[codes] ||= code_for([glyph, codes])))
+          if !parts.empty? && (codes == [SPACE] || codes == SPACE) && glyph == @subsets[0].glyph_by_code[SPACE]
+            parts.last[1] << SPACE
+          else
+            append(parts, *(@location_by_cluster[codes] ||= code_for([glyph, codes])))
+          end
         end
         parts
       end
@@ -43,11 +48,12 @@ module PrawnX
       def encode_codepoints(codepoints, glyph_by_code)
         parts = []
         codepoints.each do |codepoint|
-          # Every subset holds a space at code 32: like TTFunk, a space stays in the subset of the character before it.
-          next parts.last[1] << SPACE if codepoint == SPACE && !parts.empty?
-
-          index, code = @location_by_cluster[codepoint] ||= code_for([glyph_by_code[codepoint], codepoint])
-          append(parts, index, code)
+          if codepoint == SPACE && !parts.empty?
+            parts.last[1] << SPACE
+          else
+            index, code = @location_by_cluster[codepoint] ||= code_for([glyph_by_code[codepoint], codepoint])
+            append(parts, index, code)
+          end
         end
         parts
       end

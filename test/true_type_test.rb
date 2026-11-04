@@ -71,6 +71,20 @@ class TrueTypeTest < Minitest::Test
 
     assert_equal [[1, "! "], [0, "tea "], [1, "!"]], font.encode_text("€ tea €")
     assert_equal [[0, " "], [1, "! "]], font.encode_text(" € ", kerning: true)
+    assert_equal [[1, "! "], [0, "tea "], [1, "!"]], Prawn::Document.new.font(FONT, features: [:liga]).encode_text("€ tea €")
+  end
+
+  # As in Prawn, each kerned run is encoded on its own: one starting with a space starts from the first subset.
+  def test_a_kerned_run_starting_with_a_space_starts_from_the_first_subset
+    glyph_by_code = PrawnX::TrueType::File.new(File.binread(FONT)).glyph_by_code
+    kern = kern_table([1, 6, 0, 0, glyph_by_code[0x20AC], glyph_by_code[32], -100].pack("n6 s>"))
+    Tempfile.create(["euro_space_kerning", ".ttf"]) do |file|
+      file.binmode
+      file.write(font_with_table("kern", kern))
+      file.close
+
+      assert_equal [[0, "a"], [1, ["!", 48.828125]], [0, " tea"]], Prawn::Document.new.font(file.path).encode_text("a€ tea", kerning: true)
+    end
   end
 
   private
