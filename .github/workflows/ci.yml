@@ -1,6 +1,6 @@
 name: CI
 
-# The blocks shared by the gems of next-gen-gems stay identical: bin/x-gems-ci-check in levups/oss guards them.
+# The blocks shared by the gems of next-gen-gems are kept identical across the family.
 
 on:
   push:

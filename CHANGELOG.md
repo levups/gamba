@@ -1,9 +1,9 @@
 # Changelog
 
-## 1.0.0 — unreleased
+## 1.0.0
 
-First release under next-gen-gems: Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 in one gem, rewritten for
-speed.
+First stable release under next-gen-gems: Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 in one gem,
+rewritten for speed. 0.1.1 and 0.1.2 were previews.
 
 - Same API and same pages as Prawn, pixel for pixel, in lighter files; `require "prawn/table"` and
   `require "prawn-svg"` keep working. PrawnX refuses to load next to the prawn gem.
