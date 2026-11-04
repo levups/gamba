@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+The gem's metadata, which 1.0.0 shipped unfinished. No code changes.
+
+**Fixed**
+- MIT added to the licenses, for the code that comes from prawn-svg (`LICENSE-prawn-svg`).
+- The author is Level UP Solutions alone, and the RubyGems page links to the issue tracker.
+
 ## [1.0.0] — 2026-11-04
 
 First release under next-gen-gems: Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 in one gem, rewritten for
