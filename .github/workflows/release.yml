@@ -1,0 +1,38 @@
+name: Release
+
+# bin/release pushes a vX.Y.Z tag; this publishes that version to RubyGems, then the GitHub release with its
+# section of CHANGELOG.md. RubyGems trusts this workflow (trusted publishing): no API key is stored anywhere.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: RubyGems and GitHub release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # the GitHub release
+      id-token: write # trusted publishing to RubyGems
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+      - name: Check the tag against the gemspec and the changelog
+        run: bin/release --check "$GITHUB_REF_NAME"
+      - name: Build
+        run: gem build *.gemspec
+      - uses: rubygems/configure-rubygems-credentials@v2.1.0
+      - name: Publish to RubyGems
+        run: gem push *.gem
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bin/release --notes "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" *.gem --verify-tag \
+            --title "$(bin/release --title "$GITHUB_REF_NAME")" --notes-file "$RUNNER_TEMP/notes.md"

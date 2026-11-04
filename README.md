@@ -123,6 +123,20 @@ bundle exec rake bench
 bundle exec rubocop
 ```
 
+### Releasing
+
+Changes go under `## [Unreleased]` in `CHANGELOG.md` as they land. To release them, from an up-to-date `main`
+whose CI is green:
+
+```sh
+bin/release minor --dry-run   # the notes and the changes, nothing written
+bin/release minor             # or patch, major, or an exact version such as 1.2.0
+```
+
+`bin/release` dates the Unreleased section, bumps the version, commits, and pushes the commit with a signed tag
+`vX.Y.Z`. The tag starts the Release workflow, which publishes the gem to RubyGems through trusted publishing and
+creates the GitHub release with the version's notes and the `.gem`.
+
 ## License
 
 By Level UP Solutions. PrawnX is derived from Prawn, PDF::Core, TTFunk and prawn-table, by Gregory Brown and their
