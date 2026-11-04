@@ -44,8 +44,8 @@
     <section id="installation" aria-labelledby="installation-title">
       <h2 id="installation-title">Installation</h2>
       <div class="prose">
-<pre><code># Gemfile
-gem "prawnx" # instead of prawn, prawn-table and prawn-svg</code></pre>
+<pre><code class="language-ruby"><span class="c1"># Gemfile</span>
+<span class="n">gem</span> <span class="s2">"prawnx"</span> <span class="c1"># instead of prawn, prawn-table and prawn-svg</span></code></pre>
         <p>PrawnX needs Ruby 3.3 or later. It depends on <code>css_parser</code>, <code>matrix</code> and <code>rexml</code>, which only its SVG support loads.</p>
         <p>Remove <code>prawn</code>, <code>prawn-table</code> and <code>prawn-svg</code> from the Gemfile: PrawnX refuses to load next to the prawn gem, with a <code>LoadError</code> saying so, rather than mixing two engines in one process.</p>
       </div>
@@ -55,14 +55,14 @@ gem "prawnx" # instead of prawn, prawn-table and prawn-svg</code></pre>
       <h2 id="usage-title">Drop-in usage</h2>
       <div class="prose">
         <p>Code written for Prawn runs as it is. PrawnX provides <code>require "prawn"</code>, <code>require "prawn/table"</code>, <code>require "prawn-svg"</code> and <code>require "prawn/measurement_extensions"</code>, and the <code>Prawn</code> namespace: <code>Prawn::Document</code>, <code>Prawn::Table</code>, <code>Prawn::Errors</code>, <code>Prawn::SVG</code>.</p>
-<pre><code>require "prawn"
+<pre><code class="language-ruby"><span class="nb">require</span> <span class="s2">"prawn"</span>
 
-Prawn::Document.generate("invoice.pdf", page_size: "A4", info: {Title: "Invoice"}) do
-  font "DejaVuSans.ttf"
-  text "Invoice INV-2026-0001", size: 14, style: :bold
-  table [%w[SKU Qty Price], %w[A-1 2 $10.00]], header: true
-  number_pages "&lt;page&gt;/&lt;total&gt;", at: [bounds.right - 50, 0], width: 50, align: :right
-end</code></pre>
+<span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"invoice.pdf"</span><span class="p">,</span> <span class="ss">page_size: </span><span class="s2">"A4"</span><span class="p">,</span> <span class="ss">info: </span><span class="p">{</span><span class="no">Title</span><span class="p">:</span> <span class="s2">"Invoice"</span><span class="p">})</span> <span class="k">do</span>
+  <span class="n">font</span> <span class="s2">"DejaVuSans.ttf"</span>
+  <span class="n">text</span> <span class="s2">"Invoice INV-2026-0001"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">14</span><span class="p">,</span> <span class="ss">style: :bold</span>
+  <span class="n">table</span> <span class="p">[</span><span class="sx">%w[SKU Qty Price]</span><span class="p">,</span> <span class="sx">%w[A-1 2 $10.00]</span><span class="p">],</span> <span class="ss">header: </span><span class="kp">true</span>
+  <span class="n">number_pages</span> <span class="s2">"&lt;page&gt;/&lt;total&gt;"</span><span class="p">,</span> <span class="ss">at: </span><span class="p">[</span><span class="n">bounds</span><span class="p">.</span><span class="nf">right</span> <span class="o">-</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="ss">width: </span><span class="mi">50</span><span class="p">,</span> <span class="ss">align: :right</span>
+<span class="k">end</span></code></pre>
         <p><code>Prawn::VERSION</code> answers <code>"2.5.0"</code>, the version of the API PrawnX mirrors, because Prawn extensions check it. PrawnX’s own version is <code>PrawnX::VERSION</code>.</p>
         <p>The contract is Prawn 2.5’s public methods, listed in <code>test/contract/prawn-2.5.0.yml</code>: PrawnX accepts every call Prawn accepts on those, and <code>test/contract/decisions.yml</code> records, method by method, what is in and why the rest is left out.</p>
       </div>
@@ -72,10 +72,10 @@ end</code></pre>
       <h2 id="tables-title">Tables</h2>
       <div class="prose">
         <p>The API of prawn-table 0.2.2, built in: <code>table</code>, <code>make_table</code>, <code>cell</code>, <code>make_cell</code>, with their cell styles, headers repeated across pages, column widths, row and column spans, and subtables. No other gem and no <code>require</code> are needed.</p>
-<pre><code>table [%w[SKU Description Qty], *lines], header: true, width: bounds.width, cell_style: {padding: 3} do
-  row(0).font_style = :bold
-  column(2).align = :right
-end</code></pre>
+<pre><code class="language-ruby"><span class="n">table</span> <span class="p">[</span><span class="sx">%w[SKU Description Qty]</span><span class="p">,</span> <span class="o">*</span><span class="n">lines</span><span class="p">],</span> <span class="ss">header: </span><span class="kp">true</span><span class="p">,</span> <span class="ss">width: </span><span class="n">bounds</span><span class="p">.</span><span class="nf">width</span><span class="p">,</span> <span class="ss">cell_style: </span><span class="p">{</span><span class="ss">padding: </span><span class="mi">3</span><span class="p">}</span> <span class="k">do</span>
+  <span class="n">row</span><span class="p">(</span><span class="mi">0</span><span class="p">).</span><span class="nf">font_style</span> <span class="o">=</span> <span class="ss">:bold</span>
+  <span class="n">column</span><span class="p">(</span><span class="mi">2</span><span class="p">).</span><span class="nf">align</span> <span class="o">=</span> <span class="ss">:right</span>
+<span class="k">end</span></code></pre>
       </div>
     </section>
 
@@ -83,7 +83,7 @@ end</code></pre>
       <h2 id="svg-title">SVG</h2>
       <div class="prose">
         <p>The API of prawn-svg 0.40.4, built in: <code>svg data, options</code> loads SVG support on first use.</p>
-<pre><code>svg File.read("logo.svg"), width: 120, position: :right</code></pre>
+<pre><code class="language-ruby"><span class="n">svg</span> <span class="no">File</span><span class="p">.</span><span class="nf">read</span><span class="p">(</span><span class="s2">"logo.svg"</span><span class="p">),</span> <span class="ss">width: </span><span class="mi">120</span><span class="p">,</span> <span class="ss">position: :right</span></code></pre>
       </div>
       <table class="options">
         <thead><tr><th scope="col">Option</th><th scope="col">What it does</th></tr></thead>
@@ -108,8 +108,8 @@ end</code></pre>
         <p>A parsed font is shared by every document of the process, and every thread, until its file changes: a server reads <code>Inter.ttf</code> once, not once per PDF.</p>
         <h3 id="features">OpenType features</h3>
         <p>Ligatures and GPOS pair kerning move glyphs away from where Prawn puts them, so they stay off unless asked for, per font:</p>
-<pre><code>font "Inter.ttf", features: %i[liga kern]
-font_families.update("Inter" => {normal: {file: "Inter.ttf", features: %i[liga kern]}})</code></pre>
+<pre><code class="language-ruby"><span class="n">font</span> <span class="s2">"Inter.ttf"</span><span class="p">,</span> <span class="ss">features: </span><span class="sx">%i[liga kern]</span>
+<span class="n">font_families</span><span class="p">.</span><span class="nf">update</span><span class="p">(</span><span class="s2">"Inter"</span> <span class="o">=&gt;</span> <span class="p">{</span><span class="ss">normal: </span><span class="p">{</span><span class="ss">file: </span><span class="s2">"Inter.ttf"</span><span class="p">,</span> <span class="ss">features: </span><span class="sx">%i[liga kern]</span><span class="p">}})</span></code></pre>
         <p><code>liga</code> applies the font’s standard ligatures (GSUB); <code>kern</code> applies its GPOS pair kerning.</p>
       </div>
     </section>
@@ -125,11 +125,11 @@ font_families.update("Inter" => {normal: {file: "Inter.ttf", features: %i[liga k
     <section id="pdf-a" aria-labelledby="pdf-a-title">
       <h2 id="pdf-a-title">PDF/A and Factur-X</h2>
       <div class="prose">
-<pre><code>Prawn::Document.new(pdf_a: true, info: {Title: "Invoice INV-2026-0001"}) do
-  font "Inter.ttf"
-  # …
-  factur_x File.read("factur-x.xml"), profile: :en16931
-end</code></pre>
+<pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="ss">pdf_a: </span><span class="kp">true</span><span class="p">,</span> <span class="ss">info: </span><span class="p">{</span><span class="no">Title</span><span class="p">:</span> <span class="s2">"Invoice INV-2026-0001"</span><span class="p">})</span> <span class="k">do</span>
+  <span class="n">font</span> <span class="s2">"Inter.ttf"</span>
+  <span class="c1"># …</span>
+  <span class="n">factur_x</span> <span class="no">File</span><span class="p">.</span><span class="nf">read</span><span class="p">(</span><span class="s2">"factur-x.xml"</span><span class="p">),</span> <span class="ss">profile: :en16931</span>
+<span class="k">end</span></code></pre>
         <p><code>pdf_a: true</code> writes a PDF/A-3b document (ISO 19005-3): XMP metadata matching the <code>info</code> hash, an sRGB output intent, a file identifier, and annotations flagged for printing. What PDF/A forbids raises <code>Prawn::Errors::PdfAViolation</code>: a standard PDF font, which cannot be embedded, and encryption.</p>
         <p><code>factur_x(xml, profile:, filename:, description:)</code> embeds the CII XML of a Factur-X invoice into a PDF/A-3 document, with the relationship the specification gives each profile. PrawnX does not build that XML: it embeds the one the invoicing system produced.</p>
       </div>
@@ -157,8 +157,8 @@ end</code></pre>
       <h2 id="servers-title">Servers that fork</h2>
       <div class="prose">
         <p>TrueType and SVG support load on first use, so a document of standard fonts never pays for them. Before a server forks its workers, load them once, so every worker shares that memory instead of loading its own copy:</p>
-<pre><code># config/puma.rb, before_fork, or an initializer
-PrawnX.eager_load!</code></pre>
+<pre><code class="language-ruby"><span class="c1"># config/puma.rb, before_fork, or an initializer</span>
+<span class="no">PrawnX</span><span class="p">.</span><span class="nf">eager_load!</span></code></pre>
       </div>
     </section>
 
@@ -166,7 +166,7 @@ PrawnX.eager_load!</code></pre>
       <h2 id="comparing-title">Comparing an app’s PDFs</h2>
       <div class="prose">
         <p><code>script/capture_pdfs.rb</code> writes every PDF an app’s test suite renders, named after its test. Run the suite under Prawn, then under PrawnX, and compare both directories with <code>Oracle.pdf_differences</code>:</p>
-<pre><code>PRAWNX_CAPTURE_DIRECTORY=tmp/prawn RUBYOPT=-r/path/to/prawnx/script/capture_pdfs.rb bin/rails test</code></pre>
+<pre><code class="language-sh"><span class="nv">PRAWNX_CAPTURE_DIRECTORY</span><span class="o">=</span>tmp/prawn <span class="nv">RUBYOPT</span><span class="o">=</span><span class="nt">-r</span>/path/to/prawnx/script/capture_pdfs.rb bin/rails <span class="nb">test</span></code></pre>
       </div>
     </section>
   </main>

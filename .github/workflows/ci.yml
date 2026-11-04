@@ -75,3 +75,15 @@ jobs:
           bundle exec rake test
           FUZZ_SEED=$GITHUB_RUN_ID FUZZ_CASES=300 bundle exec ruby -Itest test/fuzz_test.rb
           INPUT_FUZZ_SEED=$GITHUB_RUN_ID INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb
+
+  docs:
+    name: Highlighted docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+          bundler-cache: true
+      - run: bundle exec rake docs:highlight:check
