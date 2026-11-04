@@ -40,3 +40,13 @@ truffleruby-head and macOS, with the oracle, the suite and both fuzzers on a fre
 - A hot-path change is measured with `rake bench`, without JIT and with YJIT. A pure performance change does not
   pin internals in tests.
 - `.claude/hooks/rubocop.sh` autocorrects each Ruby file after an edit.
+
+## Changelog and releases
+
+- Every user-visible change adds its line under `## [Unreleased]` in `CHANGELOG.md`, in the same PR. A release
+  opens with a one-sentence lede, then **Breaking**, **New**, **Faster** (measured, with and without YJIT) and
+  **Fixed**, only those with entries. No version heading, date or link by hand: `bin/release` writes them.
+- `bin/release patch|minor|major` cuts a release from a green, up-to-date `main` (README, Releasing), and
+  `.github/workflows/release.yml` publishes it. Both are the same in every next-gen-gems gem: change them in all
+  four at once.
+- RubyGems trusts the Release workflow (trusted publishing): never `gem push` from a machine.
