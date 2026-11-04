@@ -101,14 +101,14 @@
       <div class="split">
         <div>
           <p class="code-label">Gemfile</p>
-<pre><code>gem "prawnx" # instead of prawn, prawn-table and prawn-svg</code></pre>
+<pre><code class="language-ruby"><span class="n">gem</span> <span class="s2">"prawnx"</span> <span class="c1"># instead of prawn, prawn-table and prawn-svg</span></code></pre>
         </div>
         <div>
           <p class="code-label">Your code, unchanged</p>
-<pre><code>Prawn::Document.generate("hello.pdf") do
-  text "Hello, World!"
-  table [%w[SKU Qty], %w[A-1 2]]
-end</code></pre>
+<pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"hello.pdf"</span><span class="p">)</span> <span class="k">do</span>
+  <span class="n">text</span> <span class="s2">"Hello, World!"</span>
+  <span class="n">table</span> <span class="p">[</span><span class="sx">%w[SKU Qty]</span><span class="p">,</span> <span class="sx">%w[A-1 2]</span><span class="p">]</span>
+<span class="k">end</span></code></pre>
         </div>
       </div>
     </section>

@@ -18,6 +18,15 @@ p code, li code, td code, .rule-message code { background: var(--surface); paddi
 a { color: var(--accent); text-underline-offset: 0.2em; }
 a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 pre { margin: 0; padding: 0.9rem 1rem; background: var(--surface); border-radius: 4px; overflow-x: auto; line-height: 1.55; }
+/* Rouge tokens (script/highlight_docs.rb): the accent's OKLCH hue turned 120°, 240° and 180°, each at least 4.5:1 on --surface. */
+pre code { --token-string: #027e41; --token-constant: #5263d2; --token-number: #01788a; }
+pre .k, pre .kd, pre .kn, pre .kp, pre .kr, pre .kv, pre .nt, pre .nd, pre .cp, pre .gp { color: var(--accent); }
+pre .s, pre .s1, pre .s2, pre .sb, pre .sc, pre .sd, pre .se, pre .sh, pre .si, pre .sx, pre .sr, pre .dl { color: var(--token-string); }
+pre .c, pre .c1, pre .cm, pre .cs, pre .ch { color: var(--muted); }
+pre .kc, pre .no, pre .nc, pre .nn, pre .ss, pre .vi, pre .na, pre .nv { color: var(--token-constant); }
+pre .m, pre .mi, pre .mf, pre .mh, pre .mo, pre .mb, pre .il { color: var(--token-number); }
+pre .gi { color: var(--clean); }
+pre .gd { color: var(--flagged); }
 
 .page { max-width: 72rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
 

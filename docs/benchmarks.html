@@ -56,9 +56,9 @@
     <section id="reproduce" aria-labelledby="reproduce-title">
       <h2 id="reproduce-title">Reproduce</h2>
       <div class="prose">
-<pre><code>bundle install &amp;&amp; BUNDLE_GEMFILE=oracle/Gemfile bundle install
-bundle exec rake corpus:fetch  # Prawn's fonts and images, into corpus/cache
-bundle exec rake bench         # BENCH_ITERATIONS=20 by default</code></pre>
+<pre><code class="language-sh">bundle <span class="nb">install</span> <span class="o">&amp;&amp;</span> <span class="nv">BUNDLE_GEMFILE</span><span class="o">=</span>oracle/Gemfile bundle <span class="nb">install
+</span>bundle <span class="nb">exec </span>rake corpus:fetch  <span class="c"># Prawn's fonts and images, into corpus/cache</span>
+bundle <span class="nb">exec </span>rake bench         <span class="c"># BENCH_ITERATIONS=20 by default</span></code></pre>
         <p><code>bench/compare.rb</code> renders each document of <code>bench/documents/</code> with Prawn, from its own bundle in <code>oracle/Gemfile</code>, and with PrawnX, each in its own YJIT process. It measures the median render time, the objects one render allocates, the file’s weight and the process’s peak memory, and writes <code>docs/benchmarks.json</code>, which every page of this site reads.</p>
       </div>
     </section>
