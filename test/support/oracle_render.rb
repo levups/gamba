@@ -43,27 +43,28 @@ end
 
 # Whether a switch below changed what Prawn draws for the example being rendered.
 module PrawnSwitch
+  OpenSave = Struct.new(:previous, :ext_gstate)
+  # The settings a new page writes, each with its writer, in the order Prawn writes them.
+  GRAPHIC_SETTING_WRITERS = {fill_color: :set_fill_color, stroke_color: :set_stroke_color, line_width: :write_line_width,
+                             cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash}.freeze
+
   class << self
     attr_accessor :taken
   end
 end
 
-# ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK: like PrawnX, blocks crossing a page break keep their state on the next page. A
-# page break reopens the blocks still open when one of them sets an ExtGState (transparent, blend_mode), the outermost
-# in the new page's own state, each with its ExtGState; and a block saved on an earlier page writes back, once it
-# ends, the settings in effect before it that the state it returns to lacks. An example where either happened is
-# marked <name>.switched: only there may PrawnX differ from Prawn without this switch (prawn_switch in
-# test/divergences.yml).
+# ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK: like PrawnX, a page break reopens the open transparent and blend_mode blocks,
+# and a block saved on an earlier page writes back, once it ends, the settings in effect before it. Where either
+# happened, <name>.switched: only there may PrawnX differ from plain Prawn (prawn_switch in test/divergences.yml).
 if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
   Prawn::Document.prepend(Module.new do
-    open_save = Struct.new(:previous, :ext_gstate)
+    # The block runs here, not in Prawn's renderer, whose restore would bypass this module's.
+    def save_graphics_state(graphic_state = nil)
+      open_saves << PrawnSwitch::OpenSave.new(renderer.graphic_stack.current_state, nil)
+      super(graphic_state, &nil)
+      return unless block_given?
 
-    define_method(:save_graphics_state) do |graphic_state = nil, &block|
-      open_saves << open_save.new(renderer.graphic_stack.current_state, nil)
-      super(graphic_state)
-      return unless block
-
-      block.call
+      yield
       restore_graphics_state
     end
 
@@ -112,28 +113,13 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     def resume_graphic_settings(previous)
       previous ||= PDF::Core::GraphicState.new
       current = renderer.graphic_stack.current_state || PDF::Core::GraphicState.new
-      fill = current.fill_color != previous.fill_color
-      stroke = current.stroke_color != previous.stroke_color
-      width = current.line_width != previous.line_width
-      cap = current.cap_style != previous.cap_style
-      join = current.join_style != previous.join_style
-      dash = current.dash != previous.dash
-      return unless fill || stroke || width || cap || join || dash
+      differing = PrawnSwitch::GRAPHIC_SETTING_WRITERS.reject { |setting, _writer| current.public_send(setting) == previous.public_send(setting) }
+      return if differing.empty?
 
       PrawnSwitch.taken = true
       state = graphic_state
-      state.fill_color = previous.fill_color.dup
-      state.stroke_color = previous.stroke_color.dup
-      state.line_width = previous.line_width
-      state.cap_style = previous.cap_style
-      state.join_style = previous.join_style
-      state.dash = previous.dash.dup
-      set_fill_color if fill
-      set_stroke_color if stroke
-      write_line_width if width
-      write_stroke_cap_style if cap
-      write_stroke_join_style if join
-      write_stroke_dash if dash
+      PrawnSwitch::GRAPHIC_SETTING_WRITERS.each_key { |setting| state.public_send(:"#{setting}=", previous.public_send(setting).dup) }
+      differing.each_value { |writer| send(writer) }
     end
   end)
 end

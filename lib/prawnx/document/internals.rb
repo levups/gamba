@@ -9,6 +9,9 @@ module Prawn
       # ExtGState its block sets, {name:, reference:}, if any.
       OpenSave = Struct.new(:previous, :ext_gstate)
       DEFAULT_GRAPHIC_STATE = PDF::Core::GraphicState.new.freeze
+      # The settings a new page writes, each with its writer, in the order Prawn writes them.
+      GRAPHIC_SETTING_WRITERS = {fill_color: :set_fill_color, stroke_color: :set_stroke_color, line_width: :write_line_width,
+                                 cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash}.freeze
 
       attr_reader :page, :pages, :pages_reference
 
@@ -132,7 +135,14 @@ module Prawn
         end
       end
 
-      # Sets an ExtGState of the registries, {name:, reference:}, in the current state of the page.
+      def ext_gstate_block(ext_gstate)
+        save_graphics_state
+        @unrestored_graphics_states.last.ext_gstate = ext_gstate
+        write_ext_gstate(ext_gstate)
+        yield
+        restore_graphics_state
+      end
+
       def write_ext_gstate(ext_gstate)
         page.ext_gstates[ext_gstate[:name]] = ext_gstate[:reference]
         add_content("/#{ext_gstate[:name]} gs")
@@ -144,27 +154,12 @@ module Prawn
       def resume_graphic_settings(previous)
         previous ||= DEFAULT_GRAPHIC_STATE
         current = page.stack.last || DEFAULT_GRAPHIC_STATE
-        fill = current.fill_color != previous.fill_color
-        stroke = current.stroke_color != previous.stroke_color
-        width = current.line_width != previous.line_width
-        cap = current.cap_style != previous.cap_style
-        join = current.join_style != previous.join_style
-        dash = current.dash != previous.dash
-        return unless fill || stroke || width || cap || join || dash
+        differing = GRAPHIC_SETTING_WRITERS.reject { |setting, _writer| current.public_send(setting) == previous.public_send(setting) }
+        return if differing.empty?
 
         state = graphic_state
-        state.fill_color = previous.fill_color.dup
-        state.stroke_color = previous.stroke_color.dup
-        state.line_width = previous.line_width
-        state.cap_style = previous.cap_style
-        state.join_style = previous.join_style
-        state.dash = previous.dash.dup
-        set_fill_color if fill
-        set_stroke_color if stroke
-        write_line_width if width
-        write_stroke_cap_style if cap
-        write_stroke_join_style if join
-        write_stroke_dash if dash
+        GRAPHIC_SETTING_WRITERS.each_key { |setting| state.public_send(:"#{setting}=", previous.public_send(setting).dup) }
+        differing.each_value { |writer| send(writer) }
       end
 
       def initialize_internals(options)

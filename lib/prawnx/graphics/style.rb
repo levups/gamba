@@ -85,14 +85,10 @@ module Prawn
         min_version(1.4)
         opacity = opacity.clamp(0.0, 1.0)
         stroke_opacity = stroke_opacity.clamp(0.0, 1.0)
-        save_graphics_state
         @opacity_dictionary_registry ||= {}
         ext_gstate = @opacity_dictionary_registry["#{opacity}_#{stroke_opacity}"] ||=
           {name: "Tr#{@opacity_dictionary_registry.length + 1}", reference: ref!(Type: :ExtGState, CA: stroke_opacity, ca: opacity)}
-        @unrestored_graphics_states.last.ext_gstate = ext_gstate
-        write_ext_gstate(ext_gstate)
-        yield
-        restore_graphics_state
+        ext_gstate_block(ext_gstate) { yield }
       end
     end
 
@@ -102,15 +98,10 @@ module Prawn
         @blend_mode_dictionary_registry ||= {}
         name = "BM#{Array(blend_mode).join}"
         ext_gstate = @blend_mode_dictionary_registry[name] ||= {name:, reference: ref!(Type: :ExtGState, BM: blend_mode)}
-        if block_given?
-          save_graphics_state
-          @unrestored_graphics_states.last.ext_gstate = ext_gstate
-        end
-        write_ext_gstate(ext_gstate)
-        return unless block_given?
+        return ext_gstate_block(ext_gstate) { yield } if block_given?
 
-        yield
-        restore_graphics_state
+        write_ext_gstate(ext_gstate)
+        nil
       end
     end
 
