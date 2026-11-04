@@ -226,11 +226,14 @@ module Prawn
         sample_bytes = bits / 8
         color_bytes = colors * sample_bytes
         row_bytes = (width * (color_bytes + sample_bytes)) + 1
-        color_layout = "C#{color_bytes}x#{sample_bytes}" * width
-        alpha_layout = "x#{color_bytes}C#{sample_bytes}" * width
+        row_count = img_data.bytesize / row_bytes
         color = +"".b
         alpha = +"".b
-        (img_data.bytesize / row_bytes).times do |row_index|
+        return [color, alpha] if row_count.zero?
+
+        color_layout = "C#{color_bytes}x#{sample_bytes}" * width
+        alpha_layout = "x#{color_bytes}C#{sample_bytes}" * width
+        row_count.times do |row_index|
           start = row_index * row_bytes
           filter = img_data.getbyte(start)
           img_data.unpack(color_layout, offset: start + 1).pack("C*", buffer: color << filter)
