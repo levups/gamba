@@ -7,8 +7,8 @@ in the next-gen-gems organization.
 ## Compatibility
 
 - Every maintained Ruby (endoflife.date), nothing older: the oldest sets `required_ruby_version`,
-  `TargetRubyVersion` and the CI floor. Today 3.3, so no bare `it` (use `_1`, never nested). A Ruby leaves in the
-  release after its end of life.
+  `TargetRubyVersion` and the CI floor. Today 3.3, so no bare `it`: blocks name their parameter, `_1` only in a
+  one-expression block where a name adds nothing, never nested. A Ruby leaves in the release after its end of life.
 - Prawn's public API, listed in `test/contract/prawn-2.5.0.yml`, keeps working; exceptions are settled in
   `test/contract/decisions.yml`.
 - Pages stay identical to Prawn's: what would move pixels (ligatures, kerning, PDF/A) is opt-in. A Prawn bug PrawnX

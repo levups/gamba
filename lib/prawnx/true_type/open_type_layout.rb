@@ -21,7 +21,7 @@ module PrawnX
 
       # Glyphs and the characters each stands for, ligatures applied: [[glyph, [code, …]], …].
       def shape(codes)
-        clusters = codes.map { [@file.glyph_by_code[_1], [_1]] }
+        clusters = codes.map { |code| [@file.glyph_by_code[code], [code]] }
         return clusters if @ligatures_by_first_glyph.empty?
 
         shaped = []
@@ -72,7 +72,7 @@ module PrawnX
             end
           end
         end
-        ligatures.transform_values { |list| list.sort_by { -_1[0].size } }
+        ligatures.transform_values { |list| list.sort_by { |components, _glyph| -components.size } }
       end
 
       def read_pair_lookups
@@ -98,7 +98,7 @@ module PrawnX
 
             set = subtable + set_offsets[index]
             count = table.unpack1("@#{set} n")
-            record = (0...count).find { table.unpack1("@#{set + 2 + (_1 * (record_size + 2))} n") == right }
+            record = (0...count).find { |candidate| table.unpack1("@#{set + 2 + (candidate * (record_size + 2))} n") == right }
             record && table.unpack1("@#{set + 4 + (record * (record_size + 2)) + advance_position} s>")
           end
         when 2
@@ -109,7 +109,7 @@ module PrawnX
             next unless coverage[left]
 
             record = (first_classes[left] * second_count) + second_classes[right]
-            table.unpack1("@#{subtable + 16 + (record * record_size) + advance_position} s>").then { _1.zero? ? nil : _1 }
+            table.unpack1("@#{subtable + 16 + (record * record_size) + advance_position} s>").then { |adjustment| adjustment.zero? ? nil : adjustment }
           end
         end
       end
@@ -145,7 +145,7 @@ module PrawnX
 
       def default_language_features(table, script_list)
         script_count = table.unpack1("@#{script_list} n")
-        offset_by_tag = Array.new(script_count) { table.unpack("@#{script_list + 2 + (_1 * 6)} a4 n") }.to_h
+        offset_by_tag = Array.new(script_count) { |script_index| table.unpack("@#{script_list + 2 + (script_index * 6)} a4 n") }.to_h
         script_offset = offset_by_tag.values_at(*PREFERRED_SCRIPTS).find { !_1.nil? } || offset_by_tag.values.first
         return [] unless script_offset
 
@@ -167,7 +167,7 @@ module PrawnX
           table.unpack("@#{offset + 4} n#{count}").each_with_index.to_h
         else
           table.unpack("@#{offset + 4} n#{count * 3}").each_slice(3).each_with_object({}) do |(first, last, start_index), index|
-            (first..last).each { index[_1] = start_index + (_1 - first) }
+            (first..last).each { |glyph| index[glyph] = start_index + (glyph - first) }
           end
         end
       end

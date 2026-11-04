@@ -25,7 +25,7 @@ module Prawn
       #
       # See README.md for the options that can be passed to this method.
       #
-      def initialize(data, prawn, options, &block)
+      def initialize(data, prawn, options, &)
         Prawn.verify_options VALID_OPTIONS, options
 
         @data = data
@@ -36,7 +36,7 @@ module Prawn
 
         @document = Document.new(
           data, [prawn.bounds.width, prawn.bounds.height], options,
-          font_registry: font_registry, &block
+          font_registry:, &
         )
 
         @renderer = Renderer.new(prawn, document, options)

@@ -12,7 +12,7 @@ class Prawn::SVG::Elements::Image < Prawn::SVG::Elements::Base
     end
   end
 
-  ImageData = Struct.new(:dimensions, :document)
+  ImageData = Data.define(:dimensions, :document)
 
   def parse
     require_attributes "width", "height"
@@ -96,8 +96,8 @@ class Prawn::SVG::Elements::Image < Prawn::SVG::Elements::Base
 
       has_web_loader = @document.url_loader.loaders.any?(Prawn::SVG::Loaders::Web)
       document = Prawn::SVG::Document.new(
-        data, [width, height], {width: width, height: height, enable_web_requests: has_web_loader},
-        attribute_overrides: attribute_overrides
+        data, [width, height], {width:, height:, enable_web_requests: has_web_loader},
+        attribute_overrides:
       )
 
       dimensions = [document.sizing.output_width, document.sizing.output_height]

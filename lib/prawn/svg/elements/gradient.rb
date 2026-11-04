@@ -37,18 +37,18 @@ class Prawn::SVG::Elements::Gradient < Prawn::SVG::Elements::Base
         r1: fr,
         to: [cx, cy],
         r2: r,
-        stops: stops,
+        stops:,
         matrix: matrix_for_bounding_box(bbox),
-        wrap: wrap,
+        wrap:,
         bounding_box: bbox_with_stroke
       }
     else
       {
         from: [x1, y1],
         to: [x2, y2],
-        stops: stops,
+        stops:,
         matrix: matrix_for_bounding_box(bbox),
-        wrap: wrap,
+        wrap:,
         bounding_box: bbox_with_stroke
       }
     end
@@ -156,7 +156,7 @@ class Prawn::SVG::Elements::Gradient < Prawn::SVG::Elements::Base
       offset = result.last[:offset] if result.last && result.last[:offset] > offset
 
       if (color = child.properties.stop_color&.value)
-        result << {offset: offset, color: color, opacity: (child.properties.stop_opacity || 1.0).clamp(0.0, 1.0)}
+        result << {offset:, color:, opacity: (child.properties.stop_opacity || 1.0).clamp(0.0, 1.0)}
       end
     end
 

@@ -53,7 +53,7 @@ class Prawn::SVG::Document
     @sizing = Prawn::SVG::Calculators::DocumentSizing.new(bounds, attributes)
     calculate_sizing(requested_width: options[:width], requested_height: options[:height])
 
-    stylesheets = Prawn::SVG::CSS::Stylesheets.new(css_parser, root, url_loader: url_loader, warnings: warnings)
+    stylesheets = Prawn::SVG::CSS::Stylesheets.new(css_parser, root, url_loader:, warnings:)
     @element_styles = stylesheets.load
     process_font_face_rules(stylesheets.font_face_rules)
 

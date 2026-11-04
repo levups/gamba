@@ -84,7 +84,7 @@ module Prawn
             unprinted_text = (@rotate != 0 && @inked) ? render_rotated(text) : wrap(text)
             @inked = false
           end
-          unprinted_text.map { _1.merge(text: @document.font.to_utf8(_1[:text])) }
+          unprinted_text.map { |fragment| fragment.merge(text: @document.font.to_utf8(fragment[:text])) }
         end
 
         # Whether the lines of a `render(dry_run: true, keep_layout: true)` can be drawn again as they are.
@@ -131,7 +131,7 @@ module Prawn
           fragment.baseline = y
           return unless @inked
 
-          fragment.callback_objects.each { _1.render_behind(fragment) if _1.respond_to?(:render_behind) }
+          fragment.callback_objects.each { |callback| callback.render_behind(fragment) if callback.respond_to?(:render_behind) }
           @document.word_spacing(word_spacing) do
             if @draw_text_callback
               @draw_text_callback.call(fragment.text, at: [x, y], kerning: @kerning)
@@ -195,7 +195,7 @@ module Prawn
               font_glyph_pairs << [font_for_glyph(character, fragment_font, fallback_fonts.dup, fragment_font_options), character]
             end
           end
-          font_glyph_pairs.each { _1[0] = nil if _1[0] == original_font } if hash[:font].nil?
+          font_glyph_pairs.each { |pair| pair[0] = nil if pair[0] == original_font } if hash[:font].nil?
 
           fragments = []
           current_font = nil
@@ -292,7 +292,7 @@ module Prawn
           @document.stroke_line(fragment.underline_points) if fragment.styles.include?(:underline)
           @document.stroke_line(fragment.strikethrough_points) if fragment.styles.include?(:strikethrough)
           draw_link_annotations(fragment)
-          fragment.callback_objects.each { _1.render_in_front(fragment) if _1.respond_to?(:render_in_front) }
+          fragment.callback_objects.each { |callback| callback.render_in_front(fragment) if callback.respond_to?(:render_in_front) }
         end
 
         def draw_link_annotations(fragment)

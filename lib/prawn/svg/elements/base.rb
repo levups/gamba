@@ -234,7 +234,7 @@ class Prawn::SVG::Elements::Base
     # Apply stylesheet styles
     if (styles = document.element_styles[source])
       styles.each do |name, value, important|
-        @properties.set(name, value, important: important)
+        @properties.set(name, value, important:)
       end
     end
 

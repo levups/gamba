@@ -6,22 +6,22 @@ module Prawn
   module Graphics
     # Axial and radial gradients, as shading patterns (ISO 32000-1 §8.7.4.5).
     module Patterns
-      GradientStop = Struct.new(:position, :color)
-      Gradient = Struct.new(:type, :apply_transformations, :stops, :from, :to, :r1, :r2)
+      GradientStop = Data.define(:position, :color)
+      Gradient = Data.define(:type, :apply_transformations, :stops, :from, :to, :r1, :r2)
       IDENTITY_MATRIX = [1, 0, 0, 1, 0, 0].freeze
 
-      def fill_gradient(*arguments, **options)
-        set_gradient(:fill, *arguments, **options)
+      def fill_gradient(*, **)
+        set_gradient(:fill, *, **)
       end
 
-      def stroke_gradient(*arguments, **options)
-        set_gradient(:stroke, *arguments, **options)
+      def stroke_gradient(*, **)
+        set_gradient(:stroke, *, **)
       end
 
       private
 
-      def set_gradient(type, *arguments, **options)
-        gradient = parse_gradient_arguments(*arguments, **options)
+      def set_gradient(type, *, **)
+        gradient = parse_gradient_arguments(*, **)
         patterns = page.resources[:Pattern] ||= {}
         name = "SP#{gradient_registry_key(gradient)}"
         patterns[name] ||= (@gradient_registry ||= {})[name] ||= create_gradient_pattern(gradient)
@@ -62,7 +62,7 @@ module Prawn
       def gradient_registry_key(gradient)
         _x1, _y1, x2, y2, transformation = gradient_coordinates(gradient)
         key = [gradient.type.to_s, transformation, x2, y2, gradient.r1 || -1, gradient.r2 || -1, gradient.stops.length,
-          gradient.stops.map { [_1.position, _1.color] }].flatten
+          gradient.stops.map { |stop| [stop.position, stop.color] }].flatten
         Digest::SHA1.hexdigest(key.join(","))
       end
 

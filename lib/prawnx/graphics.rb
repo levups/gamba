@@ -99,7 +99,7 @@ module Prawn
       move_to(point_on_line(radius, points[1], points[0]))
       sides = points.size
       points << points[0] << points[1]
-      sides.times { rounded_vertex(radius, points[_1], points[_1 + 1], points[_1 + 2]) }
+      sides.times { |side| rounded_vertex(radius, points[side], points[side + 1], points[side + 2]) }
       add_content("h")
     end
 

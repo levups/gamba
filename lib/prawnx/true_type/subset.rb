@@ -52,7 +52,7 @@ module PrawnX
         widths = @file.advance_widths
         left_side_bearings = original_glyphs.map { left_side_bearing(_1) }
 
-        bounds = glyphs.filter_map { _1.unpack("s>5") if _1.bytesize >= 10 }
+        bounds = glyphs.filter_map { |glyph| glyph.unpack("s>5") if glyph.bytesize >= 10 }
         advances = original_glyphs.map { widths[_1] }
         tables = {
           "head" => head_table(bounds),
@@ -61,9 +61,9 @@ module PrawnX
           "hmtx" => horizontal_metrics(original_glyphs, widths, left_side_bearings),
           "loca" => offsets.pack("N*"),
           "glyf" => glyf,
-          "post" => @file.table("post").byteslice(0, 32).dup.tap { _1[0, 4] = "\x00\x03\x00\x00".b }
+          "post" => @file.table("post").byteslice(0, 32).dup.tap { |post| post[0, 4] = "\x00\x03\x00\x00".b }
         }
-        COPIED_TABLES.each { tables[_1] = @file.table(_1) if @file.table?(_1) }
+        COPIED_TABLES.each { |tag| tables[tag] = @file.table(tag) if @file.table?(tag) }
         Subset.assemble(tables.merge(extra_tables))
       end
 
@@ -81,7 +81,7 @@ module PrawnX
           body << data << ("\x00" * ((4 - (data.bytesize % 4)) % 4))
         end
         font = directory << body
-        head_offset = 12 + (table_count * 16) + tags.take_while { _1 != "head" }.sum { (tables[_1].bytesize + 3) & ~3 }
+        head_offset = 12 + (table_count * 16) + tags.take_while { _1 != "head" }.sum { |tag| (tables[tag].bytesize + 3) & ~3 }
         font[head_offset + 8, 4] = [(CHECKSUM_MAGIC - Subset.checksum(font)) & 0xFFFFFFFF].pack("N")
         font
       end
@@ -182,7 +182,7 @@ module PrawnX
         maxp[4, 2] = [glyph_count].pack("n")
         return maxp if maxp.bytesize < 10
 
-        simple = glyphs.select { _1.bytesize >= 10 && _1.unpack1("s>") >= 0 }
+        simple = glyphs.select { |glyph| glyph.bytesize >= 10 && glyph.unpack1("s>") >= 0 }
         contours = simple.map { _1.unpack1("s>") }
         points = simple.zip(contours).map! { |glyph, count| count.zero? ? 0 : glyph.unpack1("@#{10 + ((count - 1) * 2)} n") + 1 }
         maxp[6, 4] = [points.max || 0, contours.max || 0].pack("n2")

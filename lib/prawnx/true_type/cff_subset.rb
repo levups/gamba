@@ -65,21 +65,21 @@ module PrawnX
         return [[], offset + 2] if count.zero?
 
         offset_size = @cff.getbyte(offset + 2)
-        offsets = Array.new(count + 1) { read_offset(offset + 3 + (_1 * offset_size), offset_size) }
+        offsets = Array.new(count + 1) { |index| read_offset(offset + 3 + (index * offset_size), offset_size) }
         data_start = offset + 3 + ((count + 1) * offset_size) - 1
         items = offsets.each_cons(2).map { |first, last| @cff.byteslice(data_start + first, last - first) }
         [items, data_start + offsets.last]
       end
 
       def read_offset(position, size)
-        @cff.byteslice(position, size).bytes.inject(0) { (_1 << 8) | _2 }
+        @cff.byteslice(position, size).bytes.inject(0) { |value, byte| (value << 8) | byte }
       end
 
       def index(items)
         return [0].pack("n") if items.empty?
 
         offsets = items.each_with_object([1]) { |item, list| list << (list.last + item.bytesize) }
-        offset_size = [1, 2, 3, 4].find { offsets.last < (1 << (8 * _1)) }
+        offset_size = [1, 2, 3, 4].find { |size| offsets.last < (1 << (8 * size)) }
         packed_offsets = offsets.map { [_1].pack("N").byteslice(4 - offset_size, offset_size) }.join
         [items.size].pack("n") + offset_size.chr + packed_offsets + items.join.b
       end
@@ -128,7 +128,7 @@ module PrawnX
       end
 
       def operands(entries, operator)
-        entries.find { _1[0] == operator }&.dig(1) || []
+        entries.assoc(operator)&.dig(1) || []
       end
 
       # Offsets into the font move by delta; CharStrings and FDArray point at their new copies at the end.

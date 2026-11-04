@@ -130,7 +130,7 @@ module Prawn
           next if cell.is_a?(Cell::SpanDummy)
 
           height_per_row = cell.height.to_f / cell.rowspan
-          cell.rowspan.times { heights_by_row[cell.row + _1] = [heights_by_row[cell.row + _1], height_per_row].max }
+          cell.rowspan.times { |offset| heights_by_row[cell.row + offset] = [heights_by_row[cell.row + offset], height_per_row].max }
         end
         heights_by_row.sort_by { |row, _| row }.map { |_, height| height }
       end
@@ -190,7 +190,7 @@ module Prawn
     def header_rows
       header_rows = Cells.new
       number_of_header_rows.times do |row_index|
-        row(row_index).each { header_rows[_1.row, _1.column] = _1.dup }
+        row(row_index).each { |cell| header_rows[cell.row, cell.column] = cell.dup }
       end
       header_rows
     end
@@ -219,8 +219,8 @@ module Prawn
           column_number += cell.colspan
         end
       end
-      @row_length = cells.map { _1.row + _1.rowspan }.max
-      @column_length = cells.map { _1.column + _1.colspan }.max
+      @row_length = cells.map { |cell| cell.row + cell.rowspan }.max
+      @column_length = cells.map { |cell| cell.column + cell.colspan }.max
       cells
     end
 
@@ -240,7 +240,7 @@ module Prawn
       rows_to_operate_on = row_of_header ? @header_row.rows(row_of_header) : @header_row
       rows_to_operate_on.each do |cell|
         cell.row = row
-        cell.dummy_cells.each { (cell.rowspan > 1) ? _1.row += row : _1.row = row }
+        cell.dummy_cells.each { |dummy| (cell.rowspan > 1) ? dummy.row += row : dummy.row = row }
         page_of_cells << [cell, [cell.x + x_offset, y]]
       end
       rows_to_operate_on.height

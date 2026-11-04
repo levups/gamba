@@ -95,7 +95,7 @@ module Prawn
           return options[:kerning] ? encode_kerned_codepoints(text.codepoints) : @simple_subsets.encode_codepoints(text.codepoints, cmap)
         end
 
-        clusters = @layout ? @layout.shape(text.codepoints) : text.codepoints.map { [cmap[_1], _1] }
+        clusters = @layout ? @layout.shape(text.codepoints) : text.codepoints.map { |code| [cmap[code], code] }
         return @simple_subsets.encode(clusters) unless options[:kerning]
 
         encoded = []
@@ -135,7 +135,7 @@ module Prawn
       end
 
       def cap_height
-        @cap_height ||= @ttf.os2[:cap_height].to_i.then { _1.zero? ? @ascender : _1 }
+        @cap_height ||= @ttf.os2[:cap_height].to_i.then { |cap_height| cap_height.zero? ? @ascender : cap_height }
       end
 
       def x_height
@@ -220,7 +220,7 @@ module Prawn
       end
 
       def glyph_string(codes)
-        cluster_string(codes.map { [cmap[_1], _1] })
+        cluster_string(codes.map { |code| [cmap[code], code] })
       end
 
       # One character identifier per cluster of characters, in order of first use (0 stays .notdef): characters
@@ -328,7 +328,7 @@ module Prawn
         subset.glyph_by_code.sort.each { |_code, glyph| program.glyph_for(glyph) unless glyph.zero? }
         program.add_components(subset.glyph_by_code.values.uniq.sort!)
         glyph_by_code = subset.glyph_by_code.transform_values { program.glyph_for(_1) }
-        mac_roman_cmap = [0, 1, 1, 0, 12, 0, 262, 0].pack("n4 N n3") + Array.new(256) { glyph_by_code[_1] || 0 }.pack("C*")
+        mac_roman_cmap = [0, 1, 1, 0, 12, 0, 262, 0].pack("n4 N n3") + Array.new(256) { |code| glyph_by_code[code] || 0 }.pack("C*")
         font_name = :"#{subset_tag_for(program.original_glyphs)}+#{basename.delete("\0")[0, 33]}"
         font_bytes = program.bytes("cmap" => mac_roman_cmap)
         font_file = @document.ref!({Length1: font_bytes.bytesize}, font_bytes)
@@ -352,12 +352,12 @@ module Prawn
       end
 
       def subset_tag_for(glyphs)
-        Digest::MD5.digest(glyphs.pack("n*")).bytes.first(6).map! { ("A".ord + (_1 % 26)).chr }.join
+        Digest::MD5.digest(glyphs.pack("n*")).bytes.first(6).map! { |byte| ("A".ord + (byte % 26)).chr }.join
       end
 
       def to_unicode_cmap(codes_by_cid, code_bytes: 2)
         entries = codes_by_cid.map { |cid, codes| format("<%0*X> <%s>", code_bytes * 2, cid, Array(codes).pack("U*").encode(::Encoding::UTF_16BE).unpack1("H*").upcase) }
-        blocks = entries.each_slice(TO_UNICODE_ENTRIES_PER_BLOCK).map { "#{_1.size} beginbfchar\n#{_1.join("\n")}\nendbfchar" }
+        blocks = entries.each_slice(TO_UNICODE_ENTRIES_PER_BLOCK).map { |block_entries| "#{block_entries.size} beginbfchar\n#{block_entries.join("\n")}\nendbfchar" }
         <<~CMAP
           /CIDInit /ProcSet findresource begin
           12 dict begin
@@ -380,7 +380,7 @@ module Prawn
     class TTC < TTF
       def self.font_names(file)
         collection = ::File.binread(file)
-        Array.new(collection.unpack1("@8 N")) { PrawnX::TrueType::File.new(collection, index: _1).font_name }
+        Array.new(collection.unpack1("@8 N")) { |index| PrawnX::TrueType::File.new(collection, index:).font_name }
       end
 
       private

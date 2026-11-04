@@ -89,7 +89,7 @@ module Oracle
   def self.invalidity(pdf)
     output, status = Open3.capture2e("qpdf", "--check", pdf)
     output, status = Open3.capture2e("qpdf", "--check", "--password=#{MANUAL_USER_PASSWORD}", pdf) if output.include?("invalid password")
-    output.lines.grep(/WARNING|ERROR|error/).first(3).join.strip.then { _1.empty? ? "qpdf exit #{status.exitstatus}" : _1 } unless status.success?
+    output.lines.grep(/WARNING|ERROR|error/).first(3).join.strip.then { |problem| problem.empty? ? "qpdf exit #{status.exitstatus}" : problem } unless status.success?
   end
 
   def self.text_differences(reference_pdf, candidate_pdf)
@@ -200,7 +200,7 @@ module Oracle
     header = content[/\AP\d\s+\d+\s+\d+\s+\d+\s/]
     _format, width, height = header.split.map { Integer(_1[/\d+/]) }
     row_bytes = width * (content.start_with?("P5") ? 1 : 3)
-    Array.new(height) { content.byteslice(header.bytesize + _1 * row_bytes, row_bytes) }
+    Array.new(height) { |row| content.byteslice(header.bytesize + (row * row_bytes), row_bytes) }
   end
 
   def self.mutool(*arguments, pdf)

@@ -115,7 +115,7 @@ module Prawn
               when /^<color[^>]*>$/
                 rgb = attribute(token, "rgb", hash_prefixed: true)
                 colors << rgb if rgb
-                cmyk = CMYK_ATTRIBUTES.map { attribute(token, _1, hash_prefixed: true)&.then { |value| Integer(value, 10) } }
+                cmyk = CMYK_ATTRIBUTES.map { |name| attribute(token, name, hash_prefixed: true)&.then { |value| Integer(value, 10) } }
                 colors << cmyk if cmyk.all?
               when /^<font[^>]*>$/
                 attribute(token, "name")&.then { fonts << _1 }

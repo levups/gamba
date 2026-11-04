@@ -54,7 +54,7 @@ class TrueTypeTest < Minitest::Test
   def font_with_table(tag, bytes)
     font = File.binread(FONT)
     table_count = font.unpack1("@4 n")
-    record = (0...table_count).map { 12 + (_1 * 16) }.find { font.byteslice(_1, 4) == tag }
+    record = (0...table_count).map { |index| 12 + (index * 16) }.find { |offset| font.byteslice(offset, 4) == tag }
     font[record + 8, 8] = [font.bytesize, bytes.bytesize].pack("N2")
     font + bytes
   end

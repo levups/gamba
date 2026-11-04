@@ -19,7 +19,7 @@ class OracleTest < Minitest::Test
     raise "Prawn cannot render the manual: #{reference.failure}" if reference.failure
 
     candidate = Oracle.render(CANDIDATE, Oracle.example_files, File.join(OUTPUT_DIRECTORY, CANDIDATE))
-    passing_names = File.foreach(PASSING_LIST, chomp: true).reject { _1.empty? || _1.start_with?("#") }
+    passing_names = File.foreach(PASSING_LIST, chomp: true).reject { |line| line.empty? || line.start_with?("#") }
     passing_names = Oracle.example_names(reference) if CANDIDATE == "prawn"
 
     Oracle.example_names(reference).each do |name|

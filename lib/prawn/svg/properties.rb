@@ -102,7 +102,7 @@ module Prawn::SVG
       elsif name == "font"
         apply_font_shorthand(value)
       elsif name == "marker"
-        apply_marker_shorthand(value, important: important)
+        apply_marker_shorthand(value, important:)
       end
     end
 
@@ -322,7 +322,7 @@ module Prawn::SVG
 
     def apply_marker_shorthand(value, important: false)
       %w[marker-start marker-mid marker-end].each do |property|
-        set(property, value, important: important)
+        set(property, value, important:)
       end
     end
   end

@@ -1,6 +1,6 @@
 module Prawn::SVG::Calculators
   class PathLength
-    Segment = Struct.new(:start_point, :end_point, :type, :control_points, :segment_length, :cumulative_length, :lookup_table)
+    Segment = Data.define(:start_point, :end_point, :type, :control_points, :segment_length, :cumulative_length, :lookup_table)
 
     SUBDIVISION_TOLERANCE = 0.01
     LOOKUP_TABLE_STEPS = 64

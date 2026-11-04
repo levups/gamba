@@ -29,7 +29,7 @@ def measure(engine, document)
 end
 
 results = Dir[File.join(__dir__, "documents/*.rb")].sort.to_h do |document|
-  [File.basename(document, ".rb"), Oracle::ENGINES.keys.to_h { [_1, measure(_1, document)] }]
+  [File.basename(document, ".rb"), Oracle::ENGINES.keys.to_h { |engine| [engine, measure(engine, document)] }]
 end
 
 results.each do |document, measures_by_engine|

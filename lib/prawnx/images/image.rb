@@ -242,7 +242,7 @@ module Prawn
       # Palette indices and their opacity: indices only mean something once the rows are unfiltered.
       def split_palette_transparency
         rows = PngDecoder.unfilter(img_data, ((width * bits) + 7) / 8, 1)
-        alpha_by_index = Array.new(256) { transparency[:palette][_1] || 0xFF }
+        alpha_by_index = Array.new(256) { |index| transparency[:palette][index] || 0xFF }
         alpha = rows.map do |row|
           indices = (bits == 8) ? row.bytes : row.unpack1("B*").scan(/.{#{bits}}/).first(width).map! { _1.to_i(2) }
           indices.map { alpha_by_index[_1] }.pack("C*")

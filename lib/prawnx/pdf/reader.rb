@@ -121,7 +121,7 @@ module PDF
           kids = resolve(node[:Kids])
           if node[:Type] == TYPE_PAGES || (node[:Type].nil? && kids.is_a?(Array))
             inherited = inherited.merge(node.slice(*INHERITED_PAGE_KEYS))
-            Array(kids).reverse_each { pending << [_1, inherited] }
+            Array(kids).reverse_each { |kid| pending << [kid, inherited] }
           else
             pages << [reference, inherited.merge(node)]
           end
@@ -232,7 +232,7 @@ module PDF
 
       def field(bytes, position, width)
         value = 0
-        width.times { value = (value << 8) | bytes.getbyte(position + _1) }
+        width.times { |index| value = (value << 8) | bytes.getbyte(position + index) }
         value
       end
 
@@ -281,7 +281,7 @@ module PDF
           end
           offsets.each_with_index { |(packed, _), index| @locations[packed] ||= [:compressed, number, index] }
         end
-        @trailer[:Root] ||= @locations.keys.find { (catalog = object(_1)).is_a?(Hash) && catalog[:Type] == TYPE_CATALOG }&.then { Ref.new(number: _1, generation: 0) }
+        @trailer[:Root] ||= @locations.keys.find { |number| (catalog = object(number)).is_a?(Hash) && catalog[:Type] == TYPE_CATALOG }&.then { |number| Ref.new(number:, generation: 0) }
         raise Prawn::Errors::MalformedPDF, "No document catalog found" unless @trailer[:Root]
       end
 
@@ -418,7 +418,7 @@ module PDF
           output << chunk
           raise LimitExceeded, "Object streams inflate to more than the file may decode" if output.bytesize > @decoded_bytes_left
         end
-        0.step(data.bytesize - 1, INFLATE_CHUNK_BYTES) { zstream.inflate(data.byteslice(_1, INFLATE_CHUNK_BYTES), &collect) }
+        0.step(data.bytesize - 1, INFLATE_CHUNK_BYTES) { |offset| zstream.inflate(data.byteslice(offset, INFLATE_CHUNK_BYTES), &collect) }
         zstream.finish(&collect)
         output
       rescue Zlib::Error => error
@@ -503,7 +503,7 @@ module PDF
       def name_bytes
         @scanner.pos += 1 # the slash, which the callers have seen
         name = @scanner.scan(NAME_BODY)
-        name.include?("#") ? name.gsub(/#(\h\h)/n) { _1[1, 2].hex.chr } : name
+        name.include?("#") ? name.gsub(/#(\h\h)/n) { |escape| escape[1, 2].hex.chr } : name
       end
 
       def parse_number

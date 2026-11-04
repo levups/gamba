@@ -103,7 +103,7 @@ module Prawn
       end
 
       def find_font(file)
-        directory = self.class.metrics_path.find { File.exist?("#{_1}/#{file}") }
+        directory = self.class.metrics_path.find { |path| File.exist?("#{path}/#{file}") }
         raise Errors::UnknownFont, "Couldn't find the font: #{file} in any of:\n#{self.class.metrics_path.join("\n")}" unless directory
 
         "#{directory}/#{file}"
@@ -119,7 +119,7 @@ module Prawn
           runs.last << byte
           last_byte = byte
         end
-        runs.map { _1.is_a?(String) ? _1.force_encoding(::Encoding::Windows_1252) : _1 }
+        runs.map { |run| run.is_a?(String) ? run.force_encoding(::Encoding::Windows_1252) : run }
       end
 
       def unscaled_width_of(string)

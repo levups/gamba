@@ -36,7 +36,7 @@ class CombineTest < Minitest::Test
 
     original = document("alice", pages: 2)
     QPDF_VARIANTS.each do |name, arguments|
-      variant = qpdf(original, arguments.map { (_1 == '""') ? "" : _1 })
+      variant = qpdf(original, arguments.map { |argument| (argument == '""') ? "" : argument })
 
       assert_equal rasterized(original), rasterized(PrawnX.combine([variant])), "a file with #{name}"
     end
@@ -201,7 +201,7 @@ d) Tj"
   def test_damaged_files_fail_cleanly
     samples = [document("alice", pages: 2), classic_pdf({4 => stream("BT /F1 24 Tf 72 700 Td (bob) Tj ET")})]
     if system("qpdf", "--version", out: File::NULL)
-      samples += QPDF_VARIANTS.values.map { |arguments| qpdf(samples.first, arguments.map { (_1 == '""') ? "" : _1 }) }
+      samples += QPDF_VARIANTS.values.map { |arguments| qpdf(samples.first, arguments.map { |argument| (argument == '""') ? "" : argument }) }
     end
     random = Random.new(FUZZ_SEED)
     failures = []
@@ -258,14 +258,14 @@ d) Tj"
   end
 
   def test_a_chain_of_lengths_deeper_than_any_real_file_is_refused
-    chain = (6..10_005).to_h { [_1, "<< /Length #{_1 + 1} 0 R >>\nstream\nx\nendstream"] }
+    chain = (6..10_005).to_h { |number| [number, "<< /Length #{number + 1} 0 R >>\nstream\nx\nendstream"] }
     source = classic_pdf({4 => "<< /Length 6 0 R >>\nstream\nBT ET\nendstream", 10_006 => "1", **chain})
 
     assert_raises(Prawn::Errors::MalformedPDF) { PrawnX.combine([source]) }
   end
 
   def test_a_long_list_of_objects_is_copied_whole
-    chain = (6..20_005).to_h { [_1, "[#{_1 + 1} 0 R]"] }
+    chain = (6..20_005).to_h { |number| [number, "[#{number + 1} 0 R]"] }
     source = classic_pdf({3 => PAGE.sub(">> >>", ">> >> /Next 6 0 R"), 4 => stream("BT ET"), 20_006 => "[]", **chain})
     reader = PDF::Core::Reader.new(PrawnX.combine([source]))
     length = 0
@@ -291,7 +291,7 @@ d) Tj"
     # Linear takes 0.4 s on MRI; quadratic, minutes. The margin is for TruffleRuby before its JIT warms up.
     annotations = Timeout.timeout(10) { reader.resolve(reader.pages.first[1][:Annots]).map { reader.resolve(_1) } }
 
-    assert_equal 20_000, annotations.count { _1.is_a?(Hash) && _1[:Subtype] }
+    assert_equal 20_000, annotations.count { |annotation| annotation.is_a?(Hash) && annotation[:Subtype] }
   end
 
   def test_a_cross_reference_stream_without_width_is_rebuilt_instead_of_read_forever
