@@ -79,6 +79,11 @@ module Oracle
     [invalidity(pdf)].compact.map { "invalid PDF: #{_1}" }
   end
 
+  # Whether Prawn, rendered with a prawn_switch of test/divergences.yml, went where the switch changes what it draws.
+  def self.switched?(rendering, name)
+    File.exist?(File.join(rendering.directory, "#{name}.switched"))
+  end
+
   def self.error_class(rendering, name)
     read_if_present(rendering.directory, "#{name}.error")&.[](/\A\w+(?:::\w+)*/)
   end

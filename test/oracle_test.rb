@@ -19,6 +19,15 @@ class OracleTest < Minitest::Test
     raise "Prawn cannot render the manual: #{reference.failure}" if reference.failure
 
     candidate = Oracle.render(CANDIDATE, Oracle.example_files, File.join(OUTPUT_DIRECTORY, CANDIDATE))
+    # Prawn fixing a bug as PrawnX does, through a switch of test/support/oracle_render.rb (prawn_switch), for the
+    # examples of that bug only.
+    switched_by_example = DIVERGENCES.select { _1.key?("prawn_switch") }.flat_map do |divergence|
+      switch, names = divergence.values_at("prawn_switch", "examples")
+      paths = names.map { File.join(Oracle::EXAMPLES_DIRECTORY, "#{_1}.rb") }
+      switched = Oracle.render("prawn", paths, File.join(OUTPUT_DIRECTORY, switch.downcase), switch => "1")
+      raise "Prawn cannot render with #{switch}: #{switched.failure}" if switched.failure
+      names.map { [_1, switched] }
+    end.to_h
     passing_names = File.foreach(PASSING_LIST, chomp: true).reject { |line| line.empty? || line.start_with?("#") }
     passing_names = Oracle.example_names(reference) if CANDIDATE == "prawn"
 
@@ -29,6 +38,9 @@ class OracleTest < Minitest::Test
 
         differences = if divergence&.key?("prawn_raises")
           Oracle.fixed_crash_differences(reference, candidate, name, divergence["prawn_raises"])
+        elsif (switched = switched_by_example[name])
+          assert Oracle.switched?(switched, name), "#{divergence["prawn_switch"]} no longer changes how Prawn draws #{name}"
+          Oracle.differences(switched, candidate, name)
         else
           Oracle.differences(reference, candidate, name)
         end
@@ -47,6 +59,9 @@ class OracleTest < Minitest::Test
     define_method(:test_every_divergence_still_shows_in_prawn) do
       DIVERGENCE_BY_EXAMPLE.each do |name, divergence|
         assert_includes Oracle.example_names(reference), name, "test/divergences.yml names an unknown example"
+        if (switched = switched_by_example[name])
+          refute_empty Oracle.differences(switched, reference, name), "Prawn no longer shows the bug in #{name}"
+        end
         next unless divergence["prawn_writes_invalid_pdf"]
 
         refute_nil Oracle.invalidity(File.join(reference.directory, "#{name}.pdf")), "Prawn no longer shows the bug in #{name}"

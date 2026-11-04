@@ -12,7 +12,10 @@ class FuzzTest < Minitest::Test
   DIRECTORY = File.join(Oracle::ROOT, "tmp/fuzz")
   # Prawn crashes PrawnX fixes, from test/divergences.yml: PrawnX must never raise them, but render a valid PDF or
   # raise what Prawn raises once past the crash.
-  FIXED_PRAWN_CRASHES = YAML.load_file(File.join(__dir__, "divergences.yml")).filter_map { _1["prawn_raises"] }.freeze
+  DIVERGENCES = YAML.load_file(File.join(__dir__, "divergences.yml"))
+  FIXED_PRAWN_CRASHES = DIVERGENCES.filter_map { _1["prawn_raises"] }.freeze
+  # Switches of test/support/oracle_render.rb making Prawn fix a bug as PrawnX does, from test/divergences.yml.
+  PRAWN_SWITCHES = DIVERGENCES.filter_map { _1["prawn_switch"] }.to_h { [_1, "1"] }.freeze
 
   def test_random_documents_render_like_prawn
     skip CORPUS_MISSING_MESSAGE if Oracle.manual_chapters.empty?
@@ -28,7 +31,7 @@ class FuzzTest < Minitest::Test
     candidate = Oracle.render("prawnx", paths, File.join(DIRECTORY, "prawnx"))
 
     past_crash = past_fixed_crashes(reference, candidate, paths)
-    failures = Oracle.example_names(reference).filter_map do |name|
+    differences_by_name = Oracle.example_names(reference).to_h do |name|
       prawn_error = Oracle.error_class(reference, name)
       differences = if past_crash && Oracle.error_class(past_crash, name)
         # PrawnX goes past Prawn's crash and raises further on: so must Prawn once past it.
@@ -38,6 +41,12 @@ class FuzzTest < Minitest::Test
       else
         Oracle.differences(reference, candidate, name)
       end
+      [name, differences]
+    end
+    switched = switched_prawn(reference, differences_by_name)
+    failures = differences_by_name.filter_map do |name, differences|
+      # Where Prawn fixes the bug once switched, PrawnX must match that Prawn exactly.
+      differences = Oracle.differences(switched, candidate, name) if switched && Oracle.switched?(switched, name)
       "#{DIRECTORY}/documents/#{name}.rb: #{differences.first}" unless differences.empty?
     end
     assert_empty failures, "seed #{SEED}: #{failures.size} of #{CASES} documents differ"
@@ -46,7 +55,7 @@ class FuzzTest < Minitest::Test
   private
 
   # Documents where Prawn raises a crash PrawnX fixes and PrawnX raises another error, rendered again by Prawn going
-  # past that crash; nil when there are none.
+  # past that crash, with the switches of test/divergences.yml; nil when there are none.
   def past_fixed_crashes(reference, candidate, paths)
     crashed = paths.select do |path|
       name = File.basename(path, ".rb")
@@ -56,6 +65,17 @@ class FuzzTest < Minitest::Test
     end
     return if crashed.empty?
 
-    Oracle.render("prawn", crashed, File.join(DIRECTORY, "prawn-past-crash"), "ORACLE_PAST_GRAPHIC_STATE_CRASH" => "1")
+    Oracle.render("prawn", crashed, File.join(DIRECTORY, "prawn-past-crash"), {"ORACLE_PAST_GRAPHIC_STATE_CRASH" => "1", **PRAWN_SWITCHES})
+  end
+
+  # Documents PrawnX draws differently from Prawn, without a crash it fixes, rendered again by Prawn with the switches
+  # of test/divergences.yml; nil when there are none.
+  def switched_prawn(reference, differences_by_name)
+    differing = differences_by_name.filter_map do |name, differences|
+      File.join(DIRECTORY, "documents", "#{name}.rb") unless differences.empty? || FIXED_PRAWN_CRASHES.include?(Oracle.error_class(reference, name))
+    end
+    return if differing.empty? || PRAWN_SWITCHES.empty?
+
+    Oracle.render("prawn", differing, File.join(DIRECTORY, "prawn-switched"), PRAWN_SWITCHES)
   end
 end

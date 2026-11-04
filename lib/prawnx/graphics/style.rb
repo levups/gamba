@@ -86,6 +86,7 @@ module Prawn
         opacity = opacity.clamp(0.0, 1.0)
         stroke_opacity = stroke_opacity.clamp(0.0, 1.0)
         save_graphics_state
+        @unrestored_graphics_states[-1] = [opacity, stroke_opacity]
         add_content("/#{opacity_dictionary_name(opacity, stroke_opacity)} gs")
         yield
         restore_graphics_state
