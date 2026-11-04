@@ -38,7 +38,7 @@ jobs:
     name: Ruby ${{ matrix.ruby }}${{ matrix.rails && format(' · Rails {0}', matrix.rails.version) || '' }}
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     continue-on-error: ${{ endsWith(matrix.ruby, '-head') }}
     strategy:
       fail-fast: false
@@ -55,20 +55,28 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
-      - name: Install the PDF tools
-        run: sudo apt-get update && sudo apt-get install --yes mupdf-tools poppler-utils qpdf
-      - name: Set up Java for Mustang, the Factur-X validator
-        uses: actions/setup-java@v6
-        with:
-          distribution: temurin
-          java-version: "21"
-      - name: Cache the corpus and Mustang
+      - name: Cache the corpus, Mustang and the PDF tools' packages
         uses: actions/cache@v6
         with:
           path: |
             corpus/cache
             ~/.cache/prawnx-tools
+            ~/.cache/apt-archives
           key: prawnx-${{ runner.os }}-${{ hashFiles('corpus/manifest.yml', '.github/workflows/ci.yml') }}
+      # 2026-11-04: Azure's Ubuntu mirror stalled 15 minutes on libmupdf (34 MB), cancelling the job: the packages
+      # come from the cache, and a stalled mirror fails the step in minutes instead of the whole job.
+      - name: Install the PDF tools
+        timeout-minutes: 5
+        run: |
+          mkdir -p ~/.cache/apt-archives/partial
+          sudo apt-get update
+          sudo apt-get install --yes -o Dir::Cache::Archives="$HOME/.cache/apt-archives" mupdf-tools poppler-utils qpdf
+          sudo chown -R "$USER" ~/.cache/apt-archives
+      - name: Set up Java for Mustang, the Factur-X validator
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
       - name: Install Prawn, the oracle
         run: BUNDLE_GEMFILE=oracle/Gemfile bundle install
       - name: Fetch the corpus
