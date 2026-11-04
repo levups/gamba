@@ -226,15 +226,19 @@ module Prawn
         sample_bytes = bits / 8
         color_bytes = colors * sample_bytes
         row_bytes = (width * (color_bytes + sample_bytes)) + 1
-        pixel_layout = "a#{color_bytes}a#{sample_bytes}" * width
         color = +"".b
         alpha = +"".b
-        (img_data.bytesize / row_bytes).times do |row_index|
+        rows = img_data.bytesize / row_bytes
+        # A corrupted header can announce a width its data never fills: no row, and no layout of that width to build.
+        return [color, alpha] if rows.zero?
+
+        color_layout = "C#{color_bytes}x#{sample_bytes}" * width
+        alpha_layout = "x#{color_bytes}C#{sample_bytes}" * width
+        rows.times do |row_index|
           start = row_index * row_bytes
-          filter = img_data.byteslice(start, 1)
-          samples = img_data.byteslice(start + 1, row_bytes - 1).unpack(pixel_layout)
-          color << filter << samples.each_slice(2).map(&:first).join
-          alpha << filter << samples.each_slice(2).map(&:last).join
+          filter = img_data.getbyte(start)
+          img_data.unpack(color_layout, offset: start + 1).pack("C*", buffer: color << filter)
+          img_data.unpack(alpha_layout, offset: start + 1).pack("C*", buffer: alpha << filter)
         end
         [color, alpha]
       end

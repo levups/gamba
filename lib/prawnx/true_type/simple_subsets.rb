@@ -31,29 +31,34 @@ module PrawnX
 
       # [[subset index, bytes], …] for clusters of characters, each cluster [glyph, codes].
       def encode(clusters)
-        encode_keys(clusters) { |cluster| [cluster[1], cluster[0]] }
+        parts = []
+        clusters.each do |glyph, codes|
+          append(parts, *(@location_by_cluster[codes] ||= code_for([glyph, codes])))
+        end
+        parts
       end
 
-      # The same for single characters, by code point: the common case, without building a cluster per character.
+      # The same for single characters, by code point: the common case, where a character already given its code
+      # costs a single hash access, and its glyph is only looked up the first time.
       def encode_codepoints(codepoints, glyph_by_code)
-        encode_keys(codepoints) { |code| [code, glyph_by_code[code]] }
+        parts = []
+        codepoints.each do |codepoint|
+          index, code = @location_by_cluster[codepoint] ||= code_for([glyph_by_code[codepoint], codepoint])
+          append(parts, index, code)
+        end
+        parts
       end
 
       private
 
-      # A character keeps its subset and code once given: later lookups are a single hash access.
-      def encode_keys(items)
-        parts = []
-        items.each do |item|
-          key, glyph = yield item
-          index, code = @location_by_cluster[key] ||= code_for([glyph, key])
-          if parts.empty? || parts.last[0] != index
-            parts << [index, code.chr.b]
-          else
-            parts.last[1] << code
-          end
+      # Consecutive characters of one subset share a part, as in Prawn's TJ arrays.
+      def append(parts, index, code)
+        last = parts.last
+        if last.nil? || last[0] != index
+          parts << [index, code.chr(::Encoding::BINARY)]
+        else
+          last[1] << code
         end
-        parts
       end
 
       def code_for(cluster)
