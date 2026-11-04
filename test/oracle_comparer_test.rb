@@ -53,6 +53,30 @@ class OracleComparerTest < Minitest::Test
       Oracle.error_class_differences("Prawn::Errors::CannotFit: …", "ArgumentError: …")
   end
 
+  # Stream data, compressed or not, can hold the bytes of a subset tag by chance: only font names get the neutral tag.
+  def test_neutral_subset_tags_leave_stream_data_alone
+    Dir.mktmpdir do |directory|
+      pdf = File.join(directory, "tagged.pdf")
+      content = "% /AbCdEf+ is stream data\n"
+      File.binwrite(pdf, <<~PDF)
+        %PDF-1.4
+        1 0 obj <</Type/Catalog/Pages 2 0 R>> endobj
+        2 0 obj <</Type/Pages/Kids[3 0 R]/Count 1>> endobj
+        3 0 obj <</Type/Page/Parent 2 0 R/MediaBox[0 0 10 10]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>> endobj
+        4 0 obj <</Length #{content.bytesize}>> stream
+        #{content}endstream endobj
+        5 0 obj <</Type/Font/Subtype/Type1/BaseFont/AbCdEf+Helvetica/FontDescriptor 6 0 R>> endobj
+        6 0 obj <</Type/FontDescriptor/FontName/GhIjKl+Helvetica>> endobj
+        trailer <</Root 1 0 R/Size 7>>
+        %%EOF
+      PDF
+      neutral = File.binread(Oracle.with_neutral_subset_tags(pdf, File.join(directory, "neutral.pdf")))
+
+      assert_includes neutral, content
+      assert_equal ["/BaseFont /AAAAAA+Helvetica", "/FontName /AAAAAA+Helvetica"], neutral.scan(%r{/\w+ /\w{6}\+Helvetica})
+    end
+  end
+
   private
 
   def differences_with(name)
