@@ -16,7 +16,7 @@ module Prawn
 
     # Runs the block, then puts back the listed attributes as they were.
     def mask(*fields)
-      stored = fields.to_h { [_1, public_send(_1)] }
+      stored = fields.to_h { |field| [field, public_send(field)] }
       yield
       stored.each { |field, value| public_send(:"#{field}=", value) }
     end
@@ -89,7 +89,7 @@ module Prawn
         return min_width_ignoring_span if @colspan == 1
 
         min_widths = Hash.new(0)
-        dummy_cells.each { min_widths[_1.column] = [min_widths[_1.column], _1.min_width].max }
+        dummy_cells.each { |dummy| min_widths[dummy.column] = [min_widths[dummy.column], dummy.min_width].max }
         min_widths[column] = [min_widths[column], min_width_ignoring_span].max
         min_widths.values.sum
       end
@@ -107,7 +107,7 @@ module Prawn
         return max_width_ignoring_span if @colspan == 1
 
         max_widths = Hash.new(0)
-        dummy_cells.each { max_widths[_1.column] = [max_widths[_1.column], _1.max_width].min }
+        dummy_cells.each { |dummy| max_widths[dummy.column] = [max_widths[dummy.column], dummy.max_width].min }
         max_widths[column] = [max_widths[column], max_width_ignoring_span].min
         max_widths.values.sum
       end
@@ -125,7 +125,7 @@ module Prawn
         return width_ignoring_span if @colspan == 1 && @rowspan == 1
 
         column_widths = Hash.new(0)
-        dummy_cells.each { column_widths[_1.column] = [column_widths[_1.column], _1.width].max }
+        dummy_cells.each { |dummy| column_widths[dummy.column] = [column_widths[dummy.column], dummy.width].max }
         column_widths[column] = [column_widths[column], width_ignoring_span].max
         column_widths.values.sum
       end
@@ -156,7 +156,7 @@ module Prawn
         return height_ignoring_span if @colspan == 1 && @rowspan == 1
 
         row_heights = Hash.new(0)
-        dummy_cells.each { row_heights[_1.row] = [row_heights[_1.row], _1.height].max }
+        dummy_cells.each { |dummy| row_heights[dummy.row] = [row_heights[dummy.row], dummy.height].max }
         row_heights[row] = [row_heights[row], height_ignoring_span].max
         row_heights.values.sum
       end

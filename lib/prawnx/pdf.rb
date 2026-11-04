@@ -30,7 +30,7 @@ module PDF
     def escape_name(name)
       return "/#{name}" if name.match?(REGULAR_NAME)
 
-      (+"/").concat(*name.b.each_byte.map { DELIMITER_OR_IRREGULAR_BYTES.include?(_1) ? format("#%02X", _1) : _1.chr })
+      (+"/").concat(*name.b.each_byte.map { |byte| DELIMITER_OR_IRREGULAR_BYTES.include?(byte) ? format("#%02X", byte) : byte.chr })
     end
 
     # Five decimals, trailing zeros dropped but one: 1 is "1.0", 0.5 is "0.5", 1/3 is "0.33333".

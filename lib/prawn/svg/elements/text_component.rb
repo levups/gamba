@@ -238,8 +238,8 @@ module Prawn::SVG
     def font_family_names
       names = CSS::FontFamilyParser.parse(computed_properties.font_family.to_s)
       names << document.fallback_font_name if document.fallback_font_name
-      names.filter_map do
-        name = _1.strip
+      names.filter_map do |family_name|
+        name = family_name.strip
         name unless name.empty?
       end
     end

@@ -13,7 +13,7 @@ module Prawn
       def rows(row_spec)
         index_cells unless @indexed
         row_spec = transform_spec(row_spec, @first_row, @row_count)
-        Cells.new(@rows[row_spec] ||= select { row_spec.respond_to?(:include?) ? row_spec.include?(_1.row) : row_spec === _1.row })
+        Cells.new(@rows[row_spec] ||= select { |cell| row_spec.respond_to?(:include?) ? row_spec.include?(cell.row) : row_spec === cell.row })
       end
       alias_method :row, :rows
 
@@ -25,7 +25,7 @@ module Prawn
       def columns(column_spec)
         index_cells unless @indexed
         column_spec = transform_spec(column_spec, @first_column, @column_count)
-        Cells.new(@columns[column_spec] ||= select { column_spec.respond_to?(:include?) ? column_spec.include?(_1.column) : column_spec === _1.column })
+        Cells.new(@columns[column_spec] ||= select { |cell| column_spec.respond_to?(:include?) ? column_spec.include?(cell.column) : column_spec === cell.column })
       end
       alias_method :column, :columns
 
@@ -67,7 +67,7 @@ module Prawn
       end
 
       def style(options = {}, &)
-        each { _1.style(options, &) unless _1.is_a?(Cell::SpanDummy) }
+        each { |cell| cell.style(options, &) unless cell.is_a?(Cell::SpanDummy) }
       end
 
       def width
@@ -94,7 +94,7 @@ module Prawn
       def method_missing(name, *arguments, &)
         return super unless name.end_with?("=")
 
-        each { _1.public_send(name, *arguments, &) if _1.respond_to?(name) }
+        each { |cell| cell.public_send(name, *arguments, &) if cell.respond_to?(name) }
       end
 
       def respond_to_missing?(name, include_private = false)
@@ -137,7 +137,7 @@ module Prawn
         @cells = cells
         @widths_by_column = Hash.new(0)
         @rows_with_a_span_dummy = Hash.new(false)
-        @cells.each { @rows_with_a_span_dummy[_1.row] = true if _1.is_a?(Cell::SpanDummy) }
+        @cells.each { |cell| @rows_with_a_span_dummy[cell.row] = true if cell.is_a?(Cell::SpanDummy) }
       end
 
       def has_a_span_dummy?(row)
@@ -145,13 +145,13 @@ module Prawn
       end
 
       def fill_values_if_needed(values, cell, index, method)
-        missing_count = cell.colspan.times.count { values[index + _1].nil? }
+        missing_count = cell.colspan.times.count { |offset| values[index + offset].nil? }
         return values if missing_count.zero? || missing_count == cell.colspan || !has_a_span_dummy?(cell.row)
 
         new_sum = cell.send(method) * cell.colspan
-        cell.colspan.times { new_sum -= values[index + _1] unless values[index + _1].nil? }
+        cell.colspan.times { |offset| new_sum -= values[index + offset] unless values[index + offset].nil? }
         new_value = new_sum.to_f / missing_count
-        cell.colspan.times { values[index + _1] = new_value if values[index + _1].nil? }
+        cell.colspan.times { |offset| values[index + offset] = new_value if values[index + offset].nil? }
         values
       end
 
@@ -168,7 +168,7 @@ module Prawn
           else
             current_width_of_spanned_cells = @widths_by_column.to_a[cell.column..(cell.column + cell.colspan - 1)].sum(&:last)
             if (cell.width.to_f - current_width_of_spanned_cells) > FLOAT_PRECISION
-              cell.colspan.times { @widths_by_column[cell.column + _1] = cell.width.to_f / cell.colspan }
+              cell.colspan.times { |offset| @widths_by_column[cell.column + offset] = cell.width.to_f / cell.colspan }
             end
           end
         end
@@ -194,8 +194,8 @@ module Prawn
             spanned_width_needs_fixing = (new_sum - old_sum) > FLOAT_PRECISION
             if spanned_width_needs_fixing
               values[index] = [values[index], cell.send(method)].compact.send(aggregate)
-              entries_exist = cell.colspan.times.none? { values[index + _1].nil? }
-              cell.colspan.times { values[index + _1] = cell.send(method) if entries_exist }
+              entries_exist = cell.colspan.times.none? { |offset| values[index + offset].nil? }
+              cell.colspan.times { |offset| values[index + offset] = cell.send(method) if entries_exist }
             end
           elsif spanned_width_needs_fixing && cell.instance_of?(Cell::SpanDummy)
             values[index] = [values[index], cell.send(method)].compact.send(aggregate)

@@ -43,7 +43,7 @@ def group_of(file, line)
 end
 
 def private_in_yard?(file, line)
-  File.readlines(file)[0...(line - 1)].reverse.take_while { _1.match?(/^\s*#/) }.any? { _1.match?(/@private|:nodoc:/) }
+  File.readlines(file)[0...(line - 1)].reverse.take_while { |line| line.match?(/^\s*#/) }.any? { |comment| comment.match?(/@private|:nodoc:/) }
 end
 
 # Forwardable's delegators take (*args, &block): the signature that counts is the one of the method they call.
@@ -63,10 +63,10 @@ def contract_for(class_names, group: nil)
   class_names.to_h do |class_name|
     klass = Object.const_get(class_name)
     instance_methods = klass.is_a?(Class) ? klass.public_instance_methods : klass.public_instance_methods(false)
-    methods = instance_methods.map { klass.instance_method(_1) }.select { _1.owner.name&.match?(OWNER_NAMESPACES) && _1.source_location }
-    singleton_methods = klass.singleton_methods.map { klass.method(_1) }.select { _1.owner.inspect.match?(/Prawn|PDF::Core/) && _1.source_location }
-    entries = methods.sort_by(&:name).to_h { ["##{_1.name}", describe(_1)] }
-    entries.merge!(singleton_methods.sort_by(&:name).to_h { [".#{_1.name}", describe(_1)] })
+    methods = instance_methods.map { klass.instance_method(_1) }.select { |method| method.owner.name&.match?(OWNER_NAMESPACES) && method.source_location }
+    singleton_methods = klass.singleton_methods.map { klass.method(_1) }.select { |method| method.owner.inspect.match?(/Prawn|PDF::Core/) && method.source_location }
+    entries = methods.sort_by(&:name).to_h { |method| ["##{method.name}", describe(method)] }
+    entries.merge!(singleton_methods.sort_by(&:name).to_h { |method| [".#{method.name}", describe(method)] })
     entries.transform_values! { _1.merge("group" => group) } if group
     [class_name, entries]
   end

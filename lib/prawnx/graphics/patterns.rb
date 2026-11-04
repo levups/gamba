@@ -62,7 +62,7 @@ module Prawn
       def gradient_registry_key(gradient)
         _x1, _y1, x2, y2, transformation = gradient_coordinates(gradient)
         key = [gradient.type.to_s, transformation, x2, y2, gradient.r1 || -1, gradient.r2 || -1, gradient.stops.length,
-          gradient.stops.map { [_1.position, _1.color] }].flatten
+          gradient.stops.map { |stop| [stop.position, stop.color] }].flatten
         Digest::SHA1.hexdigest(key.join(","))
       end
 

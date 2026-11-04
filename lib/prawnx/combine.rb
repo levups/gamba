@@ -208,7 +208,7 @@ module PrawnX
     def contents(value)
       resolved = @reader.resolve(value)
       value = resolved if resolved.is_a?(Array)
-      Array(value).filter_map { copy_value(_1) if _1.is_a?(PDF::Core::Reader::Ref) }
+      Array(value).filter_map { |content| copy_value(content) if content.is_a?(PDF::Core::Reader::Ref) }
     end
 
     # Annotation rectangles follow the content they sit on.
@@ -249,7 +249,7 @@ module PrawnX
       own = plain_matrix(form.data[:Matrix])
       return form unless own
 
-      reference(form.data.merge(Matrix: multiply(own, linear))).tap { _1.stream = form.stream }
+      reference(form.data.merge(Matrix: multiply(own, linear))).tap { |copy| copy.stream = form.stream }
     end
 
     def plain_matrix(values)

@@ -99,7 +99,7 @@ def render(example, output_directory)
   if example.options[:standalone]
     Dir.mktmpdir do |directory|
       Dir.chdir(directory) { example.block.call }
-      Dir["#{directory}/*.pdf"].each { FileUtils.mv(_1, "#{output}-#{File.basename(_1)}") }
+      Dir["#{directory}/*.pdf"].each { |path| FileUtils.mv(path, "#{output}-#{File.basename(path)}") }
     end
   else
     document = Prawn::Document.new
