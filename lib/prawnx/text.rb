@@ -269,8 +269,11 @@ module Prawn
       end
     end
 
-    # Writes a text state parameter, and records it in the graphic state it now belongs to.
+    # Writes a text state parameter, and records it in the graphic state it now belongs to. A text rendering mode
+    # forgotten by forget_text_rendering_mode! is unknown: nothing to write, and the state keeps the mode in effect.
     def write_text_state(setting, value)
+      return if value == :unknown
+
       add_content(
         case setting
         when :text_rendering_mode then "\n#{MODES[value]} Tr"
@@ -285,13 +288,13 @@ module Prawn
 
     # The text state parameters are part of the graphic state (ISO 32000-1 §9.3.1): a new page starts without them, and
     # a restore closing a state opened on the page returns to that state's. Write back those of the blocks still open
-    # that the current state lacks. A text rendering mode forgotten by forget_text_rendering_mode! is unknown: none.
+    # that the current state lacks.
     def resume_text_state
       current = page.stack.last
       PDF::Core::GraphicState::DEFAULT_TEXT_STATE.each do |setting, default|
         written = current ? current.public_send(setting) : default
         value = public_send(setting)
-        write_text_state(setting, value) unless value == written || value == :unknown
+        write_text_state(setting, value) unless value == written
       end
     end
 

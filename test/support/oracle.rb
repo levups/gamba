@@ -92,8 +92,8 @@ module Oracle
     return ["no PDF written"] unless File.exist?(candidate_pdf)
 
     differences = []
-    qpdf_problem = invalidity(candidate_pdf)
-    differences << "invalid PDF: #{qpdf_problem}" if qpdf_problem
+    problem = invalidity(candidate_pdf)
+    differences << "invalid PDF: #{problem}" if problem
     if File.size(candidate_pdf) > File.size(reference_pdf)
       differences << "heavier: #{File.size(candidate_pdf)} bytes instead of #{File.size(reference_pdf)}"
     end
@@ -107,11 +107,15 @@ module Oracle
     (reference_class == candidate_class) ? [] : ["raises #{candidate_class} instead of #{reference_class}"]
   end
 
-  # qpdf exits with 3 for warnings: a PDF readers have to repair is not a valid one.
+  # qpdf exits with 3 for warnings: a PDF readers have to repair is not a valid one. qpdf does not check the operands
+  # of content stream operators: Poppler does, reporting a syntax error.
   def self.invalidity(pdf)
     output, status = Open3.capture2e("qpdf", "--check", pdf)
     output, status = Open3.capture2e("qpdf", "--check", "--password=#{MANUAL_USER_PASSWORD}", pdf) if output.include?("invalid password")
-    output.lines.grep(/WARNING|ERROR|error/).first(3).join.strip.then { |problem| problem.empty? ? "qpdf exit #{status.exitstatus}" : problem } unless status.success?
+    return output.lines.grep(/WARNING|ERROR|error/).first(3).join.strip.then { |problem| problem.empty? ? "qpdf exit #{status.exitstatus}" : problem } unless status.success?
+
+    errors, _status = Open3.capture2e("pdftotext", "-upw", MANUAL_USER_PASSWORD, pdf, File::NULL)
+    errors.lines.grep(/Syntax Error/).first(3).join.strip.then { |problem| problem unless problem.empty? }
   end
 
   def self.text_differences(reference_pdf, candidate_pdf)
