@@ -174,7 +174,7 @@ module Prawn
         if @document.page_number == @document.page_count
           @document.start_new_page
         else
-          @document.go_to_page(@document.page_number + 1)
+          @document.__send__(:flow_onto_page, @document.page_number + 1)
         end
       end
 

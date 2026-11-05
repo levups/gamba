@@ -104,3 +104,9 @@
   examples:
     - transparency_onto_existing_page
     - blend_mode_onto_existing_page_then_new_one
+- bug: Colours, line width, dash, cap and join styles, a blend mode or a gradient set before text flowing onto a page that exists already are lost there
+  proof: 'Prawn documents fill_color, stroke_color, line_width, dash, cap_style, join_style, fill_gradient, stroke_gradient and blend_mode without a block as setting what is drawn next, and Prawn::Document#start_new_page writes the colours and line settings in effect again on the page text flows onto; but Prawn::Document::BoundingBox#move_past_bottom reaches a page that exists through Prawn::Document#go_to_page, which keeps that page''s own state, so the text goes on there in its colours, black by default. PrawnX writes back the settings in effect that the page lacks, on top of its own state and of the blocks reopened there, as on a new page; go_to_page called directly, for page numbers and repeaters, keeps the page''s own settings, as in Prawn'
+  prawn_issue:
+  prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
+  examples:
+    - graphic_settings_onto_existing_page

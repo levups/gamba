@@ -108,12 +108,15 @@ class FuzzDocuments
     "#{onto_existing_page}blend_mode(#{pick(%i[Multiply Screen Darken Difference]).inspect}) do\n#{nested(depth)}\nend"
   end
 
-  # Sometimes a page after this one first, and low on this one: text flowing out of the block goes onto a page that
-  # exists, through go_to_page, and must keep the block's opacity and blend mode there.
+  # Sometimes a page after this one first, with settings of its own, and low on this one: text flowing out of the
+  # block goes onto a page that exists, through go_to_page, and must keep there the block's opacity and blend mode,
+  # and the settings in effect before it, not the page's.
   def onto_existing_page
     return "" if rand >= 0.25
 
-    "start_new_page\ngo_to_page(page_number - 1)\nmove_down #{rand(300..600)}\n"
+    settings_there = (rand < 0.3) ? "#{settings_statement(depth: 0)}\n" : ""
+    settings_here = (rand < 0.5) ? "#{settings_statement(depth: 0)}\n" : ""
+    "start_new_page\n#{settings_there}go_to_page(page_number - 1)\nmove_down #{rand(300..600)}\n#{settings_here}"
   end
 
   # Text state blocks: text flowing out of one onto a new page must keep it there.

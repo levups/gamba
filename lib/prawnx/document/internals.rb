@@ -173,6 +173,14 @@ module Prawn
         saved_elsewhere.each { reopen_graphics_state(_1) } if saved_elsewhere.any?(&:ext_gstate)
       end
 
+      # Content flowing onto a page that exists goes on with the settings in effect, as on a new page. go_to_page alone
+      # keeps the page's own settings, which page numbers and repeaters draw with, as in Prawn.
+      def flow_onto_page(page_number)
+        carried = page.stack.last
+        go_to_page(page_number)
+        resume_graphic_settings(carried)
+      end
+
       def reopen_graphics_state(open_save)
         page.stack.push(PDF::Core::GraphicState.new(graphic_state))
         page.stack.last.save = open_save
