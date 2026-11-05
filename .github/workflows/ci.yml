@@ -1,6 +1,6 @@
 name: CI
 
-# The blocks shared by the gems of Level UP Solutions are kept identical across the family.
+# The blocks shared by the Level UP Solutions gems are kept identical across the family.
 
 on:
   push:
