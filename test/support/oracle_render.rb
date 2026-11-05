@@ -178,9 +178,15 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     # There, it is drawn outside the blocks that ended on another page.
     def go_to_page(*)
       super
-      while renderer.graphic_stack.current_state&.save&.restored
+      closed = nil
+      while (state = renderer.graphic_stack.current_state)&.save&.restored
         PrawnSwitch.taken = true
+        closed = state
         renderer.restore_graphics_state
+      end
+      if closed
+        renderer.graphic_state
+        resume_graphic_settings(closed.save.previous)
       end
       resume_text_state
     end
@@ -208,11 +214,13 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     end
 
     def reopen_ext_gstate_blocks
+      return if open_saves.empty?
+
+      outermost, *inner = open_saves
+      renderer.graphic_stack.current_state.save = outermost
       return if open_saves.none?(&:ext_gstate)
 
       PrawnSwitch.taken = true
-      outermost, *inner = open_saves
-      renderer.graphic_stack.current_state.save = outermost
       write_ext_gstate(outermost.ext_gstate.call) if outermost.ext_gstate
       inner.each do |open_save|
         renderer.graphic_stack.save_graphic_state
