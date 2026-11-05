@@ -107,6 +107,7 @@ module Prawn
       @page = pages[page_number - 1]
       generate_margin_box
       @y = @bounding_box.absolute_top
+      close_restored_graphics_states
       resume_text_state
     end
 

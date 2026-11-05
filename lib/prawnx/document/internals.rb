@@ -5,9 +5,9 @@ module Prawn
     # The document's objects, pages and graphic state stack: what Prawn splits between PDF::Core's renderer and its
     # document state.
     module Internals
-      # A save not yet restored: the state in effect before it (nil on an empty stack, the default one), and the
-      # ExtGState its block sets, {name:, reference:}, if any.
-      OpenSave = Struct.new(:previous, :ext_gstate)
+      # A save not yet restored: the state in effect before it (nil on an empty stack, the default one), the
+      # ExtGState its block sets, {name:, reference:}, if any, and whether it was restored since.
+      OpenSave = Struct.new(:previous, :ext_gstate, :restored)
       DEFAULT_GRAPHIC_STATE = PDF::Core::GraphicState.new.freeze
       # The settings a new page writes, each with its writer, in the order Prawn writes them.
       GRAPHIC_SETTING_WRITERS = {fill_color: :set_fill_color, stroke_color: :set_stroke_color, line_width: :write_line_width,
@@ -71,8 +71,10 @@ module Prawn
       def save_graphics_state(graphic_state = nil)
         save_transformation_stack
         previous = graphic_state ? page.stack.last : self.graphic_state
-        @unrestored_graphics_states << OpenSave.new(previous, nil)
+        open_save = OpenSave.new(previous, nil, false)
+        @unrestored_graphics_states << open_save
         page.stack.push(PDF::Core::GraphicState.new(graphic_state || previous))
+        page.stack.last.save = open_save
         # A state given, as a dynamic repeater gives the one it was created in, still inherits the page's text state.
         page.stack.last.copy_text_state(previous) if graphic_state
         add_content("q")
@@ -89,6 +91,7 @@ module Prawn
       def restore_graphics_state
         restore_transformation_stack
         open_save = @unrestored_graphics_states.pop
+        open_save&.restored = true
         if page.stack.empty?
           raise Errors::EmptyGraphicStateStack, "\n You have reached the end of the graphic state stack" unless open_save
         else
@@ -120,6 +123,15 @@ module Prawn
 
       private
 
+      # The states left open on a page by blocks that ended on another one: content drawn there again is drawn outside
+      # them, as it would have been had the blocks ended there.
+      def close_restored_graphics_states
+        while page.stack.last&.save&.restored
+          page.content_stream << "Q\n"
+          page.stack.pop
+        end
+      end
+
       def open_graphics_state
         page.stack.push(PDF::Core::GraphicState.new)
         page.content_stream << "q\n"
@@ -132,9 +144,11 @@ module Prawn
         return if @unrestored_graphics_states.none?(&:ext_gstate)
 
         outermost, *inner = @unrestored_graphics_states
+        graphic_state.save = outermost
         write_ext_gstate(outermost.ext_gstate) if outermost.ext_gstate
         inner.each do |open_save|
           page.stack.push(PDF::Core::GraphicState.new(graphic_state))
+          page.stack.last.save = open_save
           add_content("q")
           write_ext_gstate(open_save.ext_gstate) if open_save.ext_gstate
         end

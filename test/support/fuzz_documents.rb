@@ -23,6 +23,7 @@ class FuzzDocuments
     lines << (pick([true, false]) ? 'font "DejaVu"' : 'font "Helvetica"')
     rand(3..9).times { lines << statement(depth: 0) }
     lines << 'number_pages "<page> / <total>", at: [0, 0]' if rand < 0.3
+    lines.insert(2, "repeat(:all) { fill_rectangle [bounds.left, bounds.top + 20], 100, 10 }") if rand < 0.2
     lines.join("\n")
   end
 

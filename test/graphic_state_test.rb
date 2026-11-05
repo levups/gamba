@@ -320,6 +320,41 @@ class GraphicStateTest < Minitest::Test
     assert_equal [2, 0], [given.character_spacing, recorded]
   end
 
+  def test_page_numbers_are_drawn_outside_a_block_that_ended_on_another_page
+    document = Prawn::Document.new do
+      transparent(0.5) do
+        text "Alice"
+        start_new_page
+        text "Bob"
+      end
+      number_pages "<page>", at: [0, 0]
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "q", "/Tr1 gs", "Alice", "Q", "1", "Q"], operators(document.pages[0])
+    assert_equal ["q", "/Tr1 gs", "Bob", "Q", "q", "2", "Q"], operators(document.pages[1])
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_content_drawn_again_on_a_page_stays_inside_the_blocks_still_open
+    document = Prawn::Document.new do
+      transparent(0.5) do
+        float do
+          text "Alice"
+          start_new_page
+          text "Bob"
+        end
+        text "Carol"
+      end
+    end
+
+    document.render
+
+    assert_equal ["q", "q", "/Tr1 gs", "Alice", "Carol", "Q", "Q"], operators(document.pages[0])
+  end
+
   def test_a_forgotten_text_rendering_mode_is_not_written_on_the_next_page
     document = Prawn::Document.new do
       forget_text_rendering_mode!
