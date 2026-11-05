@@ -67,3 +67,10 @@ Follow `STYLE.md` (naming, method size, comments, dead code): what RuboCop can't
   tags its merge commit (README, Releasing), and `.github/workflows/release.yml` publishes it. Both are the same in
   every next-gen-gems gem: change them in all four at once.
 - RubyGems trusts the Release workflow (trusted publishing): never `gem push` from a machine.
+
+## Pull requests and issues
+
+- Title: the change as a user sees it (an issue: the finding), in plain words, under 70 characters.
+- Body, no headings: two short paragraphs, the problem then the change (an issue: what to do); 3 to 5 bullets,
+  each a **bold 2–4 word lead-in** and two lines at most (decisions, divergences, what is left out); the proof
+  (reproduction, tests, fuzz seeds, benchmarks) folded in one `<details>`. Nothing the diff or the CI says.
