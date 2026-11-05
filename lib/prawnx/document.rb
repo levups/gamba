@@ -116,6 +116,7 @@ module Prawn
       generate_margin_box
       @y = @bounding_box.absolute_top
       close_restored_graphics_states
+      reopen_ext_gstate_blocks_on_existing_page
       resume_text_state
     end
 

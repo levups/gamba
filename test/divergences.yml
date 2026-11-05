@@ -97,3 +97,10 @@
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
     - repeaters_after_block_across_page_break
+- bug: A transparent or blend_mode block whose content flows onto a page that exists already draws it there opaque, in the normal blend mode
+  proof: 'Prawn documents Prawn::Graphics::Transparency#transparent and Prawn::Graphics::BlendMode#blend_mode as applying to the content within the block, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, opaque, blend mode Normal; Prawn::Document::BoundingBox#move_past_bottom reaches a page that exists through Prawn::Document#go_to_page, which never sets them again, though a new page does since PrawnX reopens the blocks there. PrawnX reopens on that page, on top of its own state, each block still open that began elsewhere, in order, with its ExtGState, so only what the blocks add there is drawn in them; each block''s end closes its own state, and q and Q stay balanced on every page'
+  prawn_issue:
+  prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
+  examples:
+    - transparency_onto_existing_page
+    - blend_mode_onto_existing_page_then_new_one

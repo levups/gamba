@@ -61,7 +61,8 @@ end
 # then sets the blend mode in effect again, a new page paints with the gradients in effect, and a block saved on an
 # earlier page writes back, once it ends, the settings in effect before it. A new page, a block ending on a later page
 # and go_to_page write back the text state in effect, and go_to_page closes the states left on its page by blocks that
-# ended on another one. Where any of these happened,
+# ended on another one, then reopens on top of the page's own state the open transparent and blend_mode blocks saved
+# on another page. Where any of these happened,
 # <name>.switched: only there may PrawnX differ from plain Prawn (prawn_switch in test/divergences.yml).
 if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
   # Each state records, by name, the pattern painting in place of each colour and the blend mode, and the text state
@@ -175,7 +176,7 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     end
 
     # Content drawn on a page again, or flowing onto one that exists, is laid out with the text state in effect.
-    # There, it is drawn outside the blocks that ended on another page.
+    # There, it is drawn outside the blocks that ended on another page, and inside those still open.
     def go_to_page(*)
       super
       closed = nil
@@ -188,6 +189,7 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
         renderer.graphic_state
         resume_graphic_settings(closed.save.previous)
       end
+      reopen_ext_gstate_blocks_on_existing_page
       resume_text_state
     end
 
@@ -222,12 +224,26 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
 
       PrawnSwitch.taken = true
       write_ext_gstate(outermost.ext_gstate.call) if outermost.ext_gstate
-      inner.each do |open_save|
-        renderer.graphic_stack.save_graphic_state
-        renderer.graphic_stack.current_state.save = open_save
-        renderer.add_content("q")
-        write_ext_gstate(open_save.ext_gstate.call) if open_save.ext_gstate
-      end
+      inner.each { reopen_graphics_state(_1) }
+    end
+
+    def reopen_ext_gstate_blocks_on_existing_page
+      return if open_saves.none?(&:ext_gstate)
+
+      saves_on_page = renderer.graphic_stack.stack.filter_map(&:save)
+      saved_elsewhere = open_saves.reject { |open_save| saves_on_page.any? { _1.equal?(open_save) } }
+      return if saved_elsewhere.none?(&:ext_gstate)
+
+      PrawnSwitch.taken = true
+      renderer.graphic_state
+      saved_elsewhere.each { reopen_graphics_state(_1) }
+    end
+
+    def reopen_graphics_state(open_save)
+      renderer.graphic_stack.save_graphic_state
+      renderer.graphic_stack.current_state.save = open_save
+      renderer.add_content("q")
+      write_ext_gstate(open_save.ext_gstate.call) if open_save.ext_gstate
     end
 
     def write_ext_gstate(name)
