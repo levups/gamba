@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-11-05
+
+PrawnX is now Gamba, at levups/gamba, and text that overflows onto a page that already exists keeps the state it was drawn with.
+
+**Breaking**
+- The gem is named `gamba`: write `gem "gamba"` in your Gemfile in place of `gem "prawnx"`. `require "prawn"`, `require "prawn/table"` and `require "prawn-svg"` keep working.
+- The `PrawnX` module is now `Gamba` (`Gamba.combine`, `Gamba.eager_load!`, `Gamba::VERSION`, `Gamba::TrueType::Error`). `Prawn` and `PDF` are unchanged.
+- PDFs name `Gamba` as their Creator and Producer, instead of `PrawnX`.
+
+**Fixed**
+- Text overflowing onto a page that already exists, after `go_to_page` back to an earlier one, keeps its `transparent` or `blend_mode` block, its colours, line settings and gradient there, as on a new page; Prawn draws it opaque and in that page's own colours.
+- After `forget_text_rendering_mode!`, ending a `text_rendering_mode` block or drawing text no longer writes `Tr` without its operand, which Prawn does and which made Poppler drop the text after it.
+- A font with no `post` table, or a short one, embeds instead of crashing with `NoMethodError`.
+
 ## [1.1.0] — 2026-11-05
 
 Page breaks now keep the whole state a page was drawing with, and what is added to a page later no longer inherits
@@ -59,7 +73,8 @@ speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
   place of combine_pdf.
 - `Gamba::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
 
-[Unreleased]: https://github.com/levups/gamba/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/levups/gamba/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/levups/gamba/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/levups/gamba/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/levups/gamba/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/levups/gamba/releases/tag/v1.0.0
