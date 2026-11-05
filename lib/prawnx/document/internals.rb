@@ -159,12 +159,25 @@ module Prawn
         return if @unrestored_graphics_states.none?(&:ext_gstate)
 
         write_ext_gstate(outermost.ext_gstate) if outermost.ext_gstate
-        inner.each do |open_save|
-          page.stack.push(PDF::Core::GraphicState.new(graphic_state))
-          page.stack.last.save = open_save
-          add_content("q")
-          write_ext_gstate(open_save.ext_gstate) if open_save.ext_gstate
-        end
+        inner.each { reopen_graphics_state(_1) }
+      end
+
+      # Content flowing onto a page that exists, through go_to_page: the page keeps its own state, which holds what it
+      # drew already. When a block still open that began elsewhere sets an ExtGState, each such block gets a state of
+      # its own on top, in order, so only what they add here is drawn in them, and each block's restore closes its own.
+      def reopen_ext_gstate_blocks_on_existing_page
+        return if @unrestored_graphics_states.none?(&:ext_gstate)
+
+        saves_on_page = page.stack.filter_map(&:save)
+        saved_elsewhere = @unrestored_graphics_states.reject { |open_save| saves_on_page.any? { _1.equal?(open_save) } }
+        saved_elsewhere.each { reopen_graphics_state(_1) } if saved_elsewhere.any?(&:ext_gstate)
+      end
+
+      def reopen_graphics_state(open_save)
+        page.stack.push(PDF::Core::GraphicState.new(graphic_state))
+        page.stack.last.save = open_save
+        add_content("q")
+        write_ext_gstate(open_save.ext_gstate) if open_save.ext_gstate
       end
 
       def ext_gstate_block(ext_gstate)

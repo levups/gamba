@@ -560,6 +560,149 @@ class GraphicStateTest < Minitest::Test
     assert_equal ["q", "Bob", "Q"], operators(document.pages[1])
   end
 
+  def test_text_flowing_onto_an_existing_page_keeps_the_opacity_of_its_block
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      move_down 650
+      transparent(0.3) { text "Faded line. " * 120 }
+    end
+
+    pdf = document.render
+
+    lines = operators(document.pages[1])
+    assert_equal ["q", "q", "/Tr1 gs"], lines.first(3)
+    assert_equal ["Q", "Q"], lines.last(2)
+    assert_equal ["Tr1"], document.pages[1].resources[:ExtGState].keys
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_a_transparent_block_ending_on_an_existing_page_covers_only_what_it_adds_there
+    document = Prawn::Document.new do
+      start_new_page
+      text "Bob"
+      go_to_page(1)
+      transparent(0.5) do
+        text "Alice"
+        go_to_page(2)
+        text "Carol"
+      end
+      text "Dave"
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "Bob", "q", "/Tr1 gs", "Carol", "Q", "Dave", "Q"], operators(document.pages[1])
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_a_block_back_on_an_existing_page_it_reopened_reopens_it_once
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      transparent(0.5) do
+        go_to_page(2)
+        text "Bob"
+        go_to_page(1)
+        text "Alice"
+        go_to_page(2)
+        text "Carol"
+      end
+    end
+
+    document.render
+
+    assert_equal ["q", "q", "/Tr1 gs", "Alice", "Q", "Q"], operators(document.pages[0])
+    assert_equal ["q", "q", "/Tr1 gs", "Bob", "Carol", "Q", "Q"], operators(document.pages[1])
+  end
+
+  def test_nested_blocks_reopen_in_order_on_an_existing_page
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      save_graphics_state do
+        transparent(0.5) do
+          blend_mode(:Multiply) do
+            go_to_page(2)
+            text "Bob"
+          end
+          text "Carol"
+        end
+        text "Dave"
+      end
+      text "Eve"
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "q", "q", "/Tr1 gs", "q", "/BMMultiply gs", "Bob", "Q", "Carol", "Q", "Dave", "Q", "Eve", "Q"],
+      operators(document.pages[1])
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_a_block_crossing_an_existing_page_then_a_new_one_keeps_its_opacity_on_both
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      transparent(0.5) do
+        text "Alice"
+        go_to_page(2)
+        text "Bob"
+        start_new_page
+        text "Carol"
+      end
+      text "Dave"
+      number_pages "<page>", at: [0, 0]
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "q", "/Tr1 gs", "Bob", "Q", "2", "Q"], operators(document.pages[1])
+    assert_equal ["q", "/Tr1 gs", "Carol", "Q", "q", "Dave", "3", "Q"], operators(document.pages[2])
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_page_numbers_on_an_existing_page_a_block_flowed_onto_are_drawn_outside_it
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      transparent(0.5) do
+        text "Alice"
+        go_to_page(2)
+        text "Bob"
+      end
+      go_to_page(1)
+      text "Carol"
+      number_pages "<page>", at: [0, 0]
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "q", "/Tr1 gs", "Alice", "Q", "Carol", "1", "Q"], operators(document.pages[0])
+    assert_equal ["q", "q", "/Tr1 gs", "Bob", "Q", "2", "Q"], operators(document.pages[1])
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_a_block_without_an_ext_gstate_reopens_nothing_on_an_existing_page
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      save_graphics_state do
+        go_to_page(2)
+        text "Bob"
+      end
+    end
+
+    document.render
+
+    assert_equal ["q", "Bob", "Q"], operators(document.pages[1])
+  end
+
   private
 
   # The page's graphics state, ExtGState, graphic settings and text state operators, with its text in place of the operators
