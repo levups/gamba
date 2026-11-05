@@ -110,6 +110,26 @@ class TrueTypeTest < Minitest::Test
     end
   end
 
+  def test_a_font_without_a_post_table_subsets_with_a_blank_one
+    font = File.binread(FONT)
+    record = (0...font.unpack1("@4 n")).map { |index| 12 + (index * 16) }.find { |offset| font.byteslice(offset, 4) == "post" }
+    font[record, 4] = "zzzz"
+    subset = PrawnX::TrueType::Subset.new(PrawnX::TrueType::File.new(font))
+    subset.glyph_for(36)
+
+    post = sfnt_table(subset.bytes, "post")
+
+    assert_equal [0x00030000, 32], [post.unpack1("N"), post.bytesize]
+  end
+
+  def test_a_short_post_table_subsets_padded_to_its_header
+    font = PrawnX::TrueType::File.new(font_with_table("post", PrawnX::TrueType::File.new(File.binread(FONT)).table("post").byteslice(0, 16)))
+    subset = PrawnX::TrueType::Subset.new(font)
+    subset.glyph_for(36)
+
+    assert_equal 32, sfnt_table(subset.bytes, "post").bytesize
+  end
+
   private
 
   # A "kern" feature for "latn" with one class pair adjustment: glyphs 36, 37 and 38 are classes 1, 2 and 3
@@ -129,6 +149,13 @@ class TrueTypeTest < Minitest::Test
 
   def kern_table(format0)
     [0, 1, 0, 6 + format0.bytesize, 0x0001].pack("n5") + format0
+  end
+
+  # A table of an sfnt file, read from its directory: a subset has no cmap, so TrueType::File refuses it.
+  def sfnt_table(font, tag)
+    record = (0...font.unpack1("@4 n")).map { |index| 12 + (index * 16) }.find { |offset| font.byteslice(offset, 4) == tag }
+    offset, length = font.unpack("@#{record + 8} N2")
+    font.byteslice(offset, length)
   end
 
   # DejaVu Sans with one table replaced: the directory is rewritten to point at the new bytes, appended last.
