@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-11-05
+
+Page breaks now keep the whole state a page was drawing with, and what is added to a page later no longer inherits
+blocks that ended elsewhere.
+
+**Fixed**
+- `text_rendering_mode`, `character_spacing`, `word_spacing`, `horizontal_text_scaling` and `rise` blocks whose
+  text crosses a page break keep their setting on the next page, where Prawn lays the text out with it but draws
+  it without, overflowing the margin.
+- A `blend_mode` set without a block, and a fill or stroke gradient, still apply after a page break, where Prawn
+  falls back to the Normal blend mode and to the colour set before the gradient.
+- Page numbers, repeaters and content drawn again through `go_to_page` on a page a block crossed are drawn outside
+  that block once it ended, with the settings in effect before it: since 1.0.1 they came out faded, rotated or
+  recoloured on every page a `transparent` or `blend_mode` block crossed (Prawn does it on the first one).
+
 ## [1.0.1] — 2026-11-04
 
 Text layout up to 26% faster, page breaks that keep what the page was drawing with, and corrupted fonts and
@@ -44,6 +59,7 @@ speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
   place of combine_pdf.
 - `PrawnX::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
 
-[Unreleased]: https://github.com/next-gen-gems/prawnx/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/next-gen-gems/prawnx/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/next-gen-gems/prawnx/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/next-gen-gems/prawnx/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/next-gen-gems/prawnx/releases/tag/v1.0.0
