@@ -61,10 +61,18 @@ module PrawnX
           "hmtx" => horizontal_metrics(original_glyphs, widths, left_side_bearings),
           "loca" => offsets.pack("N*"),
           "glyf" => glyf,
-          "post" => @file.table("post").byteslice(0, 32).dup.tap { |post| post[0, 4] = "\x00\x03\x00\x00".b }
+          "post" => post_table
         }
         COPIED_TABLES.each { |tag| tables[tag] = @file.table(tag) if @file.table?(tag) }
         Subset.assemble(tables.merge(extra_tables))
+      end
+
+      # Version 3, no glyph names: the 32-byte header of the font's own post table, zeros where it has none or a
+      # shorter one, which the file accepts since the fields it reads stop at byte 16.
+      def post_table
+        post = (@file.table("post") || "".b).byteslice(0, 32).ljust(32, "\x00".b)
+        post[0, 4] = "\x00\x03\x00\x00".b
+        post
       end
 
       # An sfnt file of these tables, with its directory and checksums (OpenType specification, "Font file").
