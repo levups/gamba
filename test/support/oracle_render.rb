@@ -43,7 +43,7 @@ end
 
 # Whether a switch below changed what Prawn draws for the example being rendered.
 module PrawnSwitch
-  OpenSave = Struct.new(:previous, :ext_gstate)
+  OpenSave = Struct.new(:previous, :ext_gstate, :restored)
   # The settings a block ending on a later page writes back, each with its writer, as PrawnX's do.
   GRAPHIC_SETTING_WRITERS = {fill_paint: :write_fill_paint, stroke_paint: :write_stroke_paint, line_width: :write_line_width,
                              cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash,
@@ -60,7 +60,8 @@ end
 # ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK: like PrawnX, a page break reopens the open transparent and blend_mode blocks,
 # then sets the blend mode in effect again, a new page paints with the gradients in effect, and a block saved on an
 # earlier page writes back, once it ends, the settings in effect before it. A new page, a block ending on a later page
-# and go_to_page write back the text state in effect. Where any of these happened,
+# and go_to_page write back the text state in effect, and go_to_page closes the states left on its page by blocks that
+# ended on another one. Where any of these happened,
 # <name>.switched: only there may PrawnX differ from plain Prawn (prawn_switch in test/divergences.yml).
 if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
   # Each state records, by name, the pattern painting in place of each colour and the blend mode, and the text state
@@ -68,6 +69,8 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
   PDF::Core::GraphicState.prepend(Module.new do
     attr_accessor :fill_pattern, :stroke_pattern, :blend_mode
     attr_writer :text_state
+    # The save that opened this state, or that it was reopened for, as PrawnX records it; a copy has none.
+    attr_accessor :save
 
     def text_state
       @text_state || PrawnSwitch::DEFAULT_TEXT_STATE
@@ -94,8 +97,10 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     # The block runs here, not in Prawn's renderer, whose restore would bypass this module's.
     def save_graphics_state(graphic_state = nil)
       previous = renderer.graphic_stack.current_state
-      open_saves << PrawnSwitch::OpenSave.new(previous, nil)
+      open_save = PrawnSwitch::OpenSave.new(previous, nil, false)
+      open_saves << open_save
       super(graphic_state, &nil)
+      renderer.graphic_stack.current_state.save = open_save
       renderer.graphic_stack.current_state.text_state = previous&.text_state if graphic_state
       return unless block_given?
 
@@ -105,6 +110,7 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
 
     def restore_graphics_state
       open_save = open_saves.pop
+      open_save&.restored = true
       super
       return unless open_save && !renderer.graphic_stack.current_state.equal?(open_save.previous)
 
@@ -169,8 +175,19 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     end
 
     # Content drawn on a page again, or flowing onto one that exists, is laid out with the text state in effect.
+    # There, it is drawn outside the blocks that ended on another page.
     def go_to_page(*)
       super
+      closed = nil
+      while (state = renderer.graphic_stack.current_state)&.save&.restored
+        PrawnSwitch.taken = true
+        closed = state
+        renderer.restore_graphics_state
+      end
+      if closed
+        renderer.graphic_state
+        resume_graphic_settings(closed.save.previous)
+      end
       resume_text_state
     end
 
@@ -197,13 +214,17 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     end
 
     def reopen_ext_gstate_blocks
+      return if open_saves.empty?
+
+      outermost, *inner = open_saves
+      renderer.graphic_stack.current_state.save = outermost
       return if open_saves.none?(&:ext_gstate)
 
       PrawnSwitch.taken = true
-      outermost, *inner = open_saves
       write_ext_gstate(outermost.ext_gstate.call) if outermost.ext_gstate
       inner.each do |open_save|
         renderer.graphic_stack.save_graphic_state
+        renderer.graphic_stack.current_state.save = open_save
         renderer.add_content("q")
         write_ext_gstate(open_save.ext_gstate.call) if open_save.ext_gstate
       end

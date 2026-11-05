@@ -14,6 +14,8 @@ module PDF::Core
     # What Prawn's state leaves out: the pattern painting in place of each colour since a gradient was set, and the
     # blend mode's ExtGState, {name:, reference:} each, nil for none and for Normal.
     attr_accessor :fill_pattern, :stroke_pattern, :blend_mode
+    # The save that opened this state on its page, or that it was reopened for on a new page; a copy has none.
+    attr_accessor :save
 
     def initialize(previous_state = nil)
       if previous_state

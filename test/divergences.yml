@@ -84,3 +84,9 @@
     - text_state_across_page_break
     - text_state_around_block_across_page_break
     - text_state_page_numbers
+- bug: Content drawn on a page again once a block that began there ended on another page, such as page numbers and repeaters, is drawn inside that block
+  proof: 'Prawn documents transparent, rotate and save_graphics_state as applying to the content within the block, and ISO 32000-1 §8.4.2 has a state saved by q last until its Q; a block whose content flows onto the next page leaves its q open on the page where it began, so Prawn::Document#go_to_page, which render and number_pages call to stamp repeaters and number pages, draws there inside the ended block, faded, rotated or recoloured. PrawnX closes, on the page go_to_page reaches, the states left open by blocks that have since ended, and keeps those of blocks still open'
+  prawn_issue:
+  prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
+  examples:
+    - repeaters_after_block_across_page_break

@@ -5,9 +5,9 @@ module Prawn
     # The document's objects, pages and graphic state stack: what Prawn splits between PDF::Core's renderer and its
     # document state.
     module Internals
-      # A save not yet restored: the state in effect before it (nil on an empty stack, the default one), and the
-      # ExtGState its block sets, {name:, reference:}, if any.
-      OpenSave = Struct.new(:previous, :ext_gstate)
+      # A save not yet restored: the state in effect before it (nil on an empty stack, the default one), the
+      # ExtGState its block sets, {name:, reference:}, if any, and whether it was restored since.
+      OpenSave = Struct.new(:previous, :ext_gstate, :restored)
       DEFAULT_GRAPHIC_STATE = PDF::Core::GraphicState.new.freeze
       # The settings a block ending on a later page writes back, each with its writer, in the order Prawn writes them
       # on a new page, then the blend mode.
@@ -75,10 +75,13 @@ module Prawn
       def save_graphics_state(graphic_state = nil)
         save_transformation_stack
         previous = graphic_state ? page.stack.last : self.graphic_state
-        @unrestored_graphics_states << OpenSave.new(previous, nil)
-        page.stack.push(PDF::Core::GraphicState.new(graphic_state || previous))
+        open_save = OpenSave.new(previous, nil, false)
+        @unrestored_graphics_states << open_save
+        state = PDF::Core::GraphicState.new(graphic_state || previous)
+        state.save = open_save
         # A state given, as a dynamic repeater gives the one it was created in, still inherits the page's text state.
-        page.stack.last.copy_text_state(previous) if graphic_state
+        state.copy_text_state(previous) if graphic_state
+        page.stack.push(state)
         add_content("q")
         return unless block_given?
 
@@ -93,6 +96,7 @@ module Prawn
       def restore_graphics_state
         restore_transformation_stack
         open_save = @unrestored_graphics_states.pop
+        open_save&.restored = true
         if page.stack.empty?
           raise Errors::EmptyGraphicStateStack, "\n You have reached the end of the graphic state stack" unless open_save
         else
@@ -124,21 +128,40 @@ module Prawn
 
       private
 
+      # The states left open on a page by blocks that ended on another one: content drawn there again is drawn outside
+      # them, as it would have been had the blocks ended there, in a base state with the settings in effect before them.
+      def close_restored_graphics_states
+        closed = nil
+        while (state = page.stack.last)&.save&.restored
+          closed = state
+          page.content_stream << "Q\n"
+          page.stack.pop
+        end
+        return unless closed
+
+        graphic_state
+        resume_graphic_settings(closed.save.previous)
+      end
+
       def open_graphics_state
         page.stack.push(PDF::Core::GraphicState.new)
         page.content_stream << "q\n"
       end
 
-      # The blocks still open saved their states on the page just closed. When one sets an ExtGState (opacity, blend
-      # mode), the new page reopens them in order, the outermost in the page's own state, so each block's restore
+      # The blocks still open saved their states on the page just closed: the page's own state is the outermost one's.
+      # When one sets an ExtGState (opacity, blend mode), the new page reopens them in order, so each block's restore
       # closes its own state; otherwise the page stays as Prawn writes it.
       def reopen_ext_gstate_blocks
-        return if @unrestored_graphics_states.none?(&:ext_gstate)
+        return if @unrestored_graphics_states.empty?
 
         outermost, *inner = @unrestored_graphics_states
+        graphic_state.save = outermost
+        return if @unrestored_graphics_states.none?(&:ext_gstate)
+
         write_ext_gstate(outermost.ext_gstate) if outermost.ext_gstate
         inner.each do |open_save|
           page.stack.push(PDF::Core::GraphicState.new(graphic_state))
+          page.stack.last.save = open_save
           add_content("q")
           write_ext_gstate(open_save.ext_gstate) if open_save.ext_gstate
         end
