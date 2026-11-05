@@ -121,6 +121,7 @@ class FuzzDocuments
   def settings_statement(depth:)
     "fill_color #{pick(COLORS).inspect}; stroke_color #{pick(COLORS).inspect}; line_width #{rand(1..4)}; " \
       "#{pick(["dash(#{rand(1..6)})", "undash", "cap_style :round", "join_style :bevel", "blend_mode(#{pick(%i[Multiply Screen Normal]).inspect})",
+        "forget_text_rendering_mode!",
         "fill_gradient [0, 0], [#{rand(100..500)}, 0], #{pick(COLORS).inspect}, #{pick(COLORS).inspect}",
         "stroke_gradient from: [0, 0], to: [0, #{rand(100..700)}], stops: #{[pick(COLORS), pick(COLORS)].inspect}"])}"
   end
