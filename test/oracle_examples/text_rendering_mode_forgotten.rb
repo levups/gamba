@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # A text rendering mode block and a text box after forget_text_rendering_mode!: Prawn writes the forgotten mode back
-# as a Tr missing its operand, and Poppler drops the last line; PrawnX writes nothing back, and draws it.
+# as a Tr missing its operand, and Poppler drops the last line; Gamba writes nothing back, and draws it.
 stroke_color "cc0000"
 forget_text_rendering_mode!
 text_rendering_mode(:fill_stroke) do

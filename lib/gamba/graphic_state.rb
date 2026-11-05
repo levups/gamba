@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module PDF::Core
-  # What a PDF `q` saves and `Q` restores, as far as PrawnX writes it.
+  # What a PDF `q` saves and `Q` restores, as far as Gamba writes it.
   class GraphicState
     UNDASHED = {dash: nil, space: nil, phase: 0}.freeze
     # The text state parameters Prawn sets, with their defaults, in the order a new page writes them back; each

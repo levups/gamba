@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # A page break inside nested blocks: the inner block's end empties the new page's stack, the next block saves on it,
-# and Prawn's outer block finds nothing to restore. PrawnX renders both pages.
+# and Prawn's outer block finds nothing to restore. Gamba renders both pages.
 transparent(0.9) do
   transparent(0.6) do
     text "First page"

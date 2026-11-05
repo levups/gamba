@@ -5,7 +5,7 @@ require "prawn"
 require "prawn-svg"
 require "yaml"
 
-# PrawnX answers every call Prawn 2.5, prawn-table and prawn-svg accept on the methods of its contract:
+# Gamba answers every call Prawn 2.5, prawn-table and prawn-svg accept on the methods of its contract:
 # test/contract/prawn-*.yml list them, test/contract/decisions.yml settles Prawn's Experimental and ungrouped ones.
 class ContractTest < Minitest::Test
   API = Dir[File.join(__dir__, "contract/prawn-*.yml")].sort.map { YAML.load_file(_1) }.inject(:merge)
@@ -26,7 +26,7 @@ class ContractTest < Minitest::Test
       next unless decision == true
 
       define_method("test_#{class_name}#{method_name}") do
-        method = prawnx_method(class_name, method_name)
+        method = gamba_method(class_name, method_name)
         skip "not written yet" unless method
 
         assert_accepts_calls_of description.fetch("parameters"), method
@@ -48,7 +48,7 @@ class ContractTest < Minitest::Test
 
   private
 
-  def prawnx_method(class_name, method_name)
+  def gamba_method(class_name, method_name)
     klass = Object.const_get(class_name) if Object.const_defined?(class_name)
     return unless klass
 
@@ -60,7 +60,7 @@ class ContractTest < Minitest::Test
     end
   end
 
-  # Every argument list Prawn's signature takes must be one PrawnX's takes too.
+  # Every argument list Prawn's signature takes must be one Gamba's takes too.
   def assert_accepts_calls_of(reference_parameters, method)
     reference = reference_parameters.map { _1.split.then { |kind, name| [kind.to_sym, name&.to_sym] } }
     candidate = method.parameters

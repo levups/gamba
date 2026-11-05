@@ -10,7 +10,7 @@ module Prawn
     include PDF::Core::Destinations
     include Security
     include Images
-    include PrawnX::PdfA
+    include Gamba::PdfA
     include Table::Interface
     include Stamp
     include SoftMask

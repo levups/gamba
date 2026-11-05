@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PrawnX — Prawn’s API, rewritten for speed</title>
+<title>Gamba PDF — Prawn’s API, rewritten for speed</title>
 <meta name="description" content="Prawn’s API, rewritten for speed: the same pages, pixel for pixel, in lighter files, faster. Tables and SVG included.">
-<meta property="og:title" content="PrawnX — Prawn’s API, rewritten for speed">
+<meta property="og:title" content="Gamba PDF — Prawn’s API, rewritten for speed">
 <meta property="og:description" content="A rewrite of Prawn, prawn-table and prawn-svg: the same pages pixel for pixel, lighter files, faster renders, PDF/A-3 and Factur-X on top.">
 <meta property="og:type" content="website">
-<link rel="canonical" href="https://next-gen-gems.github.io/prawnx/">
-<meta property="og:url" content="https://next-gen-gems.github.io/prawnx/">
-<meta property="og:site_name" content="Next Gen Gems">
+<link rel="canonical" href="https://levups.github.io/gamba/">
+<meta property="og:url" content="https://levups.github.io/gamba/">
+<meta property="og:site_name" content="Level UP Solutions">
 <meta name="twitter:card" content="summary">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"PrawnX","description":"Prawn's API, rewritten for speed: same pages, lighter files","url":"https://next-gen-gems.github.io/prawnx/","codeRepository":"https://github.com/next-gen-gems/prawnx","programmingLanguage":"Ruby","runtimePlatform":"Ruby 3.3 or later","license":"https://github.com/next-gen-gems/prawnx/blob/main/LICENSE","author":{"@type":"Organization","name":"Level UP Solutions","url":"https://levups.com"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Gamba","description":"Prawn's API, rewritten for speed: same pages, lighter files","url":"https://levups.github.io/gamba/","codeRepository":"https://github.com/levups/gamba","programmingLanguage":"Ruby","runtimePlatform":"Ruby 3.3 or later","license":"https://github.com/levups/gamba/blob/main/LICENSE","author":{"@type":"Organization","name":"Level UP Solutions","url":"https://levups.com"}}</script>
 <meta name="theme-color" content="#c2361b">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,20 +24,20 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <div class="page">
   <nav class="site-nav" aria-label="Site">
-    <a class="brand" href="./" aria-current="page">PrawnX</a>
+    <a class="brand" href="./" aria-current="page">Gamba</a>
     <a href="guide.html">Guide</a>
     <a href="compatibility.html">Compatibility</a>
     <a href="benchmarks.html">Benchmarks</a>
-    <a href="https://github.com/next-gen-gems/prawnx">GitHub</a>
+    <a href="https://github.com/levups/gamba">GitHub</a>
   </nav>
 
   <main id="main">
     <header class="hero">
-      <h1 class="wordmark">PrawnX</h1>
+      <h1 class="wordmark">Gamba</h1>
       <div>
         <p class="byline"><span id="byline-speed">Prawn’s API, rewritten for speed.</span><span class="byline-sub">The same pages, pixel for pixel.</span></p>
         <p class="summary">A rewrite of Prawn, prawn-table and prawn-svg in one gem: lighter files, faster renders, and PDF/A-3 and Factur-X on top.</p>
-        <code class="install">gem "prawnx"</code>
+        <code class="install">gem "gamba"</code>
         <p class="links"><a href="guide.html">Get started</a><a href="compatibility.html">Where it differs from Prawn</a><a href="benchmarks.html">Benchmarks</a></p>
       </div>
     </header>
@@ -53,7 +53,7 @@
       <h2 id="why-title">Why</h2>
       <div class="prose">
         <p>Prawn draws good pages, slowly. Profiling an invoice with a table shows where the time goes: line breaking rebuilds its regular expressions for every line, every number is formatted then patched, and TrueType fonts are read again for each document.</p>
-        <p>PrawnX keeps Prawn’s Ruby API and its pages, and rewrites what sits underneath. Your code does not change; the PDF it produces looks the same, weighs less, and comes out faster.</p>
+        <p>Gamba keeps Prawn’s Ruby API and its pages, and rewrites what sits underneath. Your code does not change; the PDF it produces looks the same, weighs less, and comes out faster.</p>
       </div>
     </section>
 
@@ -72,7 +72,7 @@
         </div>
         <div class="card">
           <h3>Fonts parsed once per process</h3>
-          <p>A TrueType or OpenType font is read once, frozen and shared by every document and thread, until its file changes. <code>PrawnX.eager_load!</code> loads it all before a server forks.</p>
+          <p>A TrueType or OpenType font is read once, frozen and shared by every document and thread, until its file changes. <code>Gamba.eager_load!</code> loads it all before a server forks.</p>
           <p><a href="guide.html#fonts">Fonts</a></p>
         </div>
         <div class="card">
@@ -96,9 +96,9 @@
     <section aria-labelledby="proof-title">
       <h2 id="proof-title">Same pages</h2>
       <div class="prose">
-        <p>An oracle renders every example of Prawn’s and prawn-table’s manuals and every sample SVG of prawn-svg with Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4, and with PrawnX, each in its own process. It compares their pages, their text and its positions to 0.01 pt, their pixels at 150 dpi in MuPDF and in Poppler, their validity and their weight. A seeded fuzzer writes random documents and compares them the same way.</p>
+        <p>An oracle renders every example of Prawn’s and prawn-table’s manuals and every sample SVG of prawn-svg with Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4, and with Gamba, each in its own process. It compares their pages, their text and its positions to 0.01 pt, their pixels at 150 dpi in MuPDF and in Poppler, their validity and their weight. A seeded fuzzer writes random documents and compares them the same way.</p>
       </div>
-      <p class="more"><a href="compatibility.html#testing">How PrawnX is tested</a></p>
+      <p class="more"><a href="compatibility.html#testing">How Gamba is tested</a></p>
     </section>
 
     <section aria-labelledby="start-title">
@@ -106,7 +106,7 @@
       <div class="split">
         <div>
           <p class="code-label">Gemfile</p>
-<pre><code class="language-ruby"><span class="n">gem</span> <span class="s2">"prawnx"</span> <span class="c1"># instead of prawn, prawn-table and prawn-svg</span></code></pre>
+<pre><code class="language-ruby"><span class="n">gem</span> <span class="s2">"gamba"</span> <span class="c1"># instead of prawn, prawn-table and prawn-svg</span></code></pre>
         </div>
         <div>
           <p class="code-label">Your code, unchanged</p>
@@ -120,16 +120,16 @@
   </main>
 
   <footer class="family">
-    <p><a href="https://github.com/next-gen-gems">Next Gen Gems</a>, by Level UP Solutions</p>
-    <nav aria-label="Next Gen Gems">
+    <p>Gems by <a href="https://github.com/levups">Level UP Solutions</a></p>
+    <nav aria-label="Level UP Solutionsâ gems">
       <ul>
-        <li><a href="https://next-gen-gems.github.io/slimx/">SlimX</a></li>
-        <li><a href="https://next-gen-gems.github.io/browserx/">BrowserX</a></li>
-        <li><a href="https://next-gen-gems.github.io/prawnx/" aria-current="page">PrawnX</a></li>
-        <li><a href="https://next-gen-gems.github.io/gretelx/">GretelX</a></li>
+        <li><a href="https://levups.github.io/super-slim/">SuperSlim</a></li>
+        <li><a href="https://levups.github.io/agentry/">Agentry</a></li>
+        <li><a href="https://levups.github.io/gamba/" aria-current="page">Gamba</a></li>
+        <li><a href="https://levups.github.io/crumbly/">Crumbly</a></li>
       </ul>
     </nav>
-    <p><a href="https://github.com/next-gen-gems/prawnx">Source on GitHub</a></p>
+    <p><a href="https://github.com/levups/gamba">Source on GitHub</a></p>
   </footer>
 </div>
 <script src="site.js"></script>

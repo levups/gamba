@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module PrawnX
+module Gamba
   module TrueType
     # Characters of a TrueType font split into simple fonts of single-byte codes, laid out as Prawn lays them
     # (through TTFunk) so every reader renders them the same way: the first subset codes characters in Mac Roman,

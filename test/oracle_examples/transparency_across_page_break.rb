@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# A transparent block whose text flows onto the next page: Prawn draws that page opaque, PrawnX keeps the opacity.
+# A transparent block whose text flows onto the next page: Prawn draws that page opaque, Gamba keeps the opacity.
 transparent(0.5, 0.25) do
   fill_color "cc0000"
   stroke_color "0000cc"

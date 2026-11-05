@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# The reference engine, kept out of the main bundle: PrawnX answers `require "prawn"` too.
+# The reference engine, kept out of the main bundle: Gamba answers `require "prawn"` too.
 source "https://rubygems.org"
 
 gem "matrix"

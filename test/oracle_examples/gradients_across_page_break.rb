@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Gradients set as the fill and stroke, then text flowing onto the next page inside a block of its own colour: Prawn
-# paints the rest in the colour set before the gradients; PrawnX keeps painting with them.
+# paints the rest in the colour set before the gradients; Gamba keeps painting with them.
 fill_color "336699"
 fill_gradient [0, 0], [bounds.width, 0], "ff0000", "0000ff"
 stroke_gradient from: [0, 0], to: [0, bounds.height], stops: %w[00aa00 000000]

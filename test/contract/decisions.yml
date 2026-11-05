@@ -1,5 +1,5 @@
 # Prawn files these public methods under "Experimental API" or under no YARD group at all. Each one is either part
-# of PrawnX's contract (true) or left out, with the reason. Stable methods are always in, Extension methods and
+# of Gamba's contract (true) or left out, with the reason. Stable methods are always in, Extension methods and
 # those Prawn's docs mark @private are always out: test/contract_test.rb fails on an undecided method.
 Prawn::Document:
   "#add_content": PDF::Core internals, raw content stream operators

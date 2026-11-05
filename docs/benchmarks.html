@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PrawnX Benchmarks</title>
-<meta name="description" content="PrawnX against Prawn 2.5 and prawn-table on an invoice, a report and a catalog: render time, allocations, file weight and peak memory.">
-<link rel="canonical" href="https://next-gen-gems.github.io/prawnx/benchmarks.html">
-<meta property="og:title" content="PrawnX Benchmarks">
-<meta property="og:description" content="PrawnX against Prawn 2.5 and prawn-table on an invoice, a report and a catalog: render time, allocations, file weight and peak memory.">
+<title>Gamba Benchmarks</title>
+<meta name="description" content="Gamba against Prawn 2.5 and prawn-table on an invoice, a report and a catalog: render time, allocations, file weight and peak memory.">
+<link rel="canonical" href="https://levups.github.io/gamba/benchmarks.html">
+<meta property="og:title" content="Gamba Benchmarks">
+<meta property="og:description" content="Gamba against Prawn 2.5 and prawn-table on an invoice, a report and a catalog: render time, allocations, file weight and peak memory.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://next-gen-gems.github.io/prawnx/benchmarks.html">
-<meta property="og:site_name" content="Next Gen Gems">
+<meta property="og:url" content="https://levups.github.io/gamba/benchmarks.html">
+<meta property="og:site_name" content="Level UP Solutions">
 <meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#c2361b">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -23,11 +23,11 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <div class="page">
   <nav class="site-nav" aria-label="Site">
-    <a class="brand" href="./">PrawnX</a>
+    <a class="brand" href="./">Gamba</a>
     <a href="guide.html">Guide</a>
     <a href="compatibility.html">Compatibility</a>
     <a href="benchmarks.html" aria-current="page">Benchmarks</a>
-    <a href="https://github.com/next-gen-gems/prawnx">GitHub</a>
+    <a href="https://github.com/levups/gamba">GitHub</a>
   </nav>
 
   <main id="main">
@@ -53,9 +53,9 @@
     <section id="why" aria-labelledby="why-title">
       <h2 id="why-title">Why it is faster</h2>
       <div class="prose">
-        <p><strong>Line breaking.</strong> Prawn rebuilds its regular expressions for every line it wraps. PrawnX compiles them once per text encoding, and keeps Prawn’s greedy algorithm, so lines break at the same places.</p>
-        <p><strong>Numbers.</strong> Prawn formats every number it writes, then patches the string with a regular expression. PrawnX trims the formatted digits byte by byte.</p>
-        <p><strong>Fonts.</strong> Prawn reads a TrueType file again for each document. PrawnX parses it once per process, freezes it, and shares it between documents and threads.</p>
+        <p><strong>Line breaking.</strong> Prawn rebuilds its regular expressions for every line it wraps. Gamba compiles them once per text encoding, and keeps Prawn’s greedy algorithm, so lines break at the same places.</p>
+        <p><strong>Numbers.</strong> Prawn formats every number it writes, then patches the string with a regular expression. Gamba trims the formatted digits byte by byte.</p>
+        <p><strong>Fonts.</strong> Prawn reads a TrueType file again for each document. Gamba parses it once per process, freezes it, and shares it between documents and threads.</p>
         <p><strong>Weight.</strong> An object stream and a cross-reference stream pack what Prawn writes as plain objects and an xref table.</p>
       </div>
     </section>
@@ -66,22 +66,22 @@
 <pre><code class="language-sh">bundle <span class="nb">install</span> <span class="o">&amp;&amp;</span> <span class="nv">BUNDLE_GEMFILE</span><span class="o">=</span>oracle/Gemfile bundle <span class="nb">install
 </span>bundle <span class="nb">exec </span>rake corpus:fetch  <span class="c"># Prawn's fonts and images, into corpus/cache</span>
 bundle <span class="nb">exec </span>rake bench         <span class="c"># BENCH_ITERATIONS=20 by default</span></code></pre>
-        <p><code>bench/compare.rb</code> renders each document of <code>bench/documents/</code> with Prawn, from its own bundle in <code>oracle/Gemfile</code>, and with PrawnX, in 7 fresh YJIT processes per engine that take turns. Each process measures the median of 20 renders, the objects one render allocates, the file’s weight and its peak memory; the site shows the median of the 7 processes, as <code>docs/benchmarks.json</code> records it. Peak memory varies by about 20% from one process to the next, which one process cannot show. It writes <code>docs/benchmarks.json</code>, which every page of this site reads.</p>
+        <p><code>bench/compare.rb</code> renders each document of <code>bench/documents/</code> with Prawn, from its own bundle in <code>oracle/Gemfile</code>, and with Gamba, in 7 fresh YJIT processes per engine that take turns. Each process measures the median of 20 renders, the objects one render allocates, the file’s weight and its peak memory; the site shows the median of the 7 processes, as <code>docs/benchmarks.json</code> records it. Peak memory varies by about 20% from one process to the next, which one process cannot show. It writes <code>docs/benchmarks.json</code>, which every page of this site reads.</p>
       </div>
     </section>
   </main>
 
   <footer class="family">
-    <p><a href="https://github.com/next-gen-gems">Next Gen Gems</a>, by Level UP Solutions</p>
-    <nav aria-label="Next Gen Gems">
+    <p>Gems by <a href="https://github.com/levups">Level UP Solutions</a></p>
+    <nav aria-label="Level UP Solutionsâ gems">
       <ul>
-        <li><a href="https://next-gen-gems.github.io/slimx/">SlimX</a></li>
-        <li><a href="https://next-gen-gems.github.io/browserx/">BrowserX</a></li>
-        <li><a href="https://next-gen-gems.github.io/prawnx/" aria-current="page">PrawnX</a></li>
-        <li><a href="https://next-gen-gems.github.io/gretelx/">GretelX</a></li>
+        <li><a href="https://levups.github.io/super-slim/">SuperSlim</a></li>
+        <li><a href="https://levups.github.io/agentry/">Agentry</a></li>
+        <li><a href="https://levups.github.io/gamba/" aria-current="page">Gamba</a></li>
+        <li><a href="https://levups.github.io/crumbly/">Crumbly</a></li>
       </ul>
     </nav>
-    <p><a href="https://github.com/next-gen-gems/prawnx">Source on GitHub</a></p>
+    <p><a href="https://github.com/levups/gamba">Source on GitHub</a></p>
   </footer>
 </div>
 <script src="site.js"></script>

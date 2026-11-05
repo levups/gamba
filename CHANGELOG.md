@@ -38,28 +38,28 @@ PNGs refused cleanly instead of crashing.
 - TrueType fonts with a format 6 or 10 cmap map every character to its glyph, as in Prawn, and opt-in GPOS
   kerning reads format 1 class definitions correctly.
 - A corrupted font (`unitsPerEm` of zero, a table too short, a truncated glyph) raises
-  `PrawnX::TrueType::Error` instead of `FloatDomainError`, `ArgumentError` or nil metrics.
+  `Gamba::TrueType::Error` instead of `FloatDomainError`, `ArgumentError` or nil metrics.
 - A PNG with an alpha channel no longer takes gigabytes of memory on very wide rows, nor fails with
   `ArgumentError: argument too big` on TruffleRuby when its data fills no row.
 
 ## [1.0.0] — 2026-11-04
 
-First release under next-gen-gems: Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 in one gem, rewritten for
+First release by Level UP Solutions: Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 in one gem, rewritten for
 speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
 
 **Breaking**
-- PrawnX refuses to load next to the prawn gem; `require "prawn/table"` and `require "prawn-svg"` keep working.
+- Gamba refuses to load next to the prawn gem; `require "prawn/table"` and `require "prawn-svg"` keep working.
 - SVG images fetch nothing from the web unless `enable_web_requests: true`.
 - Requires Ruby 3.3 or later, every Ruby still maintained.
 
 **New**
 - Opt-in beyond Prawn: OpenType ligatures and GPOS kerning per font, CFF (`.otf`) fonts, PDF/A-3b and Factur-X,
-  `PrawnX.eager_load!` before a server forks.
-- `PrawnX.combine(sources, page_size:, orientation:)` puts the pages of PDFs written elsewhere in one file, in
+  `Gamba.eager_load!` before a server forks.
+- `Gamba.combine(sources, page_size:, orientation:)` puts the pages of PDFs written elsewhere in one file, in
   place of combine_pdf.
-- `PrawnX::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
+- `Gamba::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
 
-[Unreleased]: https://github.com/next-gen-gems/prawnx/compare/v1.1.0...HEAD
-[1.1.0]: https://github.com/next-gen-gems/prawnx/compare/v1.0.1...v1.1.0
-[1.0.1]: https://github.com/next-gen-gems/prawnx/compare/v1.0.0...v1.0.1
-[1.0.0]: https://github.com/next-gen-gems/prawnx/releases/tag/v1.0.0
+[Unreleased]: https://github.com/levups/gamba/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/levups/gamba/compare/v1.0.1...v1.1.0
+[1.0.1]: https://github.com/levups/gamba/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/levups/gamba/releases/tag/v1.0.0

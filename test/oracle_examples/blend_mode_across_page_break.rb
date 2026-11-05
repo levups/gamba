@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # A blend_mode block whose text flows onto the next page, under a header: Prawn draws that page in the normal blend
-# mode, PrawnX keeps multiplying the colours where the rectangle overlaps the text.
+# mode, Gamba keeps multiplying the colours where the rectangle overlaps the text.
 on_page_create { text "Header", align: :right }
 blend_mode(:Multiply) do
   fill_color "00ccff"

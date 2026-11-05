@@ -42,7 +42,7 @@ class Prawn::SVG::Document
 
     @url_loader = Prawn::SVG::UrlLoader.new(
       enable_cache: options[:cache_images],
-      # PrawnX: no web request unless asked for, since an SVG could otherwise make the server fetch any URL.
+      # Gamba: no web request unless asked for, since an SVG could otherwise make the server fetch any URL.
       enable_web: options.fetch(:enable_web_requests, false),
       enable_file_with_root: options[:enable_file_requests_with_root]
     )

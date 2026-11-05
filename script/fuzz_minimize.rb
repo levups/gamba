@@ -15,7 +15,7 @@ differs = lambda do |kept|
   file = File.join(directory, "minimal.rb")
   File.write(file, [setup, *kept].join("\n"))
   reference = Oracle.render("prawn", [file], File.join(directory, "prawn"))
-  candidate = Oracle.render("prawnx", [file], File.join(directory, "prawnx"))
+  candidate = Oracle.render("gamba", [file], File.join(directory, "gamba"))
   !Oracle.differences(reference, candidate, "minimal").empty?
 end
 

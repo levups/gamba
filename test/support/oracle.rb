@@ -5,7 +5,7 @@ require "fileutils"
 require "open3"
 require "tmpdir"
 
-# Renders the same examples with Prawn and with PrawnX, each in its own process, and lists what tells their PDFs
+# Renders the same examples with Prawn and with Gamba, each in its own process, and lists what tells their PDFs
 # apart: pages, text and its positions, pixels, validity, weight.
 module Oracle
   ROOT = File.expand_path("../..", __dir__)
@@ -18,7 +18,7 @@ module Oracle
 
   ENGINES = {
     "prawn" => {gemfile: File.join(ROOT, "oracle/Gemfile"), load_path: []},
-    "prawnx" => {gemfile: File.join(ROOT, "Gemfile"), load_path: ["-I", File.join(ROOT, "lib")]}
+    "gamba" => {gemfile: File.join(ROOT, "Gemfile"), load_path: ["-I", File.join(ROOT, "lib")]}
   }.freeze
 
   Rendering = Data.define(:engine, :directory, :failure)

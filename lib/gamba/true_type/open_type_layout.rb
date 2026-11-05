@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-module PrawnX
+module Gamba
   module TrueType
-    # The parts of OpenType's GSUB and GPOS tables (OpenType specification, "OpenType Layout") PrawnX applies on
+    # The parts of OpenType's GSUB and GPOS tables (OpenType specification, "OpenType Layout") Gamba applies on
     # request: ligatures (GSUB lookup type 4) and pair kerning (GPOS lookup type 2), for the font's Latin script.
     class OpenTypeLayout
       LIGATURE_SUBSTITUTION = 4

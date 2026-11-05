@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PrawnX Guide</title>
-<meta name="description" content="Install PrawnX in place of Prawn, prawn-table and prawn-svg, and use its tables, SVG, fonts, OpenType features, PDF/A-3 and Factur-X.">
-<link rel="canonical" href="https://next-gen-gems.github.io/prawnx/guide.html">
-<meta property="og:title" content="PrawnX Guide">
-<meta property="og:description" content="Install PrawnX in place of Prawn, prawn-table and prawn-svg, and use its tables, SVG, fonts, OpenType features, PDF/A-3 and Factur-X.">
+<title>Gamba Guide</title>
+<meta name="description" content="Install Gamba in place of Prawn, prawn-table and prawn-svg, and use its tables, SVG, fonts, OpenType features, PDF/A-3 and Factur-X.">
+<link rel="canonical" href="https://levups.github.io/gamba/guide.html">
+<meta property="og:title" content="Gamba Guide">
+<meta property="og:description" content="Install Gamba in place of Prawn, prawn-table and prawn-svg, and use its tables, SVG, fonts, OpenType features, PDF/A-3 and Factur-X.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://next-gen-gems.github.io/prawnx/guide.html">
-<meta property="og:site_name" content="Next Gen Gems">
+<meta property="og:url" content="https://levups.github.io/gamba/guide.html">
+<meta property="og:site_name" content="Level UP Solutions">
 <meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#c2361b">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -23,17 +23,17 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <div class="page">
   <nav class="site-nav" aria-label="Site">
-    <a class="brand" href="./">PrawnX</a>
+    <a class="brand" href="./">Gamba</a>
     <a href="guide.html" aria-current="page">Guide</a>
     <a href="compatibility.html">Compatibility</a>
     <a href="benchmarks.html">Benchmarks</a>
-    <a href="https://github.com/next-gen-gems/prawnx">GitHub</a>
+    <a href="https://github.com/levups/gamba">GitHub</a>
   </nav>
 
   <main id="main">
     <header>
       <h1 class="page-title">Guide</h1>
-      <p class="lede">PrawnX answers to Prawn’s API: installing it is swapping gems. This page covers what it brings on top.</p>
+      <p class="lede">Gamba answers to Prawn’s API: installing it is swapping gems. This page covers what it brings on top.</p>
       <ul class="toc">
         <li><a href="#installation">Installation</a></li>
         <li><a href="#usage">Drop-in usage</a></li>
@@ -52,16 +52,16 @@
       <h2 id="installation-title">Installation</h2>
       <div class="prose">
 <pre><code class="language-ruby"><span class="c1"># Gemfile</span>
-<span class="n">gem</span> <span class="s2">"prawnx"</span> <span class="c1"># instead of prawn, prawn-table and prawn-svg</span></code></pre>
-        <p>PrawnX needs Ruby 3.3 or later. It depends on <code>css_parser</code>, <code>matrix</code> and <code>rexml</code>, which only its SVG support loads.</p>
-        <p>Remove <code>prawn</code>, <code>prawn-table</code> and <code>prawn-svg</code> from the Gemfile: PrawnX refuses to load next to the prawn gem, with a <code>LoadError</code> saying so, rather than mixing two engines in one process.</p>
+<span class="n">gem</span> <span class="s2">"gamba"</span> <span class="c1"># instead of prawn, prawn-table and prawn-svg</span></code></pre>
+        <p>Gamba needs Ruby 3.3 or later. It depends on <code>css_parser</code>, <code>matrix</code> and <code>rexml</code>, which only its SVG support loads.</p>
+        <p>Remove <code>prawn</code>, <code>prawn-table</code> and <code>prawn-svg</code> from the Gemfile: Gamba refuses to load next to the prawn gem, with a <code>LoadError</code> saying so, rather than mixing two engines in one process.</p>
       </div>
     </section>
 
     <section id="usage" aria-labelledby="usage-title">
       <h2 id="usage-title">Drop-in usage</h2>
       <div class="prose">
-        <p>Code written for Prawn runs as it is. PrawnX provides <code>require "prawn"</code>, <code>require "prawn/table"</code>, <code>require "prawn-svg"</code> and <code>require "prawn/measurement_extensions"</code>, and the <code>Prawn</code> namespace: <code>Prawn::Document</code>, <code>Prawn::Table</code>, <code>Prawn::Errors</code>, <code>Prawn::SVG</code>.</p>
+        <p>Code written for Prawn runs as it is. Gamba provides <code>require "prawn"</code>, <code>require "prawn/table"</code>, <code>require "prawn-svg"</code> and <code>require "prawn/measurement_extensions"</code>, and the <code>Prawn</code> namespace: <code>Prawn::Document</code>, <code>Prawn::Table</code>, <code>Prawn::Errors</code>, <code>Prawn::SVG</code>.</p>
 <pre><code class="language-ruby"><span class="nb">require</span> <span class="s2">"prawn"</span>
 
 <span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"invoice.pdf"</span><span class="p">,</span> <span class="ss">page_size: </span><span class="s2">"A4"</span><span class="p">,</span> <span class="ss">info: </span><span class="p">{</span><span class="no">Title</span><span class="p">:</span> <span class="s2">"Invoice"</span><span class="p">})</span> <span class="k">do</span>
@@ -70,8 +70,8 @@
   <span class="n">table</span> <span class="p">[</span><span class="sx">%w[SKU Qty Price]</span><span class="p">,</span> <span class="sx">%w[A-1 2 $10.00]</span><span class="p">],</span> <span class="ss">header: </span><span class="kp">true</span>
   <span class="n">number_pages</span> <span class="s2">"&lt;page&gt;/&lt;total&gt;"</span><span class="p">,</span> <span class="ss">at: </span><span class="p">[</span><span class="n">bounds</span><span class="p">.</span><span class="nf">right</span> <span class="o">-</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="ss">width: </span><span class="mi">50</span><span class="p">,</span> <span class="ss">align: :right</span>
 <span class="k">end</span></code></pre>
-        <p><code>Prawn::VERSION</code> answers <code>"2.5.0"</code>, the version of the API PrawnX mirrors, because Prawn extensions check it. PrawnX’s own version is <code>PrawnX::VERSION</code>.</p>
-        <p>The contract is Prawn 2.5’s public methods, listed in <code>test/contract/prawn-2.5.0.yml</code>: PrawnX accepts every call Prawn accepts on those, and <code>test/contract/decisions.yml</code> records, method by method, what is in and why the rest is left out.</p>
+        <p><code>Prawn::VERSION</code> answers <code>"2.5.0"</code>, the version of the API Gamba mirrors, because Prawn extensions check it. Gamba’s own version is <code>Gamba::VERSION</code>.</p>
+        <p>The contract is Prawn 2.5’s public methods, listed in <code>test/contract/prawn-2.5.0.yml</code>: Gamba accepts every call Prawn accepts on those, and <code>test/contract/decisions.yml</code> records, method by method, what is in and why the rest is left out.</p>
       </div>
     </section>
 
@@ -138,7 +138,7 @@
   <span class="n">factur_x</span> <span class="no">File</span><span class="p">.</span><span class="nf">read</span><span class="p">(</span><span class="s2">"factur-x.xml"</span><span class="p">),</span> <span class="ss">profile: :en16931</span>
 <span class="k">end</span></code></pre>
         <p><code>pdf_a: true</code> writes a PDF/A-3b document (ISO 19005-3): XMP metadata matching the <code>info</code> hash, an sRGB output intent, a file identifier, and annotations flagged for printing. What PDF/A forbids raises <code>Prawn::Errors::PdfAViolation</code>: a standard PDF font, which cannot be embedded, and encryption.</p>
-        <p><code>factur_x(xml, profile:, filename:, description:)</code> embeds the CII XML of a Factur-X invoice into a PDF/A-3 document, with the relationship the specification gives each profile. PrawnX does not build that XML: it embeds the one the invoicing system produced.</p>
+        <p><code>factur_x(xml, profile:, filename:, description:)</code> embeds the CII XML of a Factur-X invoice into a PDF/A-3 document, with the relationship the specification gives each profile. Gamba does not build that XML: it embeds the one the invoicing system produced.</p>
       </div>
       <table class="options">
         <thead><tr><th scope="col">Argument</th><th scope="col">Values</th></tr></thead>
@@ -165,30 +165,30 @@
       <div class="prose">
         <p>TrueType and SVG support load on first use, so a document of standard fonts never pays for them. Before a server forks its workers, load them once, so every worker shares that memory instead of loading its own copy:</p>
 <pre><code class="language-ruby"><span class="c1"># config/puma.rb, before_fork, or an initializer</span>
-<span class="no">PrawnX</span><span class="p">.</span><span class="nf">eager_load!</span></code></pre>
+<span class="no">Gamba</span><span class="p">.</span><span class="nf">eager_load!</span></code></pre>
       </div>
     </section>
 
     <section id="comparing" aria-labelledby="comparing-title">
       <h2 id="comparing-title">Comparing an app’s PDFs</h2>
       <div class="prose">
-        <p><code>script/capture_pdfs.rb</code> writes every PDF an app’s test suite renders, named after its test. Run the suite under Prawn, then under PrawnX, and compare both directories with <code>Oracle.pdf_differences</code>:</p>
-<pre><code class="language-sh"><span class="nv">PRAWNX_CAPTURE_DIRECTORY</span><span class="o">=</span>tmp/prawn <span class="nv">RUBYOPT</span><span class="o">=</span><span class="nt">-r</span>/path/to/prawnx/script/capture_pdfs.rb bin/rails <span class="nb">test</span></code></pre>
+        <p><code>script/capture_pdfs.rb</code> writes every PDF an app’s test suite renders, named after its test. Run the suite under Prawn, then under Gamba, and compare both directories with <code>Oracle.pdf_differences</code>:</p>
+<pre><code class="language-sh"><span class="nv">GAMBA_CAPTURE_DIRECTORY</span><span class="o">=</span>tmp/prawn <span class="nv">RUBYOPT</span><span class="o">=</span><span class="nt">-r</span>/path/to/gamba/script/capture_pdfs.rb bin/rails <span class="nb">test</span></code></pre>
       </div>
     </section>
   </main>
 
   <footer class="family">
-    <p><a href="https://github.com/next-gen-gems">Next Gen Gems</a>, by Level UP Solutions</p>
-    <nav aria-label="Next Gen Gems">
+    <p>Gems by <a href="https://github.com/levups">Level UP Solutions</a></p>
+    <nav aria-label="Level UP Solutionsâ gems">
       <ul>
-        <li><a href="https://next-gen-gems.github.io/slimx/">SlimX</a></li>
-        <li><a href="https://next-gen-gems.github.io/browserx/">BrowserX</a></li>
-        <li><a href="https://next-gen-gems.github.io/prawnx/" aria-current="page">PrawnX</a></li>
-        <li><a href="https://next-gen-gems.github.io/gretelx/">GretelX</a></li>
+        <li><a href="https://levups.github.io/super-slim/">SuperSlim</a></li>
+        <li><a href="https://levups.github.io/agentry/">Agentry</a></li>
+        <li><a href="https://levups.github.io/gamba/" aria-current="page">Gamba</a></li>
+        <li><a href="https://levups.github.io/crumbly/">Crumbly</a></li>
       </ul>
     </nav>
-    <p><a href="https://github.com/next-gen-gems/prawnx">Source on GitHub</a></p>
+    <p><a href="https://github.com/levups/gamba">Source on GitHub</a></p>
   </footer>
 </div>
 <script src="site.js"></script>

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Renders each document of bench/documents with Prawn and with PrawnX, in PROCESSES fresh YJIT processes per engine,
+# Renders each document of bench/documents with Prawn and with Gamba, in PROCESSES fresh YJIT processes per engine,
 # and writes the median of each measure across them (time, allocations, peak memory, file weight) to
 # docs/benchmarks.json. Peak memory varies by 20% from one process to the next: one process proves nothing.
 

@@ -32,7 +32,7 @@ module Prawn
         @code_by_glyph ||= {}
         glyphs = [0, *@code_by_glyph.keys].uniq
         font_name = :"#{subset_tag_for(glyphs)}+#{basename.delete("\0")[0, 33]}"
-        font_file = @document.ref!({Subtype: :CIDFontType0C}, PrawnX::TrueType::CffSubset.new(@ttf.table("CFF ")).bytes(glyphs))
+        font_file = @document.ref!({Subtype: :CIDFontType0C}, Gamba::TrueType::CffSubset.new(@ttf.table("CFF ")).bytes(glyphs))
         descriptor = @document.ref!(
           Type: :FontDescriptor, FontName: font_name, FontBBox: bbox, Flags: pdf_flags, StemV: stem_v, ItalicAngle: italic_angle,
           Ascent: @ascender, Descent: @descender, CapHeight: cap_height, XHeight: x_height, FontFile3: font_file

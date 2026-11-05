@@ -1,5 +1,5 @@
-# Where PrawnX deliberately differs from Prawn: each entry is a Prawn bug, proven by a specification or by
-# Prawn's own documentation. PrawnX must fix it; the other checks still compare the example with Prawn. Where
+# Where Gamba deliberately differs from Prawn: each entry is a Prawn bug, proven by a specification or by
+# Prawn's own documentation. Gamba must fix it; the other checks still compare the example with Prawn. Where
 # prawn_switch names a switch of test/support/oracle_render.rb, its examples compare with Prawn fixing the bug that
 # way, and so do fuzz documents where Prawn, switched, took it.
 - bug: Encrypted documents have no /ID in their trailer, so qpdf and strict readers reject them
@@ -30,7 +30,7 @@
     - '/\Apage 1: \d+ pixel rows differ at 150 dpi\z/'
     - '/\Apage 1: \d+ pixel rows differ at 150 dpi in Poppler\z/'
 - bug: TrueType-flavoured subsetting of CFF fonts changes how their glyphs rasterize
-  proof: 'The subset Prawn embeds (through TTFunk) renders differently from the unmodified font program; PrawnX keeps outlines and hints untouched, and renders like the font itself'
+  proof: 'The subset Prawn embeds (through TTFunk) renders differently from the unmodified font program; Gamba keeps outlines and hints untouched, and renders like the font itself'
   prawn_issue:
   examples:
     - otf_cff_outlines
@@ -38,46 +38,46 @@
     - '/\Apage 1: \d+ pixel rows differ at 150 dpi\z/'
     - '/\Apage 1: \d+ pixel rows differ at 150 dpi in Poppler\z/'
 - bug: Blocks saving the graphics state, still open at a page break, raise EmptyGraphicStateStack when they restore it
-  proof: 'Prawn::Document#start_new_page gives the new page a stack of one state, so blocks still open restore states it never saved: the inner one pops the page''s own state, and the outer one finds nothing to restore unless something was drawn in between. PrawnX reopens the page''s state before saving on its emptied stack, lets a block whose state was saved on an earlier page end without anything left to close, and keeps q and Q balanced on every page; a restore matching no save still raises'
+  proof: 'Prawn::Document#start_new_page gives the new page a stack of one state, so blocks still open restore states it never saved: the inner one pops the page''s own state, and the outer one finds nothing to restore unless something was drawn in between. Gamba reopens the page''s state before saving on its emptied stack, lets a block whose state was saved on an earlier page end without anything left to close, and keeps q and Q balanced on every page; a restore matching no save still raises'
   prawn_issue:
   prawn_raises: PDF::Core::Errors::EmptyGraphicStateStack
   examples:
     - graphic_state_restored_across_page_break
     - graphic_state_saved_on_emptied_stack
 - bug: A transparent block whose content crosses a page break draws the next page opaque
-  proof: 'Prawn documents Prawn::Graphics::Transparency#transparent as setting the opacity of the content within the block, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, opaque: Prawn::Document#start_new_page never sets the opacity again. PrawnX reopens the blocks still open on the new page, once its header and background are drawn, the outermost in the page''s own state and the others in a state each, with their ExtGState; each block''s end closes its own state, and q and Q stay balanced on every page'
+  proof: 'Prawn documents Prawn::Graphics::Transparency#transparent as setting the opacity of the content within the block, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, opaque: Prawn::Document#start_new_page never sets the opacity again. Gamba reopens the blocks still open on the new page, once its header and background are drawn, the outermost in the page''s own state and the others in a state each, with their ExtGState; each block''s end closes its own state, and q and Q stay balanced on every page'
   prawn_issue:
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
     - transparency_across_page_break
     - transparency_nested_across_page_break
 - bug: A blend_mode block whose content crosses a page break draws the next page in the normal blend mode
-  proof: 'Prawn documents Prawn::Graphics::BlendMode#blend_mode as setting the blend mode, restored after the block it is given, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, blend mode Normal (§11.3.5): Prawn::Document#start_new_page never sets it again. PrawnX reopens the blocks still open on the new page as for transparent ones, in order, with their ExtGState'
+  proof: 'Prawn documents Prawn::Graphics::BlendMode#blend_mode as setting the blend mode, restored after the block it is given, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, blend mode Normal (§11.3.5): Prawn::Document#start_new_page never sets it again. Gamba reopens the blocks still open on the new page as for transparent ones, in order, with their ExtGState'
   prawn_issue:
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
     - blend_mode_across_page_break
     - blend_mode_nested_across_page_break
 - bug: Colours, line width, dash, cap and join styles set before a block whose content crosses a page break are lost once it ends
-  proof: 'Prawn documents Prawn::Document#save_graphics_state as restoring the graphic state after the block, and ISO 32000-1 §8.4.2 has Q restore the state q saved. A block saved on an earlier page ends on the new page by closing that page''s own state, so what follows draws in the default state, black with 1-point solid lines. PrawnX writes back, after such a block ends, the settings in effect before it that the state it returns to lacks, as Prawn writes them on a new page'
+  proof: 'Prawn documents Prawn::Document#save_graphics_state as restoring the graphic state after the block, and ISO 32000-1 §8.4.2 has Q restore the state q saved. A block saved on an earlier page ends on the new page by closing that page''s own state, so what follows draws in the default state, black with 1-point solid lines. Gamba writes back, after such a block ends, the settings in effect before it that the state it returns to lacks, as Prawn writes them on a new page'
   prawn_issue:
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
     - graphic_settings_across_page_break
 - bug: A blend mode set without a block is lost on the next page
-  proof: 'Prawn documents Prawn::Graphics::BlendMode#blend_mode as setting the blend mode, restored afterwards only when given a block, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, blend mode Normal (§11.3.5): Prawn::Document#start_new_page writes the colours and line settings in effect again, never the blend mode. PrawnX sets the blend mode in effect again on the new page, after reopening the blocks still open, unless the page''s header set one, and after a block that ends on a later page, the one in effect before it'
+  proof: 'Prawn documents Prawn::Graphics::BlendMode#blend_mode as setting the blend mode, restored afterwards only when given a block, and ISO 32000-1 §8.4.1 starts each page''s content stream with the default graphics state, blend mode Normal (§11.3.5): Prawn::Document#start_new_page writes the colours and line settings in effect again, never the blend mode. Gamba sets the blend mode in effect again on the new page, after reopening the blocks still open, unless the page''s header set one, and after a block that ends on a later page, the one in effect before it'
   prawn_issue:
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
     - blend_mode_lasting_across_page_break
 - bug: A gradient set as the fill or stroke colour is lost on the next page, which paints with the colour set before it
-  proof: 'Prawn documents Prawn::Graphics::Patterns#fill_gradient and #stroke_gradient as setting the fill and stroke gradient, which ISO 32000-1 §8.6.6.2 makes the current colour, a pattern (Table 52, §8.4.1), until another replaces it; Prawn::Document#start_new_page writes the current colours again on the new page, but Prawn''s graphic state never records the gradient, so the new page paints with the colour set before it. PrawnX records the gradient in the graphic state, without changing what fill_color and stroke_color return, and paints with it on the new page and after a block that ends on a later page'
+  proof: 'Prawn documents Prawn::Graphics::Patterns#fill_gradient and #stroke_gradient as setting the fill and stroke gradient, which ISO 32000-1 §8.6.6.2 makes the current colour, a pattern (Table 52, §8.4.1), until another replaces it; Prawn::Document#start_new_page writes the current colours again on the new page, but Prawn''s graphic state never records the gradient, so the new page paints with the colour set before it. Gamba records the gradient in the graphic state, without changing what fill_color and stroke_color return, and paints with it on the new page and after a block that ends on a later page'
   prawn_issue:
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
     - gradients_across_page_break
 - bug: Text rendering mode, character spacing, word spacing, horizontal scaling and rise blocks whose text flows onto the next page draw that page without them
-  proof: 'Prawn documents text_rendering_mode, character_spacing, word_spacing, horizontal_text_scaling and rise as setting their parameter for the block they are given, and lays the text out with it, but ISO 32000-1 §9.3.1 makes the text state part of the graphics state, which §8.4.1 resets at the start of each page''s content stream: Prawn::Document#start_new_page never writes them again, so the new page is drawn plain, its lines overflowing or falling short. PrawnX writes the text state of the blocks still open on the new page, before its header, after a block that ends on a later page, the text state its Q drops, and on a page reached through go_to_page (text flowing onto a page that exists, page numbers, repeaters), the text state in effect, not the one left there'
+  proof: 'Prawn documents text_rendering_mode, character_spacing, word_spacing, horizontal_text_scaling and rise as setting their parameter for the block they are given, and lays the text out with it, but ISO 32000-1 §9.3.1 makes the text state part of the graphics state, which §8.4.1 resets at the start of each page''s content stream: Prawn::Document#start_new_page never writes them again, so the new page is drawn plain, its lines overflowing or falling short. Gamba writes the text state of the blocks still open on the new page, before its header, after a block that ends on a later page, the text state its Q drops, and on a page reached through go_to_page (text flowing onto a page that exists, page numbers, repeaters), the text state in effect, not the one left there'
   prawn_issue:
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
@@ -85,14 +85,14 @@
     - text_state_around_block_across_page_break
     - text_state_page_numbers
 - bug: A text_rendering_mode block or a text box after forget_text_rendering_mode! ends with a Tr missing its operand
-  proof: 'ISO 32000-1 §9.3.6 gives Tr one operand, the rendering mode; PDF::Core::Text#forget_text_rendering_mode! makes the mode unknown, which Prawn writes back once the block ends, and Prawn::Text::Formatted::Box draws in a fill block after it, as a bare Tr: Poppler reports a syntax error and drops the text drawn after it. PrawnX writes nothing back for an unknown mode, and draws that text in the mode the block left, as MuPDF draws Prawn''s'
+  proof: 'ISO 32000-1 §9.3.6 gives Tr one operand, the rendering mode; PDF::Core::Text#forget_text_rendering_mode! makes the mode unknown, which Prawn writes back once the block ends, and Prawn::Text::Formatted::Box draws in a fill block after it, as a bare Tr: Poppler reports a syntax error and drops the text drawn after it. Gamba writes nothing back for an unknown mode, and draws that text in the mode the block left, as MuPDF draws Prawn''s'
   prawn_issue:
   prawn_writes_invalid_pdf: true
   prawn_switch: ORACLE_SKIP_UNKNOWN_TEXT_RENDERING_MODE
   examples:
     - text_rendering_mode_forgotten
 - bug: Content drawn on a page again once a block that began there ended on another page, such as page numbers and repeaters, is drawn inside that block
-  proof: 'Prawn documents transparent, rotate and save_graphics_state as applying to the content within the block, and ISO 32000-1 §8.4.2 has a state saved by q last until its Q; a block whose content flows onto the next page leaves its q open on the page where it began, so Prawn::Document#go_to_page, which render and number_pages call to stamp repeaters and number pages, draws there inside the ended block, faded, rotated or recoloured. PrawnX closes, on the page go_to_page reaches, the states left open by blocks that have since ended, and keeps those of blocks still open'
+  proof: 'Prawn documents transparent, rotate and save_graphics_state as applying to the content within the block, and ISO 32000-1 §8.4.2 has a state saved by q last until its Q; a block whose content flows onto the next page leaves its q open on the page where it began, so Prawn::Document#go_to_page, which render and number_pages call to stamp repeaters and number pages, draws there inside the ended block, faded, rotated or recoloured. Gamba closes, on the page go_to_page reaches, the states left open by blocks that have since ended, and keeps those of blocks still open'
   prawn_issue:
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
