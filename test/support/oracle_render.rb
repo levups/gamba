@@ -44,9 +44,11 @@ end
 # Whether a switch below changed what Prawn draws for the example being rendered.
 module PrawnSwitch
   OpenSave = Struct.new(:previous, :ext_gstate, :restored)
-  # The settings a new page writes, each with its writer, in the order Prawn writes them.
-  GRAPHIC_SETTING_WRITERS = {fill_color: :set_fill_color, stroke_color: :set_stroke_color, line_width: :write_line_width,
-                             cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash}.freeze
+  # The settings a block ending on a later page writes back, each with its writer, as PrawnX's do.
+  GRAPHIC_SETTING_WRITERS = {fill_paint: :write_fill_paint, stroke_paint: :write_stroke_paint, line_width: :write_line_width,
+                             cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash,
+                             blend_mode: :write_blend_mode}.freeze
+  RESUMED_STATE = %i[fill_color fill_pattern stroke_color stroke_pattern line_width cap_style join_style dash blend_mode].freeze
   # PrawnX's PDF::Core::GraphicState::DEFAULT_TEXT_STATE, which Prawn's pdf-core lacks.
   DEFAULT_TEXT_STATE = {text_rendering_mode: :fill, character_spacing: 0, word_spacing: 0, horizontal_text_scaling: 100, rise: 0}.freeze
 
@@ -56,13 +58,16 @@ module PrawnSwitch
 end
 
 # ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK: like PrawnX, a page break reopens the open transparent and blend_mode blocks,
-# and a block saved on an earlier page writes back, once it ends, the settings in effect before it. A new page, a block
-# ending on a later page and go_to_page write back the text state in effect, and go_to_page closes the states left on
-# its page by blocks that ended on another one. Where any of these happened,
+# then sets the blend mode in effect again, a new page paints with the gradients in effect, and a block saved on an
+# earlier page writes back, once it ends, the settings in effect before it. A new page, a block ending on a later page
+# and go_to_page write back the text state in effect, and go_to_page closes the states left on its page by blocks that
+# ended on another one. Where any of these happened,
 # <name>.switched: only there may PrawnX differ from plain Prawn (prawn_switch in test/divergences.yml).
 if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
-  # Each state records the text state written in it, as PrawnX's does.
+  # Each state records, by name, the pattern painting in place of each colour and the blend mode, and the text state
+  # written in it, as PrawnX's does.
   PDF::Core::GraphicState.prepend(Module.new do
+    attr_accessor :fill_pattern, :stroke_pattern, :blend_mode
     attr_writer :text_state
     # The save that opened this state, or that it was reopened for, as PrawnX records it; a copy has none.
     attr_accessor :save
@@ -73,6 +78,9 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
 
     def initialize_copy(other)
       super
+      @fill_pattern = other.fill_pattern
+      @stroke_pattern = other.stroke_pattern
+      @blend_mode = other.blend_mode
       @text_state = other.text_state
     end
   end)
@@ -118,18 +126,51 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     end
 
     def blend_mode(blend_mode = :Normal)
-      return super unless block_given?
+      name = "BM#{Array(blend_mode).join}"
+      return super.tap { record_blend_mode(name) } unless block_given?
 
       super do
+        record_blend_mode(name)
         open_saves.last.ext_gstate = -> { blend_mode_dictionary_name(blend_mode) }
         yield
       end
     end
 
-    # Only start_new_page calls it, once the new page's state is a copy of the last page's.
-    def use_graphic_settings(*)
-      renderer.graphic_stack.current_state&.text_state = PrawnSwitch::DEFAULT_TEXT_STATE
+    # Its ExtGState sets the blend mode back to Normal.
+    def soft_mask(*)
       super
+      renderer.graphic_stack.current_state.blend_mode = nil
+    end
+
+    # A pattern the page's resources hold is recorded, to paint with on the next page.
+    def set_color(type, color, options = {})
+      super
+      reference = page.dictionary.data[:Resources]&.dig(:Pattern, color) if options[:pattern]
+      pattern_references[color] = reference if reference
+      state = renderer.graphic_stack.current_state
+      state.public_send(:"#{type}_pattern=", (color if reference)) if reference || state.public_send(:"#{type}_pattern")
+    end
+
+    def set_gradient(type, *, **)
+      super
+      name = "SP#{gradient_registry_key(parse_gradient_arguments(*, **))}"
+      pattern_references[name] = page.resources[:Pattern][name]
+      renderer.graphic_stack.current_state.public_send(:"#{type}_pattern=", name)
+    end
+
+    # Only start_new_page calls it, once the new page's state is a copy of the last page's: Prawn's, but a gradient
+    # stays the fill or stroke, and the blend mode waits for the blocks to reopen.
+    def use_graphic_settings(override_settings = false)
+      state = renderer.graphic_stack.current_state
+      @last_blend_mode = state.blend_mode
+      state.blend_mode = nil
+      state.text_state = PrawnSwitch::DEFAULT_TEXT_STATE
+      write_fill_paint if state.fill_pattern || current_fill_color != "000000" || override_settings
+      write_stroke_paint if state.stroke_pattern || current_stroke_color != "000000" || override_settings
+      write_line_width if line_width != 1 || override_settings
+      write_stroke_cap_style if cap_style != :butt || override_settings
+      write_stroke_join_style if join_style != :miter || override_settings
+      write_stroke_dash if dashed? || override_settings
       resume_text_state
     end
 
@@ -146,18 +187,14 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
 
     def start_new_page(options = {})
       super
-      return if options[:orphan] || open_saves.none?(&:ext_gstate)
+      return if options[:orphan]
+
+      header_blend_mode = renderer.graphic_stack.current_state&.blend_mode
+      reopen_ext_gstate_blocks
+      return if header_blend_mode || renderer.graphic_stack.current_state&.blend_mode == @last_blend_mode
 
       PrawnSwitch.taken = true
-      outermost, *inner = open_saves
-      renderer.graphic_stack.current_state.save = outermost
-      renderer.add_content("/#{outermost.ext_gstate.call} gs") if outermost.ext_gstate
-      inner.each do |open_save|
-        renderer.graphic_stack.save_graphic_state
-        renderer.graphic_stack.current_state.save = open_save
-        renderer.add_content("q")
-        renderer.add_content("/#{open_save.ext_gstate.call} gs") if open_save.ext_gstate
-      end
+      write_blend_mode(@last_blend_mode)
     end
 
     private
@@ -166,16 +203,72 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
       @open_saves ||= []
     end
 
+    def pattern_references
+      @pattern_references ||= {}
+    end
+
+    def reopen_ext_gstate_blocks
+      return if open_saves.none?(&:ext_gstate)
+
+      PrawnSwitch.taken = true
+      outermost, *inner = open_saves
+      renderer.graphic_stack.current_state.save = outermost
+      write_ext_gstate(outermost.ext_gstate.call) if outermost.ext_gstate
+      inner.each do |open_save|
+        renderer.graphic_stack.save_graphic_state
+        renderer.graphic_stack.current_state.save = open_save
+        renderer.add_content("q")
+        write_ext_gstate(open_save.ext_gstate.call) if open_save.ext_gstate
+      end
+    end
+
+    def write_ext_gstate(name)
+      renderer.add_content("/#{name} gs")
+      record_blend_mode(name) if name.start_with?("BM")
+    end
+
+    def record_blend_mode(name)
+      renderer.graphic_stack.current_state.blend_mode = (name == "BMNormal") ? nil : name
+    end
+
+    # The blend mode named, nil for Normal, set as it was first: registered already, but on this page.
+    def write_blend_mode(name = renderer.graphic_stack.current_state.blend_mode)
+      key = name&.delete_prefix("BM") || "Normal"
+      write_ext_gstate(blend_mode_dictionary_name((key == "Normal") ? :Normal : key))
+    end
+
+    def write_fill_paint
+      (name = renderer.graphic_stack.current_state.fill_pattern) ? write_pattern(:fill, name) : set_fill_color
+    end
+
+    def write_stroke_paint
+      (name = renderer.graphic_stack.current_state.stroke_pattern) ? write_pattern(:stroke, name) : set_stroke_color
+    end
+
+    def write_pattern(type, name)
+      PrawnSwitch.taken = true
+      (page.resources[:Pattern] ||= {})[name] ||= pattern_references.fetch(name)
+      set_color(type, name, pattern: true)
+    end
+
     def resume_graphic_settings(previous)
       previous ||= PDF::Core::GraphicState.new
       current = renderer.graphic_stack.current_state || PDF::Core::GraphicState.new
-      differing = PrawnSwitch::GRAPHIC_SETTING_WRITERS.reject { |setting, _writer| current.public_send(setting) == previous.public_send(setting) }
+      differing = PrawnSwitch::GRAPHIC_SETTING_WRITERS.reject { |setting, _writer| paint(current, setting) == paint(previous, setting) }
       return if differing.empty?
 
       PrawnSwitch.taken = true
       state = graphic_state
-      PrawnSwitch::GRAPHIC_SETTING_WRITERS.each_key { |setting| state.public_send(:"#{setting}=", previous.public_send(setting).dup) }
+      PrawnSwitch::RESUMED_STATE.each { |setting| state.public_send(:"#{setting}=", previous.public_send(setting).dup) }
       differing.each_value { |writer| send(writer) }
+    end
+
+    def paint(state, setting)
+      case setting
+      when :fill_paint then state.fill_pattern || state.fill_color
+      when :stroke_paint then state.stroke_pattern || state.stroke_color
+      else state.public_send(setting)
+      end
     end
 
     def resume_text_state

@@ -11,6 +11,9 @@ module PDF::Core
 
     attr_accessor :color_space, :dash, :cap_style, :join_style, :line_width, :fill_color, :stroke_color,
       *DEFAULT_TEXT_STATE.keys
+    # What Prawn's state leaves out: the pattern painting in place of each colour since a gradient was set, and the
+    # blend mode's ExtGState, {name:, reference:} each, nil for none and for Normal.
+    attr_accessor :fill_pattern, :stroke_pattern, :blend_mode
     # The save that opened this state on its page, or that it was reopened for on a new page; a copy has none.
     attr_accessor :save
 
@@ -23,6 +26,9 @@ module PDF::Core
         @cap_style = previous_state.cap_style
         @join_style = previous_state.join_style
         @line_width = previous_state.line_width
+        @fill_pattern = previous_state.fill_pattern
+        @stroke_pattern = previous_state.stroke_pattern
+        @blend_mode = previous_state.blend_mode
         copy_text_state(previous_state)
       else
         @color_space = {}
@@ -53,6 +59,15 @@ module PDF::Core
       @word_spacing = 0
       @horizontal_text_scaling = 100
       @rise = 0
+    end
+
+    # What fills or strokes: the pattern's name, else the colour.
+    def fill_paint
+      fill_pattern ? fill_pattern[:name] : fill_color
+    end
+
+    def stroke_paint
+      stroke_pattern ? stroke_pattern[:name] : stroke_color
     end
 
     def dup
