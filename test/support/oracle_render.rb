@@ -62,7 +62,8 @@ end
 # earlier page writes back, once it ends, the settings in effect before it. A new page, a block ending on a later page
 # and go_to_page write back the text state in effect, and go_to_page closes the states left on its page by blocks that
 # ended on another one, then reopens on top of the page's own state the open transparent and blend_mode blocks saved
-# on another page. Where any of these happened,
+# on another page; text flowing onto a page that exists writes back there the graphic settings in effect, as a new
+# page does. Where any of these happened,
 # <name>.switched: only there may PrawnX differ from plain Prawn (prawn_switch in test/divergences.yml).
 if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
   # Each state records, by name, the pattern painting in place of each colour and the blend mode, and the text state
@@ -207,6 +208,13 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
 
     private
 
+    # Text flowing onto a page that exists goes on with the settings in effect, as on a new page.
+    def flow_onto_page(page_number)
+      carried = renderer.graphic_stack.current_state
+      go_to_page(page_number)
+      resume_graphic_settings(carried)
+    end
+
     def open_saves
       @open_saves ||= []
     end
@@ -304,6 +312,14 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
         PrawnSwitch.taken = true
         send(:"update_#{setting}_state")
       end
+    end
+  end)
+
+  Prawn::Document::BoundingBox.prepend(Module.new do
+    def move_past_bottom
+      return super if @document.page_number == @document.page_count
+
+      @document.send(:flow_onto_page, @document.page_number + 1)
     end
   end)
 end

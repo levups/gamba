@@ -730,6 +730,156 @@ class GraphicStateTest < Minitest::Test
     assert_equal ["q", "Bob", "Q"], operators(document.pages[1])
   end
 
+  def test_text_flowing_onto_an_existing_page_keeps_the_settings_in_effect_as_on_a_new_page
+    settings = proc do
+      fill_color "cc0000"
+      stroke_color "0000cc"
+      line_width 4
+      dash 6
+      cap_style :round
+      join_style :bevel
+      text "Alice line. " * 60
+    end
+    existing_page = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      move_down 650
+      instance_eval(&settings)
+    end
+    new_page = Prawn::Document.new do
+      move_down 650
+      instance_eval(&settings)
+    end
+
+    pdf = existing_page.render
+    new_page.render
+
+    assert_equal ["q", "/DeviceRGB cs", "0.8 0.0 0.0 scn", "/DeviceRGB CS", "0.0 0.0 0.8 SCN", "4 w", "1 J", "2 j", "[6.0 6.0] 0.0 d"],
+      operators(existing_page.pages[1]).first(9)
+    assert_equal operators(new_page.pages[1]), operators(existing_page.pages[1])
+    existing_page.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_text_flowing_onto_an_existing_page_draws_with_the_settings_in_effect_not_the_pages_own
+    document = Prawn::Document.new do
+      start_new_page
+      fill_color "0000cc"
+      line_width 3
+      text "Bob"
+      go_to_page(1)
+      move_down 650
+      text "Alice line. " * 60
+    end
+
+    document.render
+
+    lines = operators(document.pages[1])
+    assert_equal ["q", "/DeviceRGB cs", "0.0 0.0 0.8 scn", "3 w", "Bob", "0.0 0.0 0.0 scn", "1 w"], lines.first(7)
+    assert_equal ["Alice line. Alice line. Alice line.", "Q"], lines.last(2)
+  end
+
+  def test_a_blend_mode_set_without_a_block_holds_on_an_existing_page_text_flows_onto
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      move_down 650
+      blend_mode(:Multiply)
+      text "Alice line. " * 60
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "/BMMultiply gs"], operators(document.pages[1]).first(2)
+    assert_equal ["BMMultiply"], document.pages[1].resources[:ExtGState].keys
+    assert_valid(pdf)
+  end
+
+  def test_a_gradient_holds_on_an_existing_page_text_flows_onto
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      move_down 650
+      fill_gradient [0, 0], [100, 0], "ff0000", "0000ff"
+      text "Alice line. " * 60
+    end
+    gradient = document.pages[0].resources[:Pattern].keys.first
+
+    pdf = document.render
+
+    assert_equal ["q", "/Pattern cs", "/#{gradient} scn"], operators(document.pages[1]).first(3)
+    assert_equal [gradient], document.pages[1].resources[:Pattern].keys
+    assert_valid(pdf)
+  end
+
+  def test_a_block_flowing_onto_an_existing_page_draws_in_its_colour_then_ends_on_the_one_before_it
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      move_down 650
+      fill_color "cc0000"
+      transparent(0.5) do
+        fill_color "0000cc"
+        text "Alice line. " * 60
+      end
+      text "Dave"
+    end
+
+    pdf = document.render
+
+    lines = operators(document.pages[1])
+    assert_equal ["q", "q", "/Tr1 gs", "/DeviceRGB cs", "0.0 0.0 0.8 scn"], lines.first(5)
+    assert_equal ["Q", "/DeviceRGB cs", "0.8 0.0 0.0 scn", "Dave", "Q"], lines.last(5)
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
+  def test_go_to_page_alone_keeps_the_pages_own_settings
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      fill_color "cc0000"
+      line_width 4
+      go_to_page(2)
+      text "Bob"
+    end
+
+    document.render
+
+    assert_equal ["q", "Bob", "Q"], operators(document.pages[1])
+  end
+
+  def test_page_numbers_and_repeaters_after_text_flowed_onto_an_existing_page_draw_as_on_a_new_page
+    body = proc do
+      fill_color "cc0000"
+      text "Alice line. " * 60
+      fill_color "0000cc"
+      go_to_page(1)
+      number_pages "<page>", at: [0, 0]
+      repeat(:all, dynamic: true) { draw_text "Carol", at: [0, 20] }
+    end
+    existing_page = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      move_down 650
+      instance_eval(&body)
+    end
+    new_page = Prawn::Document.new do
+      move_down 650
+      instance_eval(&body)
+    end
+
+    pdf = existing_page.render
+    new_page.render
+
+    lines = operators(existing_page.pages[1])
+    assert_equal ["q", "/DeviceRGB cs", "0.8 0.0 0.0 scn"], lines.first(3)
+    assert_equal ["Alice line. Alice line. Alice line.", "0.0 0.0 0.8 scn", "2", "q"], lines.drop_while { _1 != "Alice line. Alice line. Alice line." }.first(4)
+    assert_equal operators(new_page.pages[1]), operators(existing_page.pages[1])
+    existing_page.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
   private
 
   # The page's graphics state, ExtGState, graphic settings and text state operators, with its text in place of the operators
