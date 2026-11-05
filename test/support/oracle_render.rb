@@ -308,6 +308,19 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
   end)
 end
 
+# ORACLE_SKIP_UNKNOWN_TEXT_RENDERING_MODE: like PrawnX, a text rendering mode forgotten by forget_text_rendering_mode!
+# is not written back, as a Tr without its operand, once a block ends. Prepended last, so that
+# ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK does not record it either.
+if ENV["ORACLE_SKIP_UNKNOWN_TEXT_RENDERING_MODE"]
+  Prawn::Document.prepend(Module.new do
+    def update_text_rendering_mode_state
+      return super unless text_rendering_mode == :unknown
+
+      PrawnSwitch.taken = true
+    end
+  end)
+end
+
 CACHE_DIRECTORY = File.expand_path("../../corpus/cache", __dir__)
 MANUAL_DIRECTORY = File.join(CACHE_DIRECTORY, "prawn/manual/")
 

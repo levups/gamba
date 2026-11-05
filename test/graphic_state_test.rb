@@ -546,6 +546,33 @@ class GraphicStateTest < Minitest::Test
     assert_equal ["q", "Bob", "Q"], operators(document.pages[1])
   end
 
+  def test_a_text_rendering_mode_block_after_the_mode_was_forgotten_restores_nothing
+    document = Prawn::Document.new do
+      forget_text_rendering_mode!
+      text_rendering_mode(:stroke) { draw_text "Alice", at: [0, 0] }
+    end
+
+    pdf = document.render
+
+    assert_equal :unknown, document.text_rendering_mode
+    assert_equal ["q", "1 Tr", "Alice", "Q"], operators(document.pages[0])
+    assert_valid pdf
+  end
+
+  def test_text_drawn_after_the_mode_was_forgotten_is_filled_without_restoring_it
+    document = Prawn::Document.new do
+      forget_text_rendering_mode!
+      text "Alice"
+      text "Bob"
+    end
+
+    pdf = document.render
+
+    assert_equal :unknown, document.text_rendering_mode
+    assert_equal ["q", "0 Tr", "Alice", "0 Tr", "Bob", "Q"], operators(document.pages[0])
+    assert_valid pdf
+  end
+
   def test_a_page_break_without_a_transparent_block_open_reopens_nothing
     document = Prawn::Document.new do
       save_graphics_state do
@@ -716,7 +743,7 @@ class GraphicStateTest < Minitest::Test
   end
 
   def assert_valid(pdf)
-    skip "qpdf is not installed" unless system("qpdf", "--version", out: File::NULL)
+    skip "qpdf or pdftotext is not installed" unless system("qpdf", "--version", out: File::NULL) && system("pdftotext", "-v", err: File::NULL)
     Tempfile.create(["graphic_state", ".pdf"]) do |file|
       file.binmode
       file.write(pdf)
