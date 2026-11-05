@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # A blend mode set without a block, then a table that breaks pages, inside a block setting another one: Prawn draws
-# the next page in the normal blend mode; PrawnX keeps each blend mode until it is changed or its block ends.
+# the next page in the normal blend mode; Gamba keeps each blend mode until it is changed or its block ends.
 fill_color "3366cc"
 blend_mode(:Multiply)
 save_graphics_state do

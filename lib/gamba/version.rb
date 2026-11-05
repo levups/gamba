@@ -5,6 +5,6 @@ module Prawn
   VERSION = "2.5.0"
 end
 
-module PrawnX
+module Gamba
   VERSION = "1.1.0"
 end

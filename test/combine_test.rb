@@ -4,8 +4,8 @@ require_relative "test_helper"
 require "prawn"
 require "timeout"
 
-# PrawnX.combine reads PDFs written by others: the pages must come out as they were drawn, whatever the file's
-# structure, and a damaged file must fail with an error PrawnX names. COMBINE_FUZZ_SEED and COMBINE_FUZZ_CASES choose
+# Gamba.combine reads PDFs written by others: the pages must come out as they were drawn, whatever the file's
+# structure, and a damaged file must fail with an error Gamba names. COMBINE_FUZZ_SEED and COMBINE_FUZZ_CASES choose
 # the damaged files.
 class CombineTest < Minitest::Test
   LETTER = [612, 792].freeze
@@ -26,7 +26,7 @@ class CombineTest < Minitest::Test
     alice = document("alice")
     bob = document("bob", pages: 2)
 
-    combined = PrawnX.combine([alice, bob])
+    combined = Gamba.combine([alice, bob])
 
     assert_equal rasterized(alice) + rasterized(bob), rasterized(combined)
   end
@@ -38,7 +38,7 @@ class CombineTest < Minitest::Test
     QPDF_VARIANTS.each do |name, arguments|
       variant = qpdf(original, arguments.map { |argument| (argument == '""') ? "" : argument })
 
-      assert_equal rasterized(original), rasterized(PrawnX.combine([variant])), "a file with #{name}"
+      assert_equal rasterized(original), rasterized(Gamba.combine([variant])), "a file with #{name}"
     end
   end
 
@@ -46,7 +46,7 @@ class CombineTest < Minitest::Test
     source = document("alice", page_size: "LETTER")
     scale = [LABEL[0].to_f / LETTER[0], LABEL[1].to_f / LETTER[1]].min.round(4)
 
-    combined = PrawnX.combine([source], page_size: LABEL)
+    combined = Gamba.combine([source], page_size: LABEL)
 
     assert_equal [[0, 0, 288, 432]], media_boxes(combined)
     expected = glyphs(source).map { |character, x, y| [character, x * scale, LABEL[1] - (LETTER[1] - y) * scale] }
@@ -54,7 +54,7 @@ class CombineTest < Minitest::Test
   end
 
   def test_a_page_the_other_way_round_turns_a_quarter_counterclockwise
-    combined = PrawnX.combine([document("alice", page_size: "LETTER")], page_size: A4, orientation: :landscape)
+    combined = Gamba.combine([document("alice", page_size: "LETTER")], page_size: A4, orientation: :landscape)
 
     assert_equal [[0, 0, 841.89, 595.28]], media_boxes(combined)
     xs, ys = glyphs(combined).map { _1.drop(1) }.transpose
@@ -67,7 +67,7 @@ class CombineTest < Minitest::Test
 
     rotated = qpdf(document("alice", page_size: "LETTER"), %w[--rotate=+90])
 
-    combined = PrawnX.combine([rotated], orientation: :landscape)
+    combined = Gamba.combine([rotated], orientation: :landscape)
 
     assert_equal [[0, 0, 792, 612]], media_boxes(combined)
     assert_glyphs_near glyphs(rotated), glyphs(combined)
@@ -80,7 +80,7 @@ class CombineTest < Minitest::Test
     end.render
     scale = (LABEL[0].to_f / LETTER[0]).round(4)
 
-    combined = PrawnX.combine([source], page_size: LABEL)
+    combined = Gamba.combine([source], page_size: LABEL)
 
     reader = PDF::Core::Reader.new(combined)
     _, page = reader.pages.first
@@ -89,7 +89,7 @@ class CombineTest < Minitest::Test
   end
 
   def test_an_annotation_two_pages_share_moves_once
-    combined = PrawnX.combine([two_rotated_pages_sharing_a_stamp], orientation: :landscape)
+    combined = Gamba.combine([two_rotated_pages_sharing_a_stamp], orientation: :landscape)
 
     reader = PDF::Core::Reader.new(combined)
     rectangles = reader.pages.map { |_, page| reader.resolve(reader.resolve(page[:Annots]).first)[:Rect].map(&:to_f) }
@@ -99,13 +99,13 @@ class CombineTest < Minitest::Test
   def test_annotation_appearances_turn_with_their_page
     source = two_rotated_pages_sharing_a_stamp
 
-    combined = PrawnX.combine([source], orientation: :landscape)
+    combined = Gamba.combine([source], orientation: :landscape)
 
     assert_equal rasterized(source), rasterized(combined)
   end
 
   def test_a_page_size_without_orientation_is_used_as_given
-    assert_equal [[0, 0, 432, 288]], media_boxes(PrawnX.combine([document("alice")], page_size: [432, 288]))
+    assert_equal [[0, 0, 432, 288]], media_boxes(Gamba.combine([document("alice")], page_size: [432, 288]))
   end
 
   def test_names_that_read_alike_once_escaped_differ_stay_apart
@@ -113,13 +113,13 @@ class CombineTest < Minitest::Test
       classic_pdf({3 => PAGE.sub(/>>\z/, "/Mark 6 0 R >>"), 4 => stream("BT /F1 24 Tf 72 700 Td (alice) Tj ET"), 6 => array})
     end
 
-    reader = PDF::Core::Reader.new(PrawnX.combine(sources))
+    reader = PDF::Core::Reader.new(Gamba.combine(sources))
     marks = reader.pages.map { |_, page| PDF::Core.serialize(reader.resolve(page[:Mark])) }
     assert_equal ["[/F#201]", "[/F 1]"], marks
   end
 
   def test_a_batch_of_identical_labels_stores_what_they_share_once
-    batch = PrawnX.combine([document("alice")] * 10, page_size: LABEL)
+    batch = Gamba.combine([document("alice")] * 10, page_size: LABEL)
 
     reader = PDF::Core::Reader.new(batch)
     fonts = reader.pages.map { |_, page| reader.resolve(reader.resolve(page[:Resources])[:Font]).values }
@@ -131,7 +131,7 @@ class CombineTest < Minitest::Test
     original = classic_pdf({4 => stream("BT /F1 24 Tf 72 700 Td (alice) Tj ET")})
     updated = append_update(original, {4 => stream("BT /F1 24 Tf 72 700 Td (bob) Tj ET")})
 
-    assert_equal "bob", glyphs(PrawnX.combine([updated])).map(&:first).join
+    assert_equal "bob", glyphs(Gamba.combine([updated])).map(&:first).join
   end
 
   def test_an_encrypted_file_with_object_streams_and_a_wrong_xref_is_rebuilt
@@ -141,7 +141,7 @@ class CombineTest < Minitest::Test
     encrypted = qpdf(original, ["--object-streams=generate", "--encrypt", "", "owner", "256", "--"])
     broken = encrypted.sub(/startxref\s+\d+/) { |line| line.sub(/\d+\z/) { (_1.to_i - 7).to_s } }
 
-    assert_equal rasterized(original), rasterized(PrawnX.combine([broken]))
+    assert_equal rasterized(original), rasterized(Gamba.combine([broken]))
   end
 
   def test_a_crypt_filter_without_a_top_level_length_is_128_bits
@@ -151,14 +151,14 @@ class CombineTest < Minitest::Test
     encrypted = qpdf(original, ["--object-streams=disable", "--allow-weak-crypto", "--encrypt", "", "owner", "128", "--use-aes=n", "--force-V4", "--"])
     without_length = encrypted.sub(%r{/Length 128(?=[^0-9])}n) { " " * _1.bytesize }
 
-    assert_equal rasterized(original), rasterized(PrawnX.combine([without_length]))
+    assert_equal rasterized(original), rasterized(Gamba.combine([without_length]))
   end
 
   def test_offsets_the_xref_table_got_wrong_are_found_by_scanning_the_file
     original = classic_pdf({4 => stream("BT /F1 24 Tf 72 700 Td (alice) Tj ET")})
     shifted = original.sub("%PDF-1.4\n", "%PDF-1.4\n% inserted after the offsets were counted\n")
 
-    assert_equal "alice", glyphs(PrawnX.combine([shifted])).map(&:first).join
+    assert_equal "alice", glyphs(Gamba.combine([shifted])).map(&:first).join
   end
 
   def test_literal_strings_names_and_reals_are_written_back_as_they_mean
@@ -166,7 +166,7 @@ class CombineTest < Minitest::Test
 d) Tj"
     source = classic_pdf({4 => stream("BT /F#31 24 Tf 72.25 700.125 Td #{text} ET")}, font_name: "F#31")
 
-    combined = PrawnX.combine([source])
+    combined = Gamba.combine([source])
 
     assert_equal "a(b)c Ad", glyphs(combined).map(&:first).join
     assert_equal [72.25], glyphs(combined).first(1).map { _1[1].round(2) }
@@ -180,22 +180,22 @@ d) Tj"
     # Offsets shifted: the reader rebuilds the xref by scanning, and opens every object stream it finds.
     shifted = source.sub("%PDF-1.4\n", "%PDF-1.4\n% inserted after the offsets were counted\n")
 
-    assert_equal "alice", glyphs(PrawnX.combine([shifted])).map(&:first).join
+    assert_equal "alice", glyphs(Gamba.combine([shifted])).map(&:first).join
   end
 
   def test_a_file_that_needs_a_password_is_refused_by_name
     locked = Prawn::Document.new { text "alice" }.tap { _1.encrypt_document(user_password: "secret") }.render
 
-    assert_raises(Prawn::Errors::EncryptedPDF) { PrawnX.combine([locked]) }
+    assert_raises(Prawn::Errors::EncryptedPDF) { Gamba.combine([locked]) }
   end
 
   def test_something_that_is_not_a_pdf_is_refused_by_name
-    assert_raises(Prawn::Errors::MalformedPDF) { PrawnX.combine(["alice"]) }
+    assert_raises(Prawn::Errors::MalformedPDF) { Gamba.combine(["alice"]) }
   end
 
   def test_unknown_options_are_refused
-    assert_raises(ArgumentError) { PrawnX.combine([], orientation: :sideways) }
-    assert_raises(ArgumentError) { PrawnX.combine([], page_size: "B42") }
+    assert_raises(ArgumentError) { Gamba.combine([], orientation: :sideways) }
+    assert_raises(ArgumentError) { Gamba.combine([], page_size: "B42") }
   end
 
   def test_damaged_files_fail_cleanly
@@ -207,7 +207,7 @@ d) Tj"
     failures = []
     FUZZ_CASES.times do |index|
       damaged = corrupt(samples.sample(random:), random)
-      Timeout.timeout(10) { PrawnX.combine([damaged], page_size: LABEL, orientation: :portrait) }
+      Timeout.timeout(10) { Gamba.combine([damaged], page_size: LABEL, orientation: :portrait) }
     rescue Prawn::Errors::MalformedPDF, Prawn::Errors::EncryptedPDF
       nil
     rescue Exception => exception # rubocop:disable Lint/RescueException -- a timeout or any crash is the finding
@@ -229,7 +229,7 @@ d) Tj"
       # Offsets shifted: the reader rebuilds the xref by scanning, and opens every object stream it finds.
       shifted = source.sub("%PDF-1.4\n", "%PDF-1.4\n% inserted after the offsets were counted\n")
 
-      assert_raises(Prawn::Errors::MalformedPDF, "a bomb behind #{name}") { PrawnX.combine([shifted]) }
+      assert_raises(Prawn::Errors::MalformedPDF, "a bomb behind #{name}") { Gamba.combine([shifted]) }
     end
   end
 
@@ -247,27 +247,27 @@ d) Tj"
     [deep_array, deep_dictionary].each do |deep|
       source = classic_pdf({1 => "<< /Type /Catalog /Pages 2 0 R /Deep #{deep} >>", 4 => stream("BT ET")})
 
-      assert_raises(Prawn::Errors::MalformedPDF) { PrawnX.combine([source]) }
+      assert_raises(Prawn::Errors::MalformedPDF) { Gamba.combine([source]) }
     end
   end
 
   def test_stray_delimiters_are_skipped_however_many
     source = classic_pdf({1 => "<< /Type /Catalog /Stray #{")" * 100_000} 0 /Pages 2 0 R >>", 4 => stream("BT ET")})
 
-    assert_equal 1, PDF::Core::Reader.new(PrawnX.combine([source])).pages.size
+    assert_equal 1, PDF::Core::Reader.new(Gamba.combine([source])).pages.size
   end
 
   def test_a_chain_of_lengths_deeper_than_any_real_file_is_refused
     chain = (6..10_005).to_h { |number| [number, "<< /Length #{number + 1} 0 R >>\nstream\nx\nendstream"] }
     source = classic_pdf({4 => "<< /Length 6 0 R >>\nstream\nBT ET\nendstream", 10_006 => "1", **chain})
 
-    assert_raises(Prawn::Errors::MalformedPDF) { PrawnX.combine([source]) }
+    assert_raises(Prawn::Errors::MalformedPDF) { Gamba.combine([source]) }
   end
 
   def test_a_long_list_of_objects_is_copied_whole
     chain = (6..20_005).to_h { |number| [number, "[#{number + 1} 0 R]"] }
     source = classic_pdf({3 => PAGE.sub(">> >>", ">> >> /Next 6 0 R"), 4 => stream("BT ET"), 20_006 => "[]", **chain})
-    reader = PDF::Core::Reader.new(PrawnX.combine([source]))
+    reader = PDF::Core::Reader.new(Gamba.combine([source]))
     length = 0
     link = reader.pages.first[1][:Next]
     while (list = reader.resolve(link)).is_a?(Array) && !list.empty?
@@ -283,7 +283,7 @@ d) Tj"
     source = classic_pdf({4 => stream("BT /F1 24 Tf 72 700 Td (alice) Tj ET"), 6 => overlapping})
     shifted = source.sub("%PDF-1.4\n", "%PDF-1.4\n% inserted after the offsets were counted\n")
 
-    assert_raises(Prawn::Errors::MalformedPDF) { PrawnX.combine([shifted]) }
+    assert_raises(Prawn::Errors::MalformedPDF) { Gamba.combine([shifted]) }
   end
 
   def test_an_object_stream_whose_index_misleads_is_read_in_linear_time
@@ -297,14 +297,14 @@ d) Tj"
   def test_a_cross_reference_stream_without_width_is_rebuilt_instead_of_read_forever
     source = packed_catalog_pdf(xref_widths: "[0 0 0] /Size 999999999999")
 
-    assert_equal 1, Timeout.timeout(5) { PDF::Core::Reader.new(PrawnX.combine([source])).pages.size }
+    assert_equal 1, Timeout.timeout(5) { PDF::Core::Reader.new(Gamba.combine([source])).pages.size }
   end
 
   def test_loops_in_the_page_tree_and_the_xref_chain_end
     source = classic_pdf({2 => "<< /Type /Pages /Kids [3 0 R 2 0 R] /Count 2 >>", 4 => stream("BT ET")})
     looped = source.sub("/Root 1 0 R", "/Root 1 0 R /Prev #{source[/startxref\s+(\d+)/, 1]}")
 
-    assert_equal 1, Timeout.timeout(5) { PDF::Core::Reader.new(PrawnX.combine([looped])).pages.size }
+    assert_equal 1, Timeout.timeout(5) { PDF::Core::Reader.new(Gamba.combine([looped])).pages.size }
   end
 
   private

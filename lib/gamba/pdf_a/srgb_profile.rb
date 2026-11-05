@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module PrawnX
+module Gamba
   module PdfA
     # An ICC version 2 display profile for sRGB (IEC 61966-2.1), built from the standard's primaries adapted to D50
     # (ICC.1:2001-04): PDF/A needs one as output intent, and building it avoids shipping a third-party file.

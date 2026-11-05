@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 # Loaded with RUBYOPT=-r…/capture_pdfs.rb into an app's test run: every PDF a test renders is written to
-# PRAWNX_CAPTURE_DIRECTORY, named after the test, so the same run under Prawn and under PrawnX can be compared.
+# GAMBA_CAPTURE_DIRECTORY, named after the test, so the same run under Prawn and under Gamba can be compared.
 require "fileutils"
 
-module PrawnXCapture
-  DIRECTORY = ENV.fetch("PRAWNX_CAPTURE_DIRECTORY")
+module GambaCapture
+  DIRECTORY = ENV.fetch("GAMBA_CAPTURE_DIRECTORY")
   @count_by_test = Hash.new(0)
 
   class << self
@@ -22,14 +22,14 @@ module PrawnXCapture
   module Render
     def render(*arguments)
       pdf = super
-      PrawnXCapture.write(pdf)
+      GambaCapture.write(pdf)
       pdf
     end
   end
 
   module NameTests
     def before_setup
-      PrawnXCapture.current_test = "#{self.class.name}##{name}"
+      GambaCapture.current_test = "#{self.class.name}##{name}"
       super
     end
   end
@@ -40,9 +40,9 @@ MODULE_NAME = Module.instance_method(:name)
 TracePoint.new(:end) do |trace|
   name = MODULE_NAME.bind_call(trace.self)
   if name == "Prawn::Document"
-    trace.self.prepend(PrawnXCapture::Render) unless trace.self.ancestors.include?(PrawnXCapture::Render)
+    trace.self.prepend(GambaCapture::Render) unless trace.self.ancestors.include?(GambaCapture::Render)
   end
-  if defined?(Minitest::Test) && trace.self == Minitest::Test && !Minitest::Test <= PrawnXCapture::NameTests
-    Minitest::Test.prepend(PrawnXCapture::NameTests)
+  if defined?(Minitest::Test) && trace.self == Minitest::Test && !Minitest::Test <= GambaCapture::NameTests
+    Minitest::Test.prepend(GambaCapture::NameTests)
   end
 end.enable

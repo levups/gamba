@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Colours, line settings, a blend mode and a gradient set before text flowing onto a page that exists already, with
-# settings of its own: Prawn draws there with that page's settings, PrawnX with the ones in effect, as on a new page,
+# settings of its own: Prawn draws there with that page's settings, Gamba with the ones in effect, as on a new page,
 # and the page numbers drawn after with the settings each page ends on.
 start_new_page
 fill_color "336699"

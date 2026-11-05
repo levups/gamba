@@ -5,7 +5,7 @@
 # becomes the version's and the version constant is bumped on a branch release/vX.Y.Z, whose pull request merges
 # itself once CI is green. The merge commit then gets a signed tag vX.Y.Z, which starts
 # .github/workflows/release.yml: it publishes the gem to RubyGems and the GitHub release. The same file in every
-# next-gen-gems gem.
+# Level UP Solutions gem.
 #
 #   bin/release minor              # or patch, major, or an exact version such as 1.2.0
 #   bin/release minor --dry-run    # shows the notes and the changes, touches nothing
@@ -15,7 +15,7 @@
 #
 #   bin/release --check v1.2.0     # fails unless the tag matches the gemspec's version and has notes
 #   bin/release --notes v1.2.0     # the GitHub release notes: the version's section of CHANGELOG.md
-#   bin/release --title v1.2.0     # the GitHub release title, "SlimX 1.2.0"
+#   bin/release --title v1.2.0     # the GitHub release title, "SuperSlim 1.2.0"
 
 require "date"
 require "json"

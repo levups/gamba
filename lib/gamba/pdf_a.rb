@@ -8,7 +8,7 @@ module Prawn
   end
 end
 
-module PrawnX
+module Gamba
   # PDF/A-3b (ISO 19005-3), switched on with Prawn::Document.new(pdf_a: true): XMP metadata matching the
   # document information, an sRGB output intent, a file identifier, and errors for what PDF/A forbids.
   # Factur-X invoices (pdf.factur_x) embed their CII XML into such a document.

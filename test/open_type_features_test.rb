@@ -13,7 +13,7 @@ class OpenTypeFeaturesTest < Minitest::Test
   end
 
   def test_a_ligature_stands_for_all_its_characters
-    layout = PrawnX::TrueType::OpenTypeLayout.new(PrawnX::TrueType::File.open(FONT), %i[liga])
+    layout = Gamba::TrueType::OpenTypeLayout.new(Gamba::TrueType::File.open(FONT), %i[liga])
 
     assert_equal [["f".ord, "i".ord]], layout.shape("fi".codepoints).map(&:last)
   end

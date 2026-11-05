@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # A header stamped on every page, page numbers and a dynamic footer, after a rotated block and a transparent one ran
-# over several pages: Prawn draws them inside each block on the page where it began, faded or tilted; PrawnX draws
+# over several pages: Prawn draws them inside each block on the page where it began, faded or tilted; Gamba draws
 # them the same on every page.
 repeat(:all) do
   fill_color "336699"

@@ -3,13 +3,13 @@
 require_relative "test_helper"
 require "yaml"
 
-# Every example of Prawn's manual, rendered by Prawn and by ORACLE_CANDIDATE (PrawnX by default). The examples in
+# Every example of Prawn's manual, rendered by Prawn and by ORACLE_CANDIDATE (Gamba by default). The examples in
 # test/oracle_passing.txt must stay identical; any other one that becomes identical must be added there.
 class OracleTest < Minitest::Test
   PASSING_LIST = File.join(__dir__, "oracle_passing.txt")
   DIVERGENCES = YAML.load_file(File.join(__dir__, "divergences.yml"))
   DIVERGENCE_BY_EXAMPLE = DIVERGENCES.flat_map { |divergence| divergence.fetch("examples").map { [_1, divergence] } }.to_h
-  CANDIDATE = ENV.fetch("ORACLE_CANDIDATE", "prawnx")
+  CANDIDATE = ENV.fetch("ORACLE_CANDIDATE", "gamba")
   OUTPUT_DIRECTORY = File.join(Oracle::ROOT, "tmp/oracle")
 
   if Oracle.manual_chapters.empty?
@@ -19,7 +19,7 @@ class OracleTest < Minitest::Test
     raise "Prawn cannot render the manual: #{reference.failure}" if reference.failure
 
     candidate = Oracle.render(CANDIDATE, Oracle.example_files, File.join(OUTPUT_DIRECTORY, CANDIDATE))
-    # Prawn fixing a bug as PrawnX does, through a switch of test/support/oracle_render.rb (prawn_switch), for the
+    # Prawn fixing a bug as Gamba does, through a switch of test/support/oracle_render.rb (prawn_switch), for the
     # examples of the bugs it fixes only.
     names_by_switch = DIVERGENCES.select { _1.key?("prawn_switch") }.group_by { _1["prawn_switch"] }
       .transform_values { |divergences| divergences.flat_map { _1["examples"] } }

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module PrawnX
+module Gamba
   module TrueType
     class Error < StandardError
     end

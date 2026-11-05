@@ -1,6 +1,6 @@
 name: CI
 
-# The blocks shared by the gems of next-gen-gems are kept identical across the family.
+# The blocks shared by the Level UP Solutions gems are kept identical across the family.
 
 on:
   push:
@@ -59,9 +59,9 @@ jobs:
         with:
           path: |
             corpus/cache
-            ~/.cache/prawnx-tools
+            ~/.cache/gamba-tools
             ~/.cache/apt-archives
-          key: prawnx-${{ runner.os }}-${{ hashFiles('corpus/manifest.yml', '.github/workflows/ci.yml') }}
+          key: gamba-${{ runner.os }}-${{ hashFiles('corpus/manifest.yml', '.github/workflows/ci.yml') }}
       # 2026-11-04: Azure's Ubuntu mirror stalls for minutes on libmupdf (34 MB), which cancelled whole jobs: the
       # packages come from the cache, and a stalled attempt is cut after 90 seconds and resumed.
       - name: Install the PDF tools
@@ -85,8 +85,8 @@ jobs:
         run: bundle exec rake corpus:fetch
       - name: Fetch Mustang
         run: |
-          mkdir -p ~/.cache/prawnx-tools
-          test -f ~/.cache/prawnx-tools/Mustang-CLI.jar || curl -sSfL -o ~/.cache/prawnx-tools/Mustang-CLI.jar https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
+          mkdir -p ~/.cache/gamba-tools
+          test -f ~/.cache/gamba-tools/Mustang-CLI.jar || curl -sSfL -o ~/.cache/gamba-tools/Mustang-CLI.jar https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
       - name: Check the oracle, Prawn against itself
         run: ORACLE_CANDIDATE=prawn FUZZ_CASES=0 bundle exec rake test
       - name: Run the tests

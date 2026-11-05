@@ -47,10 +47,10 @@ module Prawn
         raise NoUnicodeCMap.new(font: name) unless @ttf.unicode_cmap?
         @code_by_glyph = {}
 
-        @subset = PrawnX::TrueType::Subset.new(@ttf)
+        @subset = Gamba::TrueType::Subset.new(@ttf)
         @cid_by_cluster = {}
-        @simple_subsets = PrawnX::TrueType::SimpleSubsets.new(->(codes) { cmap[Array(codes).first] })
-        @layout = PrawnX::TrueType::OpenTypeLayout.new(@ttf, options[:features]) if options[:features]&.any?
+        @simple_subsets = Gamba::TrueType::SimpleSubsets.new(->(codes) { cmap[Array(codes).first] })
+        @layout = Gamba::TrueType::OpenTypeLayout.new(@ttf, options[:features]) if options[:features]&.any?
         @width_by_code = {}
         @ascender = Integer(@ttf.ascent * scale_factor)
         @descender = Integer(@ttf.descent * scale_factor)
@@ -191,7 +191,7 @@ module Prawn
       private
 
       def read_ttf_file
-        PrawnX::TrueType::File.open(@name)
+        Gamba::TrueType::File.open(@name)
       end
 
       def cmap
@@ -326,7 +326,7 @@ module Prawn
       # from those codes to its glyphs, widths per code, and a ToUnicode map.
       def embed(reference, subset_index)
         subset = @simple_subsets[subset_index]
-        program = PrawnX::TrueType::Subset.new(@ttf)
+        program = Gamba::TrueType::Subset.new(@ttf)
         # Glyphs numbered as TTFunk numbers them, by character code then components: TrueType hinting can depend
         # on glyph indices, and a different order rasterizes differently in MuPDF.
         subset.glyph_by_code.sort.each { |_code, glyph| program.glyph_for(glyph) unless glyph.zero? }
@@ -384,14 +384,14 @@ module Prawn
     class TTC < TTF
       def self.font_names(file)
         collection = ::File.binread(file)
-        Array.new(collection.unpack1("@8 N")) { |index| PrawnX::TrueType::File.new(collection, index:).font_name }
+        Array.new(collection.unpack1("@8 N")) { |index| Gamba::TrueType::File.new(collection, index:).font_name }
       end
 
       private
 
       def read_ttf_file
         index = @options[:font].is_a?(Numeric) ? @options[:font] : self.class.font_names(@name).index(@options[:font]) || 0
-        PrawnX::TrueType::File.open(@name, index:)
+        Gamba::TrueType::File.open(@name, index:)
       end
     end
 
@@ -399,7 +399,7 @@ module Prawn
       private
 
       def read_ttf_file
-        PrawnX::TrueType::File.open(@name, index: @options[:font] || 0, resource: true)
+        Gamba::TrueType::File.open(@name, index: @options[:font] || 0, resource: true)
       end
     end
   end

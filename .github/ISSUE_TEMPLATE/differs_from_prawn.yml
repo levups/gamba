@@ -1,5 +1,5 @@
 name: Differs from Prawn
-description: Code that works with Prawn fails, or renders a different page, with PrawnX
+description: Code that works with Prawn fails, or renders a different page, with Gamba
 labels: [bug]
 body:
   - type: textarea
@@ -21,6 +21,6 @@ body:
     id: versions
     attributes:
       label: Versions
-      placeholder: PrawnX 1.0.0 (or commit), Prawn 2.5.0, prawn-table 0.2.2, prawn-svg 0.40.4, Ruby 4.0.1
+      placeholder: Gamba 1.0.0 (or commit), Prawn 2.5.0, prawn-table 0.2.2, prawn-svg 0.40.4, Ruby 4.0.1
     validations:
       required: true

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module PrawnX
+module Gamba
   module TrueType
     # A Compact Font Format program (Adobe Technical Note #5176) keeping only the outlines a document uses: other
     # glyphs become an empty charstring, so glyph indices and subroutines stay where they were.

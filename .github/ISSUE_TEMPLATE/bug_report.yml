@@ -1,5 +1,5 @@
 name: Bug report
-description: Something PrawnX does wrong on its own — a feature beyond Prawn, an invalid PDF, a crash
+description: Something Gamba does wrong on its own — a feature beyond Prawn, an invalid PDF, a crash
 labels: [bug]
 body:
   - type: textarea
@@ -21,6 +21,6 @@ body:
     id: versions
     attributes:
       label: Versions
-      placeholder: PrawnX 1.0.0 (or commit), Ruby 4.0.1
+      placeholder: Gamba 1.0.0 (or commit), Ruby 4.0.1
     validations:
       required: true

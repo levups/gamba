@@ -15,7 +15,7 @@ namespace :corpus do
   end
 end
 
-desc "Compare PrawnX with Prawn on bench/documents and write docs/benchmarks.json"
+desc "Compare Gamba with Prawn on bench/documents and write docs/benchmarks.json"
 task :bench do
   ruby "bench/compare.rb"
 end

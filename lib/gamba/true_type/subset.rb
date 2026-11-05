@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module PrawnX
+module Gamba
   module TrueType
     # A new TrueType font holding only the glyphs a document uses, numbered in the order it first used them
     # (glyph 0, .notdef, stays first). Composite glyphs bring their components along.

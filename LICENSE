@@ -1,18 +1,18 @@
-PrawnX is a rewrite of Prawn, and a derived work of Prawn, PDF::Core, TTFunk and
+Gamba is a rewrite of Prawn, and a derived work of Prawn, PDF::Core, TTFunk and
 prawn-table:
 it follows their behaviour and, in places, the structure of their code.
 
 Prawn, PDF::Core, TTFunk and prawn-table are copyrighted free software produced by Gregory
 Brown along with community contributions. See their git logs for authorship
-information. PrawnX is Copyright (c) 2026 Level UP Solutions and its contributors.
+information. Gamba is Copyright (c) 2026 Level UP Solutions and its contributors.
 
 lib/prawn-svg.rb and lib/prawn/svg come from prawn-svg 0.40.4, copyright 2010-2019
-Roger Nesbitt, under the MIT license in LICENSE-prawn-svg, adapted to PrawnX.
+Roger Nesbitt, under the MIT license in LICENSE-prawn-svg, adapted to Gamba.
 
 The files in data/fonts are Adobe's Core 14 AFM files, distributed under the
 terms of data/fonts/MustRead.html.
 
-You can redistribute PrawnX and/or modify it under either the terms of the GPLv2
+You can redistribute Gamba and/or modify it under either the terms of the GPLv2
 or GPLv3 (see GPLv2 and GPLv3 files), or the conditions below:
 
   1. You may make and give away verbatim copies of the source form of the

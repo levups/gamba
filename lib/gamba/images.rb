@@ -8,7 +8,7 @@ module Prawn
     @image_handler ||= ImageHandler.new
   end
 
-  # The image formats PrawnX knows, tried in order on an image's first bytes.
+  # The image formats Gamba knows, tried in order on an image's first bytes.
   class ImageHandler
     def initialize
       @handlers = []

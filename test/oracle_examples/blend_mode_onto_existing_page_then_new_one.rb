@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Nested transparent and blend_mode blocks whose text flows onto a page that exists, then onto a new one: Prawn
-# draws the existing page opaque and in the normal blend mode, PrawnX keeps both, in order, on each page.
+# draws the existing page opaque and in the normal blend mode, Gamba keeps both, in order, on each page.
 start_new_page
 fill_color "ffcc00"
 fill_rectangle [bounds.left, bounds.top], bounds.width, bounds.height

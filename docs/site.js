@@ -5,7 +5,7 @@ const METRICS = [
   { key: "bytes", title: "File weight", better: "lower", format: (value) => formatBytes(value) },
   { key: "peak_memory_megabytes", title: "Peak memory of the process", better: "lower", format: (value) => `${formatNumber(value)} MB` }
 ];
-const ENGINE_NAMES = { prawn: "Prawn", prawnx: "PrawnX" };
+const ENGINE_NAMES = { prawn: "Prawn", gamba: "Gamba" };
 const DOCUMENT_DESCRIPTIONS = {
   invoice: "A one-page invoice: an embedded TrueType font, a JPEG letterhead, a ten-line table.",
   report: "A 101-page report: an embedded TrueType font, a PNG with alpha and a JPEG on every page, justified text.",
@@ -33,7 +33,7 @@ function columnChart({ title, better, rows, format = formatNumber, heading = "h3
   const maximum = Math.max(...rows.map((row) => row.value));
   const columns = element("div", { class: "columns", style: { "--count": rows.length }, role: "img", "aria-label": `${title}: ${rows.map((row) => `${row.name} ${format(row.value)}`).join(", ")}` });
   for (const row of rows) {
-    const ours = row.name.startsWith("PrawnX") ? " ours" : "";
+    const ours = row.name.startsWith("Gamba") ? " ours" : "";
     columns.append(element("div", { class: `column${ours}`, title: `${row.label || row.name}: ${format(row.value)}` },
       element("span", { class: "column-value" }, format(row.value)),
       element("div", { class: `column-bar${ours}`, style: { height: `${(row.value / maximum) * 100}%` } }),
@@ -50,9 +50,9 @@ function columnChart({ title, better, rows, format = formatNumber, heading = "h3
     element("details", {}, element("summary", {}, "Table"), table));
 }
 
-// Each document's Prawn measure divided by PrawnX's: how many times faster, fewer, lighter.
+// Each document's Prawn measure divided by Gamba's: how many times faster, fewer, lighter.
 function ratiosBy(benchmarks, key) {
-  return Object.entries(benchmarks.results).map(([name, measures]) => ({ name, ratio: measures.prawn[key] / measures.prawnx[key], prawn: measures.prawn[key], prawnx: measures.prawnx[key] }));
+  return Object.entries(benchmarks.results).map(([name, measures]) => ({ name, ratio: measures.prawn[key] / measures.gamba[key], prawn: measures.prawn[key], gamba: measures.gamba[key] }));
 }
 
 // The smallest ratio of all documents: the headline never picks the flattering one.
@@ -66,7 +66,7 @@ function measuredOn(benchmarks) {
 
 function memoryTile(memory, tile) {
   const lower = memory.filter((entry) => entry.ratio > 1);
-  const peak = (entry) => `${formatNumber(entry.prawnx)} MB instead of ${formatNumber(entry.prawn)} MB`;
+  const peak = (entry) => `${formatNumber(entry.gamba)} MB instead of ${formatNumber(entry.prawn)} MB`;
   if (lower.length === memory.length) return tile(formatPercent(1 - 1 / weakest(memory).ratio), "less peak memory, at the least", `The ${strongest(memory).name}: ${peak(strongest(memory))}`);
   return tile(`${lower.length} of ${memory.length}`, "documents with less peak memory", `The ${strongest(memory).name}: ${peak(strongest(memory))}; the ${weakest(memory).name}: ${peak(weakest(memory))}`);
 }
@@ -84,15 +84,15 @@ function renderHome(benchmarks) {
     element("span", { class: "tile-value" }, value), element("span", { class: "tile-label" }, label), element("span", { class: "tile-detail" }, detail));
   const fastest = strongest(speed);
   tiles.append(
-    tile(formatRatio(weakest(speed).ratio), "faster, at the least", `The ${fastest.name}: ${formatSeconds(fastest.prawnx)} instead of ${formatSeconds(fastest.prawn)}, ${formatRatio(fastest.ratio)} faster`),
-    tile(formatRatio(weakest(allocations).ratio), "fewer allocations, at the least", `The ${strongest(allocations).name}: ${formatNumber(strongest(allocations).prawnx)} objects instead of ${formatNumber(strongest(allocations).prawn)}`),
-    tile(formatPercent(1 - 1 / weakest(weight).ratio), "lighter files, at the least", `The ${strongest(weight).name}: ${formatBytes(strongest(weight).prawnx)} instead of ${formatBytes(strongest(weight).prawn)}, the same pixels`),
+    tile(formatRatio(weakest(speed).ratio), "faster, at the least", `The ${fastest.name}: ${formatSeconds(fastest.gamba)} instead of ${formatSeconds(fastest.prawn)}, ${formatRatio(fastest.ratio)} faster`),
+    tile(formatRatio(weakest(allocations).ratio), "fewer allocations, at the least", `The ${strongest(allocations).name}: ${formatNumber(strongest(allocations).gamba)} objects instead of ${formatNumber(strongest(allocations).prawn)}`),
+    tile(formatPercent(1 - 1 / weakest(weight).ratio), "lighter files, at the least", `The ${strongest(weight).name}: ${formatBytes(strongest(weight).gamba)} instead of ${formatBytes(strongest(weight).prawn)}, the same pixels`),
     memoryTile(memory, tile));
   fill("#tiles-note", `${measuredOn(benchmarks)} Each headline is the weakest of the three documents on the benchmarks page.`);
 }
 
 function renderBenchmarks(benchmarks) {
-  fill("#bench-note", `Each document rendered by Prawn 2.5 with prawn-table, and by PrawnX. ${measuredOn(benchmarks)}`);
+  fill("#bench-note", `Each document rendered by Prawn 2.5 with prawn-table, and by Gamba. ${measuredOn(benchmarks)}`);
   const documents = document.getElementById("documents");
   for (const [name, measures] of Object.entries(benchmarks.results)) {
     const rowsFor = (key) => Object.entries(measures).map(([engine, engineMeasures]) => ({ name: ENGINE_NAMES[engine] || engine, value: engineMeasures[key] }));

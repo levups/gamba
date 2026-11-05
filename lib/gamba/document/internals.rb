@@ -222,7 +222,7 @@ module Prawn
 
       def initialize_internals(options)
         @objects = []
-        @info = ref!({Creator: "PrawnX", Producer: "PrawnX"}.merge(options[:info] || {}))
+        @info = ref!({Creator: "Gamba", Producer: "Gamba"}.merge(options[:info] || {}))
         @root = ref!(Type: :Catalog)
         @pages_reference = ref!(Type: :Pages, Count: 0, Kids: [])
         @root.data[:Pages] = @pages_reference

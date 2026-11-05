@@ -17,14 +17,14 @@ end
 # SVG samples must not depend on the fonts of the machine rendering them.
 Prawn::SVG::FontRegistry.instance_variable_set(:@font_path, [])
 
-# Prawn compresses only when asked: the weight check compares PrawnX with Prawn at its lightest.
+# Prawn compresses only when asked: the weight check compares Gamba with Prawn at its lightest.
 Prawn::Document.prepend(Module.new do
   def initialize(options = {}, &)
     super({compress: true}.merge(options), &)
   end
 end)
 
-# ORACLE_PAST_GRAPHIC_STATE_CRASH: like PrawnX, Prawn lets a restore end without anything to close on an emptied
+# ORACLE_PAST_GRAPHIC_STATE_CRASH: like Gamba, Prawn lets a restore end without anything to close on an emptied
 # stack while a save is still open, to tell what a document raises further on.
 if ENV["ORACLE_PAST_GRAPHIC_STATE_CRASH"]
   PDF::Core::Renderer.prepend(Module.new do
@@ -44,12 +44,12 @@ end
 # Whether a switch below changed what Prawn draws for the example being rendered.
 module PrawnSwitch
   OpenSave = Struct.new(:previous, :ext_gstate, :restored)
-  # The settings a block ending on a later page writes back, each with its writer, as PrawnX's do.
+  # The settings a block ending on a later page writes back, each with its writer, as Gamba's do.
   GRAPHIC_SETTING_WRITERS = {fill_paint: :write_fill_paint, stroke_paint: :write_stroke_paint, line_width: :write_line_width,
                              cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash,
                              blend_mode: :write_blend_mode}.freeze
   RESUMED_STATE = %i[fill_color fill_pattern stroke_color stroke_pattern line_width cap_style join_style dash blend_mode].freeze
-  # PrawnX's PDF::Core::GraphicState::DEFAULT_TEXT_STATE, which Prawn's pdf-core lacks.
+  # Gamba's PDF::Core::GraphicState::DEFAULT_TEXT_STATE, which Prawn's pdf-core lacks.
   DEFAULT_TEXT_STATE = {text_rendering_mode: :fill, character_spacing: 0, word_spacing: 0, horizontal_text_scaling: 100, rise: 0}.freeze
 
   class << self
@@ -57,21 +57,21 @@ module PrawnSwitch
   end
 end
 
-# ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK: like PrawnX, a page break reopens the open transparent and blend_mode blocks,
+# ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK: like Gamba, a page break reopens the open transparent and blend_mode blocks,
 # then sets the blend mode in effect again, a new page paints with the gradients in effect, and a block saved on an
 # earlier page writes back, once it ends, the settings in effect before it. A new page, a block ending on a later page
 # and go_to_page write back the text state in effect, and go_to_page closes the states left on its page by blocks that
 # ended on another one, then reopens on top of the page's own state the open transparent and blend_mode blocks saved
 # on another page; text flowing onto a page that exists writes back there the graphic settings in effect, as a new
 # page does. Where any of these happened,
-# <name>.switched: only there may PrawnX differ from plain Prawn (prawn_switch in test/divergences.yml).
+# <name>.switched: only there may Gamba differ from plain Prawn (prawn_switch in test/divergences.yml).
 if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
   # Each state records, by name, the pattern painting in place of each colour and the blend mode, and the text state
-  # written in it, as PrawnX's does.
+  # written in it, as Gamba's does.
   PDF::Core::GraphicState.prepend(Module.new do
     attr_accessor :fill_pattern, :stroke_pattern, :blend_mode
     attr_writer :text_state
-    # The save that opened this state, or that it was reopened for, as PrawnX records it; a copy has none.
+    # The save that opened this state, or that it was reopened for, as Gamba records it; a copy has none.
     attr_accessor :save
 
     def text_state
@@ -324,7 +324,7 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
   end)
 end
 
-# ORACLE_SKIP_UNKNOWN_TEXT_RENDERING_MODE: like PrawnX, a text rendering mode forgotten by forget_text_rendering_mode!
+# ORACLE_SKIP_UNKNOWN_TEXT_RENDERING_MODE: like Gamba, a text rendering mode forgotten by forget_text_rendering_mode!
 # is not written back, as a Tr without its operand, once a block ends. Prepended last, so that
 # ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK does not record it either.
 if ENV["ORACLE_SKIP_UNKNOWN_TEXT_RENDERING_MODE"]

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module PrawnX
+module Gamba
   # Each page keeps its resources and content streams as they were encoded; only the page dictionaries and the
   # document structure are written anew. Outlines, forms and tagged structure of the sources are not carried over.
   class Combine
@@ -35,7 +35,7 @@ module PrawnX
       @shared = {}
       @pages_reference = reference({Type: :Pages})
       root = reference({Type: :Catalog, Pages: @pages_reference})
-      info = reference({Producer: "PrawnX"})
+      info = reference({Producer: "Gamba"})
       version = sources.map { copy_pages(PDF::Core::Reader.new(source_bytes(_1))) }.max || 1.3
       @pages_reference.data.merge!(Kids: @kids, Count: @kids.size)
       PDF::Core::Writer.call(objects: @objects, root:, info:, version:)

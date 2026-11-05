@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PrawnX Compatibility</title>
-<meta name="description" content="Where PrawnX differs from Prawn, prawn-table and prawn-svg: the Prawn bugs it fixes, its safer SVG default, its lighter files, and how the oracle proves the rest identical.">
-<link rel="canonical" href="https://next-gen-gems.github.io/prawnx/compatibility.html">
-<meta property="og:title" content="PrawnX Compatibility">
-<meta property="og:description" content="Where PrawnX differs from Prawn, prawn-table and prawn-svg: the Prawn bugs it fixes, its safer SVG default, its lighter files, and how the oracle proves the rest identical.">
+<title>Gamba Compatibility</title>
+<meta name="description" content="Where Gamba differs from Prawn, prawn-table and prawn-svg: the Prawn bugs it fixes, its safer SVG default, its lighter files, and how the oracle proves the rest identical.">
+<link rel="canonical" href="https://levups.github.io/gamba/compatibility.html">
+<meta property="og:title" content="Gamba Compatibility">
+<meta property="og:description" content="Where Gamba differs from Prawn, prawn-table and prawn-svg: the Prawn bugs it fixes, its safer SVG default, its lighter files, and how the oracle proves the rest identical.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://next-gen-gems.github.io/prawnx/compatibility.html">
-<meta property="og:site_name" content="Next Gen Gems">
+<meta property="og:url" content="https://levups.github.io/gamba/compatibility.html">
+<meta property="og:site_name" content="Level UP Solutions">
 <meta name="twitter:card" content="summary">
 <meta name="theme-color" content="#c2361b">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -23,19 +23,19 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <div class="page">
   <nav class="site-nav" aria-label="Site">
-    <a class="brand" href="./">PrawnX</a>
+    <a class="brand" href="./">Gamba</a>
     <a href="guide.html">Guide</a>
     <a href="compatibility.html" aria-current="page">Compatibility</a>
     <a href="benchmarks.html">Benchmarks</a>
-    <a href="https://github.com/next-gen-gems/prawnx">GitHub</a>
+    <a href="https://github.com/levups/gamba">GitHub</a>
   </nav>
 
   <main id="main">
     <header>
       <h1 class="page-title">Compatibility</h1>
-      <p class="lede">PrawnX draws the pages Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 draw. Every exception is on this page, declared in the repository and checked by the oracle.</p>
+      <p class="lede">Gamba draws the pages Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 draw. Every exception is on this page, declared in the repository and checked by the oracle.</p>
       <ul class="toc">
-        <li><a href="#bugs">Prawn bugs PrawnX fixes</a></li>
+        <li><a href="#bugs">Prawn bugs Gamba fixes</a></li>
         <li><a href="#svg">SVG web requests</a></li>
         <li><a href="#files">Lighter files</a></li>
         <li><a href="#opt-in">Off unless asked for</a></li>
@@ -45,7 +45,7 @@
     </header>
 
     <section id="bugs" aria-labelledby="bugs-title">
-      <h2 id="bugs-title">Prawn bugs PrawnX fixes</h2>
+      <h2 id="bugs-title">Prawn bugs Gamba fixes</h2>
       <p class="note">A bug counts only when a specification or Prawn’s own documentation proves it; a mere preference becomes an option. <code>test/divergences.yml</code> lists each one, its proof, the examples that show it, and the exact differences the oracle must report: no more, no fewer.</p>
       <table class="options">
         <thead><tr><th scope="col">Prawn’s behaviour</th><th scope="col">Proof</th></tr></thead>
@@ -53,17 +53,17 @@
           <tr><td>Encrypted documents have no <code>/ID</code> in their trailer, so qpdf and strict readers reject them</td><td>ISO 32000-1 §7.5.5, trailer dictionary, ID: “Required if an Encrypt entry is present”</td></tr>
           <tr><td>Built-in fonts measure Ÿ (byte 159) as ÿ, so right-aligned or wrapped text holding it overflows</td><td>ISO 32000-1 Annex D.2: WinAnsiEncoding maps byte 237 octal to Ydieresis, not ydieresis</td></tr>
           <tr><td>The faces of one font collection share their width cache, so text in one face is measured with another’s widths</td><td><code>Prawn::Font#eql?</code> compares the file name, family and size, which every face of a <code>.ttc</code> shares; Prawn documents each face as a font of its own</td></tr>
-          <tr><td>TrueType-flavoured subsetting of CFF fonts changes how their glyphs rasterize</td><td>The subset Prawn embeds (through TTFunk) renders differently from the unmodified font program; PrawnX keeps outlines and hints untouched, and renders like the font itself</td></tr>
-          <tr><td>A <code>transparent</code> block whose content crosses a page break draws the next page opaque</td><td>Prawn documents <code>transparent</code> as setting the opacity of the content within the block, and ISO 32000-1 §8.4.1 starts each page with the default graphics state, opaque; PrawnX sets the opacity of the blocks still open again on the new page, after its header and background</td></tr>
-          <tr><td>A <code>blend_mode</code> block whose content crosses a page break draws the next page in the normal blend mode</td><td>Prawn documents <code>blend_mode</code> as setting the blend mode, restored after the block, and ISO 32000-1 §8.4.1 starts each page with the default graphics state, blend mode Normal; PrawnX sets the blend mode of the blocks still open again on the new page, like their opacity</td></tr>
-          <tr><td>Colours, line width, dash, cap and join styles set before a block whose content crosses a page break are lost once it ends: what follows draws black, with thin solid lines</td><td>Prawn documents <code>save_graphics_state</code> as restoring the graphic state after the block, and ISO 32000-1 §8.4.2 has <code>Q</code> restore the state <code>q</code> saved; on the new page the block closes the page’s own state instead, so PrawnX writes back the settings in effect before the block</td></tr>
-          <tr><td>A blend mode set without a block is lost on the next page</td><td>Prawn documents <code>blend_mode</code> without a block as setting the blend mode for what follows, and ISO 32000-1 §8.4.1 starts each page with blend mode Normal; Prawn writes the colours and line settings again on a new page, not the blend mode, which PrawnX sets again after reopening the blocks still open</td></tr>
-          <tr><td>A gradient set as the fill or stroke is lost on the next page, which paints with the colour set before the gradient</td><td>ISO 32000-1 §8.6.6.2 makes the gradient the current colour until another replaces it; Prawn writes the current colours again on a new page but never records a gradient, so PrawnX records it and paints with it there, while <code>fill_color</code> and <code>stroke_color</code> return what they return in Prawn</td></tr>
-          <tr><td><code>text_rendering_mode</code>, <code>character_spacing</code>, <code>word_spacing</code>, <code>horizontal_text_scaling</code> and <code>rise</code> blocks whose text flows onto the next page draw that page without them, though Prawn lays it out with them</td><td>ISO 32000-1 §9.3.1 makes the text state part of the graphics state, which §8.4.1 resets on each page; PrawnX writes the text state of the blocks still open on the new page, before its header, again after a block ending there closes the state holding it, and on a page reached through <code>go_to_page</code>, where page numbers and repeaters no longer take the text state of a block left open there</td></tr>
-          <tr><td>A <code>text_rendering_mode</code> block or a text box drawn after <code>forget_text_rendering_mode!</code> ends with a <code>Tr</code> missing its operand: Poppler drops the text drawn after it</td><td>ISO 32000-1 §9.3.6 gives <code>Tr</code> one operand, the rendering mode; Prawn writes back the forgotten, unknown mode without one, and PrawnX writes nothing back, so the text after it draws in the mode the block left</td></tr>
-          <tr><td>Page numbers, repeaters and other content drawn on a page again, once a block that began there ended on another page, are drawn inside that block: faded, rotated or recoloured on that page only</td><td>ISO 32000-1 §8.4.2 has a state saved by <code>q</code> last until its <code>Q</code>, which such a block writes on another page; PrawnX closes, on the page <code>go_to_page</code> reaches, the states of blocks that have ended, and keeps those of blocks still open</td></tr>
-          <tr><td>A <code>transparent</code> or <code>blend_mode</code> block whose content flows onto a page that exists already, reached through <code>go_to_page</code>, draws it there opaque, in the normal blend mode</td><td>Prawn documents both as applying to the content within the block, and ISO 32000-1 §8.4.1 starts each page with the default graphics state; PrawnX reopens the blocks still open on that page, on top of what it drew already, as it does on a new page</td></tr>
-          <tr><td>Colours, line settings, a gradient or a blend mode set before text that flows onto a page that exists already, reached through <code>go_to_page</code>, are lost there: the text goes on in that page's own colours, black by default</td><td>Prawn writes them again on a new page, never on one that exists; PrawnX writes back there the settings in effect, as on a new page, while <code>go_to_page</code> called directly, for page numbers and repeaters, keeps the page's own, as in Prawn</td></tr>
+          <tr><td>TrueType-flavoured subsetting of CFF fonts changes how their glyphs rasterize</td><td>The subset Prawn embeds (through TTFunk) renders differently from the unmodified font program; Gamba keeps outlines and hints untouched, and renders like the font itself</td></tr>
+          <tr><td>A <code>transparent</code> block whose content crosses a page break draws the next page opaque</td><td>Prawn documents <code>transparent</code> as setting the opacity of the content within the block, and ISO 32000-1 §8.4.1 starts each page with the default graphics state, opaque; Gamba sets the opacity of the blocks still open again on the new page, after its header and background</td></tr>
+          <tr><td>A <code>blend_mode</code> block whose content crosses a page break draws the next page in the normal blend mode</td><td>Prawn documents <code>blend_mode</code> as setting the blend mode, restored after the block, and ISO 32000-1 §8.4.1 starts each page with the default graphics state, blend mode Normal; Gamba sets the blend mode of the blocks still open again on the new page, like their opacity</td></tr>
+          <tr><td>Colours, line width, dash, cap and join styles set before a block whose content crosses a page break are lost once it ends: what follows draws black, with thin solid lines</td><td>Prawn documents <code>save_graphics_state</code> as restoring the graphic state after the block, and ISO 32000-1 §8.4.2 has <code>Q</code> restore the state <code>q</code> saved; on the new page the block closes the page’s own state instead, so Gamba writes back the settings in effect before the block</td></tr>
+          <tr><td>A blend mode set without a block is lost on the next page</td><td>Prawn documents <code>blend_mode</code> without a block as setting the blend mode for what follows, and ISO 32000-1 §8.4.1 starts each page with blend mode Normal; Prawn writes the colours and line settings again on a new page, not the blend mode, which Gamba sets again after reopening the blocks still open</td></tr>
+          <tr><td>A gradient set as the fill or stroke is lost on the next page, which paints with the colour set before the gradient</td><td>ISO 32000-1 §8.6.6.2 makes the gradient the current colour until another replaces it; Prawn writes the current colours again on a new page but never records a gradient, so Gamba records it and paints with it there, while <code>fill_color</code> and <code>stroke_color</code> return what they return in Prawn</td></tr>
+          <tr><td><code>text_rendering_mode</code>, <code>character_spacing</code>, <code>word_spacing</code>, <code>horizontal_text_scaling</code> and <code>rise</code> blocks whose text flows onto the next page draw that page without them, though Prawn lays it out with them</td><td>ISO 32000-1 §9.3.1 makes the text state part of the graphics state, which §8.4.1 resets on each page; Gamba writes the text state of the blocks still open on the new page, before its header, again after a block ending there closes the state holding it, and on a page reached through <code>go_to_page</code>, where page numbers and repeaters no longer take the text state of a block left open there</td></tr>
+          <tr><td>A <code>text_rendering_mode</code> block or a text box drawn after <code>forget_text_rendering_mode!</code> ends with a <code>Tr</code> missing its operand: Poppler drops the text drawn after it</td><td>ISO 32000-1 §9.3.6 gives <code>Tr</code> one operand, the rendering mode; Prawn writes back the forgotten, unknown mode without one, and Gamba writes nothing back, so the text after it draws in the mode the block left</td></tr>
+          <tr><td>Page numbers, repeaters and other content drawn on a page again, once a block that began there ended on another page, are drawn inside that block: faded, rotated or recoloured on that page only</td><td>ISO 32000-1 §8.4.2 has a state saved by <code>q</code> last until its <code>Q</code>, which such a block writes on another page; Gamba closes, on the page <code>go_to_page</code> reaches, the states of blocks that have ended, and keeps those of blocks still open</td></tr>
+          <tr><td>A <code>transparent</code> or <code>blend_mode</code> block whose content flows onto a page that exists already, reached through <code>go_to_page</code>, draws it there opaque, in the normal blend mode</td><td>Prawn documents both as applying to the content within the block, and ISO 32000-1 §8.4.1 starts each page with the default graphics state; Gamba reopens the blocks still open on that page, on top of what it drew already, as it does on a new page</td></tr>
+          <tr><td>Colours, line settings, a gradient or a blend mode set before text that flows onto a page that exists already, reached through <code>go_to_page</code>, are lost there: the text goes on in that page's own colours, black by default</td><td>Prawn writes them again on a new page, never on one that exists; Gamba writes back there the settings in effect, as on a new page, while <code>go_to_page</code> called directly, for page numbers and repeaters, keeps the page's own, as in Prawn</td></tr>
         </tbody>
       </table>
     </section>
@@ -71,14 +71,14 @@
     <section id="svg" aria-labelledby="svg-title">
       <h2 id="svg-title">SVG web requests</h2>
       <div class="prose">
-        <p>SVG images do not fetch anything from the web unless asked to: <code>svg data, enable_web_requests: true</code>. prawn-svg 0.40 fetches by default, which lets a submitted SVG make the server request any URL. prawn-svg 1.0 plans the same default as PrawnX.</p>
+        <p>SVG images do not fetch anything from the web unless asked to: <code>svg data, enable_web_requests: true</code>. prawn-svg 0.40 fetches by default, which lets a submitted SVG make the server request any URL. prawn-svg 1.0 plans the same default as Gamba.</p>
       </div>
     </section>
 
     <section id="files" aria-labelledby="files-title">
       <h2 id="files-title">Lighter files</h2>
       <div class="prose">
-        <p>The pages are the same; the bytes are not. PrawnX writes at least PDF 1.5, with compressed streams, one compressed object stream and a cross-reference stream, where Prawn writes plain objects and an xref table. The oracle checks that each PrawnX file passes <code>qpdf --check</code> and weighs no more than Prawn’s. Tools that read PDF files byte for byte, rather than through a PDF parser, see a different file.</p>
+        <p>The pages are the same; the bytes are not. Gamba writes at least PDF 1.5, with compressed streams, one compressed object stream and a cross-reference stream, where Prawn writes plain objects and an xref table. The oracle checks that each Gamba file passes <code>qpdf --check</code> and weighs no more than Prawn’s. Tools that read PDF files byte for byte, rather than through a PDF parser, see a different file.</p>
       </div>
     </section>
 
@@ -98,9 +98,9 @@
       <h2 id="loading-title">Loading and versions</h2>
       <div class="prose">
         <ul>
-          <li>PrawnX raises a <code>LoadError</code> when the prawn gem is in the bundle too: remove prawn, prawn-table and prawn-svg from the Gemfile.</li>
-          <li><code>Prawn::VERSION</code> is <code>"2.5.0"</code>, the API PrawnX mirrors, since Prawn extensions check it; <code>PrawnX::VERSION</code> is PrawnX’s own.</li>
-          <li>The public methods of Prawn 2.5 are listed in <code>test/contract/prawn-2.5.0.yml</code>, generated by <code>script/contract_extract.rb</code>. PrawnX accepts every call Prawn accepts on those of its contract; <code>test/contract/decisions.yml</code> settles each method outside the Stable API, with the reason when it is left out.</li>
+          <li>Gamba raises a <code>LoadError</code> when the prawn gem is in the bundle too: remove prawn, prawn-table and prawn-svg from the Gemfile.</li>
+          <li><code>Prawn::VERSION</code> is <code>"2.5.0"</code>, the API Gamba mirrors, since Prawn extensions check it; <code>Gamba::VERSION</code> is Gamba’s own.</li>
+          <li>The public methods of Prawn 2.5 are listed in <code>test/contract/prawn-2.5.0.yml</code>, generated by <code>script/contract_extract.rb</code>. Gamba accepts every call Prawn accepts on those of its contract; <code>test/contract/decisions.yml</code> settles each method outside the Stable API, with the reason when it is left out.</li>
         </ul>
       </div>
     </section>
@@ -108,10 +108,10 @@
     <section id="testing" aria-labelledby="testing-title">
       <h2 id="testing-title">How it is tested</h2>
       <ol class="steps">
-        <li><strong>An oracle.</strong> It renders every example of Prawn’s and prawn-table’s manuals and every sample SVG of prawn-svg with Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 and with PrawnX, each in its own process, and compares their pages, their text and its positions to 0.01 pt, their pixels at 150 dpi in two renderers that share no code (MuPDF and Poppler), their validity (<code>qpdf --check</code>) and their weight. Examples listed in <code>test/oracle_passing.txt</code> must stay identical; one that becomes identical must join the list. <code>test/oracle_examples</code> holds documents of our own for what the manuals do not show.</li>
+        <li><strong>An oracle.</strong> It renders every example of Prawn’s and prawn-table’s manuals and every sample SVG of prawn-svg with Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 and with Gamba, each in its own process, and compares their pages, their text and its positions to 0.01 pt, their pixels at 150 dpi in two renderers that share no code (MuPDF and Poppler), their validity (<code>qpdf --check</code>) and their weight. Examples listed in <code>test/oracle_passing.txt</code> must stay identical; one that becomes identical must join the list. <code>test/oracle_examples</code> holds documents of our own for what the manuals do not show.</li>
         <li><strong>The oracle against itself.</strong> <code>ORACLE_CANDIDATE=prawn bundle exec rake test</code> runs Prawn as the candidate, which proves the comparison reports nothing when nothing differs.</li>
         <li><strong>A document fuzzer.</strong> Seeded, it writes random documents (text in all its options, boxes, columns, tables, shapes, pages) and compares them the same way. CI adds 300 from a fresh seed on every run; <code>script/fuzz_minimize.rb</code> shrinks a failing one.</li>
-        <li><strong>An input fuzzer.</strong> It corrupts sample PNGs, JPEGs and fonts (flipped bytes, truncations, forged lengths): each must render or raise an error PrawnX names, never crash inside a parser, hang or exhaust memory.</li>
+        <li><strong>An input fuzzer.</strong> It corrupts sample PNGs, JPEGs and fonts (flipped bytes, truncations, forged lengths): each must render or raise an error Gamba names, never crash inside a parser, hang or exhaust memory.</li>
         <li><strong>veraPDF.</strong> PDF/A documents are checked by veraPDF when it is installed.</li>
       </ol>
       <div class="prose">
@@ -122,16 +122,16 @@ ruby <span class="nt">-Itest</span> script/fuzz_minimize.rb tmp/fuzz/documents/f
   </main>
 
   <footer class="family">
-    <p><a href="https://github.com/next-gen-gems">Next Gen Gems</a>, by Level UP Solutions</p>
-    <nav aria-label="Next Gen Gems">
+    <p>Gems by <a href="https://github.com/levups">Level UP Solutions</a></p>
+    <nav aria-label="Level UP Solutionsâ gems">
       <ul>
-        <li><a href="https://next-gen-gems.github.io/slimx/">SlimX</a></li>
-        <li><a href="https://next-gen-gems.github.io/browserx/">BrowserX</a></li>
-        <li><a href="https://next-gen-gems.github.io/prawnx/" aria-current="page">PrawnX</a></li>
-        <li><a href="https://next-gen-gems.github.io/gretelx/">GretelX</a></li>
+        <li><a href="https://levups.github.io/super-slim/">SuperSlim</a></li>
+        <li><a href="https://levups.github.io/agentry/">Agentry</a></li>
+        <li><a href="https://levups.github.io/gamba/" aria-current="page">Gamba</a></li>
+        <li><a href="https://levups.github.io/crumbly/">Crumbly</a></li>
       </ul>
     </nav>
-    <p><a href="https://github.com/next-gen-gems/prawnx">Source on GitHub</a></p>
+    <p><a href="https://github.com/levups/gamba">Source on GitHub</a></p>
   </footer>
 </div>
 <script src="site.js"></script>

@@ -5,14 +5,14 @@ require_relative "support/corrupt_inputs"
 require "prawn"
 require "timeout"
 
-# Images and fonts may come from users: corrupted ones must render or fail with an error PrawnX names, never crash
+# Images and fonts may come from users: corrupted ones must render or fail with an error Gamba names, never crash
 # inside a parser, hang or exhaust memory. INPUT_FUZZ_SEED and INPUT_FUZZ_CASES choose them.
 class InputFuzzTest < Minitest::Test
   SEED = Integer(ENV.fetch("INPUT_FUZZ_SEED", "20261102"))
   CASES = Integer(ENV.fetch("INPUT_FUZZ_CASES", "200"))
   SECONDS_PER_CASE = 10
   EXPECTED_ERRORS = [
-    Prawn::Errors::UnsupportedImageType, Prawn::Images::JPG::FormatError, PrawnX::TrueType::Error,
+    Prawn::Errors::UnsupportedImageType, Prawn::Images::JPG::FormatError, Gamba::TrueType::Error,
     Prawn::Errors::IncompatibleStringEncoding
   ].freeze
   DATA_DIRECTORY = File.join(Oracle::ROOT, "corpus/cache/prawn/data")

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Colours, line width, dash and cap and join styles set before a block whose text flows onto the next page: Prawn
-# draws what follows the block in black, with thin solid lines; PrawnX draws it as before the block.
+# draws what follows the block in black, with thin solid lines; Gamba draws it as before the block.
 fill_color "cc0000"
 stroke_color "0000cc"
 line_width 4

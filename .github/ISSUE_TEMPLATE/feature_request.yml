@@ -1,5 +1,5 @@
 name: Feature request
-description: Something neither Prawn nor PrawnX does yet
+description: Something neither Prawn nor Gamba does yet
 body:
   - type: textarea
     id: need

@@ -10,7 +10,7 @@
         "bytes": 147731,
         "peak_memory_megabytes": 135.0
       },
-      "prawnx": {
+      "gamba": {
         "median_milliseconds": 265.6,
         "allocations": 2078343,
         "bytes": 134082,
@@ -24,7 +24,7 @@
         "bytes": 38766,
         "peak_memory_megabytes": 61.7
       },
-      "prawnx": {
+      "gamba": {
         "median_milliseconds": 4.5,
         "allocations": 31366,
         "bytes": 28992,
@@ -38,7 +38,7 @@
         "bytes": 207815,
         "peak_memory_megabytes": 79.6
       },
-      "prawnx": {
+      "gamba": {
         "median_milliseconds": 216.0,
         "allocations": 2089008,
         "bytes": 164924,

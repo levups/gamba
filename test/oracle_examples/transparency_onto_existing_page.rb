@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# A transparent block whose text flows onto a page that exists already: Prawn draws it opaque there, PrawnX keeps
+# A transparent block whose text flows onto a page that exists already: Prawn draws it opaque there, Gamba keeps
 # the opacity for what the block adds, not for what the page drew before, nor for the page numbers drawn after.
 start_new_page
 fill_color "336699"
