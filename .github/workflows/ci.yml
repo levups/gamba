@@ -25,9 +25,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
           ruby-version: "4.0"
           bundler-cache: true
@@ -48,14 +50,16 @@ jobs:
       BUNDLE_GEMFILE: ${{ matrix.rails.gemfile != 'Gemfile' && matrix.rails.gemfile || '' }}
     steps: &test-steps
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
       - name: Cache the corpus, Mustang and the PDF tools' packages
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             corpus/cache
@@ -75,7 +79,7 @@ jobs:
           done
           sudo chown -R "$USER" ~/.cache/apt-archives
       - name: Set up Java for Mustang, the Factur-X validator
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: "21"
@@ -87,6 +91,8 @@ jobs:
         run: |
           mkdir -p ~/.cache/gamba-tools
           test -f ~/.cache/gamba-tools/Mustang-CLI.jar || curl -sSfL -o ~/.cache/gamba-tools/Mustang-CLI.jar https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
+          # The jar runs in CI: the release's SHA-256, its SHA-1 matching Maven Central's org.mustangproject:Mustang-CLI:2.26.0.
+          echo "42d7868cb68264874a7b8cab4c3587b03b23ccc7cd72373da917f66758bb9736  $HOME/.cache/gamba-tools/Mustang-CLI.jar" | sha256sum --check --strict
       - name: Check the oracle, Prawn against itself
         run: ORACLE_CANDIDATE=prawn FUZZ_CASES=0 bundle exec rake test
       - name: Run the tests
@@ -119,9 +125,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
           ruby-version: "4.0"
           bundler-cache: true
