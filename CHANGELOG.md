@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [2.0.1] — 2026-11-06
+
+Fonts, images, SVGs and PDFs that users send can no longer hang a server, exhaust its memory or crash it.
+
+**Faster**
+- Packed indexed transparency in PNGs goes through a byte table: 4 seconds instead of 48 on an 8 KB file.
+- Inline formatting tokenizes in linear time and dedupes repeated styles: `"<a" * 40_000` took 5.8 seconds, and `"<b>x" * 8000` used 401 MB.
+
+**Fixed**
+- SVG ids are read once instead of through XPath built from the id, which could be injected and scanned the whole document for each missing id. `<use>` cycles are skipped, `<use>` draws at most 20,000 elements, gradient cycles paint nothing, nesting stops at 256 levels, and an SVG's `@font-face` faces no longer replace the application's fonts once it is drawn.
+- Composite glyph cycles end, overlapping cmap ranges raise `TrueType::Error`, and malformed name tables or `.otf`/`.ttf` outline mismatches no longer crash. The parsed font cache keeps 64 files.
+- Truncated or zero-sized JPEGs raise `FormatError`, and a PNG without a full row is still written.
+- An encrypted PDF's `/ID` mixes in the passwords, so it can no longer be used to check guesses at the content, and `owner_password: :random` uses SecureRandom.
+- PDF/A metadata with control characters raises `PdfAViolation`, `Gamba.combine` no longer writes NaN for huge reals, and SVG never writes NaN or Infinity.
+
 ## [2.0.0] — 2026-11-05
 
 PrawnX is now Gamba, at levups/gamba, and text that overflows onto a page that already exists keeps the state it was drawn with.
@@ -73,7 +88,8 @@ speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
   place of combine_pdf.
 - `Gamba::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
 
-[Unreleased]: https://github.com/levups/gamba/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/levups/gamba/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/levups/gamba/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/levups/gamba/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/levups/gamba/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/levups/gamba/compare/v1.0.0...v1.0.1
