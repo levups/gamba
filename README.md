@@ -91,7 +91,7 @@ are not carried over.
 ## Files your users send
 
 Applications often put user content into PDFs: an uploaded logo, a font, a name typed in a form, a PDF to attach.
-Gamba treats all of it as untrusted.
+Any of it can be built to attack the server that renders it.
 
 - SVG images fetch nothing from the web unless you pass `enable_web_requests: true`. prawn-svg 0.40 fetched by
   default, so a submitted SVG could make your server request any URL. prawn-svg 1.0 plans the same default as
@@ -99,11 +99,12 @@ Gamba treats all of it as untrusted.
 - An SVG can't make Gamba loop or run out of stack through references (`<use>`, gradients) or deep nesting, and
   fonts it declares with `@font-face` disappear once it is drawn. In prawn-svg, an uploaded SVG declaring a
   "Helvetica" font changed the font of the application's own text.
-- Damaged or malicious PNG, JPEG, TrueType and OpenType files either render or raise an error Gamba names
-  (`Prawn::Errors::UnsupportedImageType`, `Prawn::Images::JPG::FormatError`, `Gamba::TrueType::Error`). They don't
-  crash inside a parser, hang, or inflate into gigabytes of memory. A fuzzer checks this on every CI run.
-- `Gamba.combine` limits how deep, how large and how many times it reads what a PDF declares, so a crafted file
-  can't send it into a loop or exhaust memory.
+- A damaged or malicious PNG, JPEG, TrueType or OpenType file either renders or raises an error Gamba names
+  (`Prawn::Errors::UnsupportedImageType`, `Prawn::Images::JPG::FormatError`, `Gamba::TrueType::Error`). A PNG
+  inflates no further than the size its header gives. CI corrupts sample files on every run to check this.
+- `Gamba.combine` stops at 64 levels of nested arrays and dictionaries and at 256 MB of decompressed data, and
+  ignores references that lead back to themselves, so a crafted PDF can't send it into a loop or fill
+  memory.
 - Text with inline formatting (`inline_format: true`) is parsed in linear time, whatever the markup.
 - The `/ID` of an encrypted PDF depends on its passwords, so it reveals nothing about the content to someone
   without them.
@@ -146,9 +147,9 @@ with the original gems and once with Gamba. For each pair it compares the text a
 pixels at 150 dpi in two unrelated renderers (MuPDF and Poppler), whether `qpdf --check` accepts the file, and its
 size. We call this the oracle.
 
-Where Prawn has a bug, such as a crash, an invalid PDF, or behavior its own documentation contradicts, Gamba fixes
-it instead of copying it. Each fix is listed with its proof on the
-[compatibility page](https://levups.github.io/gamba/compatibility.html).
+Gamba does not copy Prawn's bugs. When Prawn crashes, writes an invalid PDF or contradicts its own documentation,
+Gamba fixes it, and the [compatibility page](https://levups.github.io/gamba/compatibility.html) lists each fix with
+its proof.
 
 ## Development
 
