@@ -10,6 +10,8 @@ class Prawn::SVG::Document
   MAXIMUM_ELEMENTS_THROUGH_USE = 20_000
   # Elements inside one another: deeper, Ruby's stack runs out, and REXML resolves each namespace by its ancestors.
   MAXIMUM_DEPTH = 256
+  # SVG images inside SVG images: over the web, an SVG can embed itself without end.
+  MAXIMUM_EMBEDDING_DEPTH = 16
 
   class << self
     attr_accessor :enable_web_requests_warned
@@ -26,19 +28,20 @@ class Prawn::SVG::Document
     :elements_by_id, :gradients,
     :element_styles,
     :color_mode,
-    :external_svg_cache
+    :external_svg_cache,
+    :embedding_depth,
+    :raster_dimensions_by_data
 
-  def initialize(data, bounds, options, font_registry: nil, css_parser: CssParser::Parser.new, attribute_overrides: {})
+  # Gamba: embedder is the document whose <image> embeds this one, for the budgets they share.
+  def initialize(data, bounds, options, font_registry: nil, css_parser: CssParser::Parser.new, attribute_overrides: {}, embedder: nil)
     begin
-      @root = REXML::Document.new(data).root or raise_parse_error(data)
+      @root = self.class.parse(data) or raise_parse_error(data)
     rescue REXML::ParseException => e
       raise_parse_error(data, e.message)
-    rescue RuntimeError => e
-      # Gamba: REXML's entity expansion limits raise a bare RuntimeError.
-      raise InvalidSVGData, "The data supplied is not a valid SVG document: #{e.message}"
     end
-    check_tree!(@root)
 
+    @embedder = embedder
+    @embedding_depth = embedder ? embedder.embedding_depth + 1 : 0
     @warnings = []
     @options = options
     @elements_by_id = {}
@@ -48,6 +51,7 @@ class Prawn::SVG::Document
     @depth = 0
     @gradients = Prawn::SVG::Gradients.new(self)
     @external_svg_cache = {}
+    @raster_dimensions_by_data = {}.compare_by_identity
     @fallback_font_name = options.fetch(:fallback_font_name, DEFAULT_FALLBACK_FONT_NAME)
     @font_registry = font_registry
     @color_mode = load_color_mode
@@ -96,26 +100,54 @@ class Prawn::SVG::Document
   def drawing_through_use(source)
     raise Prawn::SVG::Elements::Base::SkipElementError, "use tag references an element that contains it" if @references_in_use.any? { _1.equal?(source) }
 
-    @elements_through_use += 1
-    source.each_recursive { @elements_through_use += 1 }
-    raise Prawn::SVG::Elements::Base::SkipElementError, "use tags draw more than #{MAXIMUM_ELEMENTS_THROUGH_USE} elements" if @elements_through_use > MAXIMUM_ELEMENTS_THROUGH_USE
-
+    draw_again(self.class.element_count(source))
     @references_in_use << source
     yield
   ensure
     @references_in_use.pop if @references_in_use.last.equal?(source)
   end
 
-  # Gamba: walked without recursion, before anything else walks the tree with it. Texts expand their entities
-  # here, so that REXML's limits on expansion raise InvalidSVGData rather than a RuntimeError mid-render.
-  def check_tree!(root)
+  # Gamba: elements drawn once more, counted against one budget for this document and the SVG images it embeds.
+  def draw_again(element_count)
+    return @embedder.draw_again(element_count) if @embedder
+
+    @elements_through_use += element_count
+    raise Prawn::SVG::Elements::Base::SkipElementError, "use tags and SVG images draw more than #{MAXIMUM_ELEMENTS_THROUGH_USE} elements" if @elements_through_use > MAXIMUM_ELEMENTS_THROUGH_USE
+  end
+
+  def self.element_count(source)
+    count = 1
+    source.each_recursive { count += 1 }
+    count
+  end
+
+  # Gamba: the root of an SVG, checked before anything walks it: the document's own, and every SVG it loads with
+  # <use> or <image>. REXML's limits on entity expansion raise a bare RuntimeError.
+  def self.parse(data)
+    root = REXML::Document.new(data).root
+    check_tree!(root) if root
+    root
+  rescue REXML::ParseException
+    raise
+  rescue RuntimeError => e
+    raise InvalidSVGData, "The data supplied is not a valid SVG document: #{e.message}"
+  end
+
+  # Gamba: walked without recursion. Texts and attributes expand their entities here, so that REXML's limits on
+  # expansion raise InvalidSVGData rather than a RuntimeError mid-render.
+  def self.check_tree!(root)
     level = [root]
     MAXIMUM_DEPTH.times do
-      level.each { |element| element.texts.each(&:value) }
+      level.each do |element|
+        element.texts.each(&:value)
+        element.attributes.each_attribute(&:value)
+      end
       level = level.flat_map { _1.elements.to_a }
       return if level.empty?
     end
     raise InvalidSVGData, "The SVG document nests elements deeper than #{MAXIMUM_DEPTH} levels"
+  rescue REXML::ParseException
+    raise
   rescue RuntimeError => e
     raise InvalidSVGData, "The data supplied is not a valid SVG document: #{e.message}"
   end
@@ -199,10 +231,12 @@ class Prawn::SVG::Document
     tempfile.write(data)
     tempfile.close
     @font_face_tempfiles << tempfile
+    # Gamba: read now, so that a damaged font is a warning like a missing one, not an error mid-render.
+    Gamba::TrueType::File.open(tempfile.path).glyph_by_code
 
     font_registry.register_font_face(family, weight, style, stretch, tempfile.path)
     true
-  rescue Prawn::SVG::UrlLoader::Error => e
+  rescue Prawn::SVG::UrlLoader::Error, Gamba::TrueType::Error => e
     warnings << "Failed to load @font-face font from #{source[:url]}: #{e.message}"
     false
   end

@@ -77,6 +77,9 @@ module Prawn
     alias_method :column, :columns
 
     def draw
+      # Gamba: rows without a single cell, such as [[]], draw nothing, where prawn-table raised NoMethodError.
+      return if @cells.empty?
+
       with_position do
         reference_bounds = @pdf.reference_bounds
         started_new_page_at_row = initial_row_on_initial_page

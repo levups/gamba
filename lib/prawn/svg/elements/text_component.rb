@@ -27,20 +27,12 @@ module Prawn::SVG
 
       @font, @fallback_fonts = select_fonts
 
-      @children = svg_text_children.flat_map do |child|
-        if child.node_type == :text
-          build_text_node(child)
-        else
-          case child.name
-          when "tspan", "tref"
-            build_child(child)
-          when "textPath"
-            build_text_path(child)
-          else
-            warnings << "Unknown tag '#{child.name}' inside text tag; ignoring"
-            []
-          end
-        end
+      @children = if name == "tref"
+        # Gamba: a <tref> draws its text again, as a <use> does: not inside itself, and within the same budget.
+        reference = find_referenced_element
+        reference ? document.drawing_through_use(reference.source) { build_children(reference.source.children) } : []
+      else
+        build_children(source.children)
       end
     end
 
@@ -158,9 +150,29 @@ module Prawn::SVG
       Elements::TextNode.new(self, text, leading, trailing)
     end
 
+    def build_children(nodes)
+      svg_text_children(nodes).flat_map do |child|
+        if child.node_type == :text
+          build_text_node(child)
+        else
+          case child.name
+          when "tspan", "tref"
+            build_child(child)
+          when "textPath"
+            build_text_path(child)
+          else
+            warnings << "Unknown tag '#{child.name}' inside text tag; ignoring"
+            []
+          end
+        end
+      end
+    end
+
     def build_child(child)
       component = self.class.new(document, child, [], state.dup, self)
       component.process
+      return [] unless component.children
+
       component
     end
 
@@ -172,8 +184,8 @@ module Prawn::SVG
       component
     end
 
-    def svg_text_children
-      text_children.select do |child|
+    def svg_text_children(nodes)
+      nodes.select do |child|
         child.node_type == :text || (
           child.node_type == :element &&
             [SVG_NAMESPACE, ""].include?(child.namespace)
@@ -182,21 +194,12 @@ module Prawn::SVG
       end
     end
 
-    def text_children
-      if name == "tref"
-        reference = find_referenced_element
-        reference ? reference.source.children : []
-      else
-        source.children
-      end
-    end
-
     def find_referenced_element
       href = href_attribute
 
       if href && href[0..0] == "#"
         element = document.elements_by_id[href[1..]] # rubocop:disable Performance/ArraySemiInfiniteRangeSlice -- String
-        element if element.name == "text"
+        element if element&.name == "text"
       end
     end
 

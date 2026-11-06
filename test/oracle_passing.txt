@@ -260,3 +260,4 @@ blend_mode_onto_existing_page_then_new_one
 graphic_settings_onto_existing_page
 space_in_the_subset_before_it
 subset_tag_bytes_in_a_font_program
+table_without_cells

@@ -29,7 +29,8 @@ class Prawn::SVG::UrlLoader
 
   def perform_and_cache(url)
     data = perform(url)
-    add_to_cache(url, data) if enable_cache
+    # Gamba: a data: URL decodes to the same bytes every time, and <use> can make a document load it thousands of times.
+    add_to_cache(url, data) if enable_cache || url[0, 5].casecmp?("data:")
     data
   end
 

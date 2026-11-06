@@ -2,9 +2,11 @@
 
 require_relative "test_helper"
 require "prawn"
+require "prawn-svg"
 require "socket"
 require "timeout"
 require "base64"
+require "zlib"
 
 # An SVG names URLs: rendering it must not make the server fetch them unless the caller says so.
 class SvgSecurityTest < Minitest::Test
@@ -113,9 +115,79 @@ class SvgSecurityTest < Minitest::Test
     end
   end
 
+  def test_an_svg_loaded_by_use_is_checked_like_the_document
+    entities = %(<!ENTITY a "aaaaaaaaaa">) + (1..9).map { |level| %(<!ENTITY #{("a".ord + level).chr} "#{"&#{("a".ord + level - 1).chr};" * 10}">) }.join
+    [svg(%(<g id="a">#{"<g>" * 4000}#{"</g>" * 4000}</g>)),
+      %(<?xml version="1.0"?><!DOCTYPE svg [#{entities}]><svg xmlns="http://www.w3.org/2000/svg"><g id="a"><text>&j;</text></g></svg>)].each do |external|
+      assert_includes render_within_time(svg(%(<use xlink:href="#{data_url(external)}#a"/>))).join, "could not be parsed"
+    end
+  end
+
+  def test_entities_expanding_too_far_in_an_attribute_are_invalid_svg
+    entities = %(<!ENTITY a "aaaaaaaaaa">) + (1..9).map { |level| %(<!ENTITY #{("a".ord + level).chr} "#{"&#{("a".ord + level - 1).chr};" * 10}">) }.join
+    data = %(<?xml version="1.0"?><!DOCTYPE svg [#{entities}]><svg xmlns="http://www.w3.org/2000/svg"><rect id="&j;" width="1" height="1"/></svg>)
+    assert_raises(Prawn::SVG::Document::InvalidSVGData) { Prawn::Document.new { svg data } }
+  end
+
+  def test_svg_images_drawn_through_use_share_the_budget_of_their_document
+    levels = (1..9).map { |level| %(<g id="l#{level}"><use xlink:href="#l#{level - 1}"/><use xlink:href="#l#{level - 1}"/></g>) }
+    image = svg(%(<defs><rect id="l0" width="1" height="1"/>#{levels.join}</defs><use xlink:href="#l9"/>))
+    refute_includes render_within_time(image).join, "draw more than"
+
+    image = data_url(image)
+    copies = (1..3).map { |level| %(<g id="m#{level}"><use xlink:href="#m#{level - 1}"/><use xlink:href="#m#{level - 1}"/></g>) }
+    warnings = render_within_time(svg(%(<defs><image id="m0" width="5" height="5" xlink:href="#{image}"/>#{copies.join}</defs><use xlink:href="#m3"/>)))
+    assert_includes warnings.join, "draw more than"
+  end
+
+  def test_svg_images_inside_svg_images_stop_at_a_depth
+    image = svg(%(<rect width="1" height="1"/>))
+    (Prawn::SVG::Document::MAXIMUM_EMBEDDING_DEPTH + 1).times { image = svg(%(<image width="5" height="5" xlink:href="#{data_url(image)}"/>)) }
+    assert_includes render_within_time(image).join, "nested deeper than"
+  end
+
+  def test_a_data_url_image_drawn_through_use_is_decoded_once
+    rows = Array.new(400) { |row| "\x00".b + Random.new(row).bytes(1200) }
+    png = "\x89PNG\r\n\x1A\n".b + png_chunk("IHDR", [400, 400, 8, 2, 0, 0, 0].pack("N2C5")) +
+      png_chunk("IDAT", Zlib::Deflate.deflate(rows.join)) + png_chunk("IEND", "")
+    copies = (1..12).map { |level| %(<g id="m#{level}"><use xlink:href="#m#{level - 1}"/><use xlink:href="#m#{level - 1}"/></g>) }
+    render_within_time(svg(%(<defs><image id="m0" width="5" height="5" xlink:href="data:image/png;base64,#{Base64.strict_encode64(png)}"/>#{copies.join}</defs><use xlink:href="#m12"/>)))
+  end
+
+  def test_a_tref_inside_the_text_it_refers_to_is_skipped
+    assert_includes render_within_time(svg(%(<text id="t">alice<tref xlink:href="#t"/></text>))).join, "contains it"
+  end
+
+  def test_a_tref_to_a_missing_or_later_text_draws_nothing
+    render_within_time(svg(%(<text>alice<tref xlink:href="#missing"/><tref xlink:href="#later"/></text><text id="later">Post</text>)))
+  end
+
+  def test_trefs_doubling_at_each_level_stop_at_a_budget
+    levels = (1..20).map { |level| %(<text id="t#{level}"><tref xlink:href="#t#{level - 1}"/><tref xlink:href="#t#{level - 1}"/></text>) }
+    assert_includes render_within_time(svg(%(<text id="t0">a</text>#{levels.join}))).join, "draw more than"
+  end
+
+  def test_a_font_face_that_is_not_a_font_is_left_out
+    font_face = %(<style>@font-face { font-family: "alice"; src: url("data:image/png;base64,#{Base64.strict_encode64("alice")}"); }</style>)
+    render_within_time(svg(%(#{font_face}<text font-family="alice">Post</text>)))
+  end
+
+  def test_an_import_climbing_back_up_its_path_resolves_quickly
+    path = "/#{"a/" * 4000}#{"../" * 4000}example.css"
+    render_within_time(svg(%(<style>@import url("#{path}");</style><rect width="1" height="1"/>)), seconds: 2)
+  end
+
   private
 
   FONT = File.join(Oracle::ROOT, "corpus/cache/prawn/data/fonts/DejaVuSans.ttf")
+
+  def data_url(svg)
+    "data:image/svg+xml;base64,#{Base64.strict_encode64(svg)}"
+  end
+
+  def png_chunk(type, data)
+    [data.bytesize].pack("N") + type + data.b + [Zlib.crc32(type + data.b)].pack("N")
+  end
 
   def svg(body)
     %(<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="10" height="10">#{body}</svg>)
