@@ -83,10 +83,12 @@ jobs:
         run: BUNDLE_GEMFILE=oracle/Gemfile bundle install
       - name: Fetch the corpus
         run: bundle exec rake corpus:fetch
+      # The jar runs with the job's token at hand: it must be the one the GitHub release and Maven Central both serve.
       - name: Fetch Mustang
         run: |
           mkdir -p ~/.cache/gamba-tools
           test -f ~/.cache/gamba-tools/Mustang-CLI.jar || curl -sSfL -o ~/.cache/gamba-tools/Mustang-CLI.jar https://github.com/ZUGFeRD/mustangproject/releases/download/core-2.26.0/Mustang-CLI-2.26.0.jar
+          echo "42d7868cb68264874a7b8cab4c3587b03b23ccc7cd72373da917f66758bb9736  $HOME/.cache/gamba-tools/Mustang-CLI.jar" | sha256sum --check --strict
       - name: Check the oracle, Prawn against itself
         run: ORACLE_CANDIDATE=prawn FUZZ_CASES=0 bundle exec rake test
       - name: Run the tests

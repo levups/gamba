@@ -32,6 +32,10 @@ module Prawn
         @prawn = prawn
         @options = options
 
+        # Gamba: the document's font families as they were, put back once the SVG is drawn. Faces its @font-face
+        # rules declare, into the families its text draws with, would otherwise stay: an uploaded SVG could
+        # declare "Helvetica" and change the glyphs of every text the application draws after it.
+        @font_families_before = prawn.font_families.transform_values(&:dup)
         font_registry = Prawn::SVG::FontRegistry.new(prawn.font_families)
 
         @document = Document.new(
@@ -49,6 +53,8 @@ module Prawn
         @renderer.draw
 
         document.warnings.each { |w| warn w } if options[:log_warnings]
+      ensure
+        prawn.font_families.replace(@font_families_before)
       end
 
       def sizing

@@ -5,6 +5,11 @@ class Prawn::SVG::Document
   InvalidSVGData = Class.new(Error)
 
   DEFAULT_FALLBACK_FONT_NAME = "Times-Roman".freeze
+  # Gamba: limits a crafted SVG would otherwise exceed to hang the process. Elements drawn again through <use>,
+  # counted over the whole document: two <use> of the level below, sixteen levels deep, draw 65,536 copies.
+  MAXIMUM_ELEMENTS_THROUGH_USE = 20_000
+  # Elements inside one another: deeper, Ruby's stack runs out, and REXML resolves each namespace by its ancestors.
+  MAXIMUM_DEPTH = 256
 
   class << self
     attr_accessor :enable_web_requests_warned
@@ -28,11 +33,19 @@ class Prawn::SVG::Document
       @root = REXML::Document.new(data).root or raise_parse_error(data)
     rescue REXML::ParseException => e
       raise_parse_error(data, e.message)
+    rescue RuntimeError => e
+      # Gamba: REXML's entity expansion limits raise a bare RuntimeError.
+      raise InvalidSVGData, "The data supplied is not a valid SVG document: #{e.message}"
     end
+    check_tree!(@root)
 
     @warnings = []
     @options = options
     @elements_by_id = {}
+    @element_index_by_root = {}.compare_by_identity
+    @elements_through_use = 0
+    @references_in_use = []
+    @depth = 0
     @gradients = Prawn::SVG::Gradients.new(self)
     @external_svg_cache = {}
     @fallback_font_name = options.fetch(:fallback_font_name, DEFAULT_FALLBACK_FONT_NAME)
@@ -58,6 +71,65 @@ class Prawn::SVG::Document
     process_font_face_rules(stylesheets.font_face_rules)
 
     yield self if block_given?
+  end
+
+  # Gamba: the first element of root, in document order, whose id is id. Read once into a hash per root, where
+  # prawn-svg built an XPath query from the id: an id holding a quote injected XPath, and each reference to a
+  # missing id scanned the whole document.
+  def self.element_by_id(root, id, cache = nil)
+    index = cache ? (cache[root] ||= element_index(root)) : element_index(root)
+    index[id]
+  end
+
+  def self.element_index(root)
+    index = {}
+    index[root.attributes["id"]] = root if root.attributes["id"]
+    root.each_recursive { |element| (id = element.attributes["id"]) && (index[id] ||= element) }
+    index
+  end
+
+  def raw_element_by_id(id, root = @root)
+    self.class.element_by_id(root, id, @element_index_by_root)
+  end
+
+  # Gamba: the elements a <use> draws, unless it draws one of its own ancestors or the document has drawn too many.
+  def drawing_through_use(source)
+    raise Prawn::SVG::Elements::Base::SkipElementError, "use tag references an element that contains it" if @references_in_use.any? { _1.equal?(source) }
+
+    @elements_through_use += 1
+    source.each_recursive { @elements_through_use += 1 }
+    raise Prawn::SVG::Elements::Base::SkipElementError, "use tags draw more than #{MAXIMUM_ELEMENTS_THROUGH_USE} elements" if @elements_through_use > MAXIMUM_ELEMENTS_THROUGH_USE
+
+    @references_in_use << source
+    yield
+  ensure
+    @references_in_use.pop if @references_in_use.last.equal?(source)
+  end
+
+  # Gamba: walked without recursion, before anything else walks the tree with it. Texts expand their entities
+  # here, so that REXML's limits on expansion raise InvalidSVGData rather than a RuntimeError mid-render.
+  def check_tree!(root)
+    level = [root]
+    MAXIMUM_DEPTH.times do
+      level.each { |element| element.texts.each(&:value) }
+      level = level.flat_map { _1.elements.to_a }
+      return if level.empty?
+    end
+    raise InvalidSVGData, "The SVG document nests elements deeper than #{MAXIMUM_DEPTH} levels"
+  rescue RuntimeError => e
+    raise InvalidSVGData, "The data supplied is not a valid SVG document: #{e.message}"
+  end
+
+  # Gamba: one level further down the tree, unless that is too deep.
+  def nested
+    raise Prawn::SVG::Elements::Base::SkipElementError, "elements nested deeper than #{MAXIMUM_DEPTH} levels" if @depth >= MAXIMUM_DEPTH
+
+    @depth += 1
+    begin
+      yield
+    ensure
+      @depth -= 1
+    end
   end
 
   def calculate_sizing(requested_width: nil, requested_height: nil)

@@ -28,6 +28,8 @@ module Gamba
       Title: "dc:title", Author: "dc:creator", Subject: "dc:description", Keywords: "pdf:Keywords",
       Creator: "xmp:CreatorTool", Producer: "pdf:Producer", CreationDate: "xmp:CreateDate", ModDate: "xmp:ModifyDate"
     }.freeze
+    # XML 1.0 has no way to write these, not even as references: the XMP would not parse.
+    XML_FORBIDDEN_CHARACTERS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/
 
     def pdf_a?
       @pdf_a == true
@@ -126,7 +128,12 @@ module Gamba
     end
 
     def escape_xml(text)
+      text = text.encode(::Encoding::UTF_8)
+      raise Prawn::Errors::PdfAViolation, "PDF/A metadata cannot hold control characters: #{text.inspect}" if text.match?(XML_FORBIDDEN_CHARACTERS)
+
       text.encode(xml: :text)
+    rescue EncodingError => error
+      raise Prawn::Errors::PdfAViolation, "PDF/A metadata must be text: #{error.message}"
     end
   end
 end

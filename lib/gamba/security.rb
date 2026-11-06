@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "digest/md5"
+require "securerandom"
 
 module Prawn
   class Document
@@ -18,7 +19,7 @@ module Prawn
         Prawn.verify_options(%i[user_password owner_password permissions], options)
         @user_password = options.delete(:user_password) || ""
         @owner_password = options.delete(:owner_password) || @user_password
-        @owner_password = Random.bytes(32) if @owner_password == :random
+        @owner_password = SecureRandom.bytes(32) if @owner_password == :random
         self.permissions = options.delete(:permissions) || {}
         @encryption = Encryption.new(user_password: @user_password, owner_password: @owner_password, permissions: permissions_value)
       end
@@ -70,6 +71,13 @@ module Prawn
           key = Digest::MD5.digest(Security.pad_password(@owner_password))[0, Security::KEY_LENGTH_BYTES]
           Arcfour.new(key).encrypt(Security.pad_password(@user_password))
         end
+      end
+
+      # Mixed into the file identifier, which is written in clear: without it, anyone holding the template could
+      # check guesses at the encrypted content against the identifier. The /U and /O entries already let a password
+      # guess be checked, so this tells nothing more about the passwords.
+      def identifier_secret
+        Security.pad_password(@user_password) + Security.pad_password(@owner_password)
       end
 
       def key(file_identifier)

@@ -58,12 +58,19 @@ module Prawn::SVG::Loaders
 
     private
 
+    # Gamba: a regular file only, so that a directory, a FIFO or a device inside the root raises the loader's error,
+    # which skips the element, instead of failing the document or reading without end. Symbolic links inside the
+    # root are followed, as in prawn-svg: deployments link shared directories into it.
     def load_file(path)
       path = Addressable::URI.unencode(path)
       path = build_absolute_and_expand_path(path)
       assert_valid_path!(path)
       assert_file_exists!(path)
+      raise Prawn::SVG::UrlLoader::Error, "#{path} is not a regular file" unless ::File.file?(path)
+
       ::File.binread(path)
+    rescue SystemCallError, ArgumentError => e
+      raise Prawn::SVG::UrlLoader::Error, "cannot read #{path}: #{e.message}"
     end
 
     def build_uri(url)

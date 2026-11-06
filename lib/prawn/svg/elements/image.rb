@@ -97,7 +97,8 @@ class Prawn::SVG::Elements::Image < Prawn::SVG::Elements::Base
       has_web_loader = @document.url_loader.loaders.any?(Prawn::SVG::Loaders::Web)
       document = Prawn::SVG::Document.new(
         data, [width, height], {width:, height:, enable_web_requests: has_web_loader},
-        attribute_overrides:
+        # Gamba: the parent's fonts, without which an embedded SVG holding text failed to render.
+        attribute_overrides:, font_registry: @document.font_registry
       )
 
       dimensions = [document.sizing.output_width, document.sizing.output_height]
@@ -151,7 +152,7 @@ class Prawn::SVG::Elements::Image < Prawn::SVG::Elements::Base
     root = REXML::Document.new(data).root
     return unless root
 
-    element = REXML::XPath.match(root, %(//*[@id="#{fragment.gsub('"', '\\"')}"])).first
+    element = Prawn::SVG::Document.element_by_id(root, fragment)
     return unless element&.name == "view"
 
     attrs = {}

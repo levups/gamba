@@ -58,9 +58,14 @@ module Prawn
         loop do
           marker, code, length = data.byteslice(position, 4)&.unpack("CCn")
           raise FormatError, "JPEG marker not found!" if marker != MARKER_PREFIX
+          raise FormatError, "Truncated JPEG" if length.nil?
 
           if START_OF_FRAME_MARKERS.include?(code)
+            raise FormatError, "Truncated JPEG frame header" if position + 10 > data.bytesize
+
             @bits, @height, @width, @channels = data.unpack("@#{position + 4} CnnC")
+            raise FormatError, "JPEG of #{@width}x#{@height} pixels at #{@bits} bits" unless @bits.positive? && @height.positive? && @width.positive?
+
             break
           end
           position += 2 + length
@@ -121,8 +126,9 @@ module Prawn
             @transparency =
               case @color_type
               when INDEXED then {palette: chunk.unpack("C*")}
-              when GRAYSCALE then {grayscale: chunk.unpack1("n")}
-              when TRUE_COLOR then {rgb: chunk.unpack("nnn")}
+              # Shorter than the samples they need, they would write a /Mask of nulls: ignored, as viewers do.
+              when GRAYSCALE then (chunk.bytesize >= 2) ? {grayscale: chunk.unpack1("n")} : {}
+              when TRUE_COLOR then (chunk.bytesize >= 6) ? {rgb: chunk.unpack("nnn")} : {}
               else {}
               end
           when "IEND" then break
@@ -185,6 +191,7 @@ module Prawn
         raise Errors::UnsupportedImageType, "PNG uses an unsupported filter method" if filter_method != 0
         raise Errors::UnsupportedImageType, "PNG uses unsupported interlace method" if interlace_method != 0
         raise Errors::UnsupportedImageType, "PNG uses an invalid bit depth" if BIT_DEPTHS[color_type]&.include?(bits) == false
+        raise Errors::UnsupportedImageType, "PNG has a palette of #{palette.bytesize / 3} colors" if color_type == INDEXED && !(3..768).cover?(palette.bytesize)
 
         dictionary = {Type: :XObject, Subtype: :Image, Height: height, Width: width, BitsPerComponent: bits}
         if color_type == INDEXED && alpha_channel?
@@ -203,6 +210,9 @@ module Prawn
         else
           [:Indexed, :DeviceRGB, (palette.bytesize / 3) - 1, document.ref!({}, palette)]
         end
+        # Data too short for one row still makes an image XObject, which must be a stream: viewers pad it.
+        image.empty_stream = true
+        image.data[:SMask]&.empty_stream = true
         if transparency[:grayscale]
           image.data[:Mask] = [transparency[:grayscale]] * 2
         elsif transparency[:rgb]
@@ -256,14 +266,18 @@ module Prawn
         img_data.unpack(alpha_layout, offset:).pack("C*", buffer: alpha)
       end
 
-      # Palette indices and their opacity: indices only mean something once the rows are unfiltered.
+      # Palette indices and their opacity: indices only mean something once the rows are unfiltered. Each byte of
+      # a row maps to the opacity of the 8 / bits pixels it packs, through a table of its 256 values.
       def split_palette_transparency
         rows = PngDecoder.unfilter(img_data, ((width * bits) + 7) / 8, 1)
         alpha_by_index = Array.new(256) { |index| transparency[:palette][index] || 0xFF }
-        alpha = rows.map do |row|
-          indices = (bits == 8) ? row.bytes : row.unpack1("B*").scan(/.{#{bits}}/).first(width).map! { _1.to_i(2) }
-          indices.map { alpha_by_index[_1] }.pack("C*")
-        end
+        pixels_per_byte = 8 / bits
+        mask = (1 << bits) - 1
+        alpha_by_byte = Array.new(256) do |byte|
+          indices = Array.new(pixels_per_byte) { |pixel| (byte >> (8 - (bits * (pixel + 1)))) & mask }
+          [byte.chr, indices.map { alpha_by_index[_1] }.pack("C*")]
+        end.to_h
+        alpha = rows.map { |row| row.gsub(/./mn, alpha_by_byte).byteslice(0, width) }
         [rows.join, alpha.join]
       end
     end
