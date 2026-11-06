@@ -11,9 +11,10 @@ class InputFuzzTest < Minitest::Test
   SEED = Integer(ENV.fetch("INPUT_FUZZ_SEED", "20261102"))
   CASES = Integer(ENV.fetch("INPUT_FUZZ_CASES", "200"))
   SECONDS_PER_CASE = 10
+  # CannotFit: a corrupted advance width can make a glyph wider than the page, as Prawn reports it.
   EXPECTED_ERRORS = [
     Prawn::Errors::UnsupportedImageType, Prawn::Images::JPG::FormatError, Gamba::TrueType::Error,
-    Prawn::Errors::IncompatibleStringEncoding
+    Prawn::Errors::IncompatibleStringEncoding, Prawn::Errors::CannotFit
   ].freeze
   DATA_DIRECTORY = File.join(Oracle::ROOT, "corpus/cache/prawn/data")
 

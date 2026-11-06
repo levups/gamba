@@ -96,11 +96,18 @@ Any of it can be built to attack the server that renders it.
 - SVG images fetch nothing from the web unless you pass `enable_web_requests: true`. prawn-svg 0.40 fetched by
   default, so a submitted SVG could make your server request any URL. prawn-svg 1.0 plans the same default as
   Gamba.
-- An SVG can't make Gamba loop or run out of stack through references (`<use>`, gradients) or deep nesting, and
-  fonts it declares with `@font-face` disappear once it is drawn. In prawn-svg, an uploaded SVG declaring a
-  "Helvetica" font changed the font of the application's own text.
+- An SVG reads only what you allow. Base64 `data:` URLs of PNG, JPEG and SVG images always load; `http` and
+  `https` URLs need `enable_web_requests: true`; files need `enable_file_requests_with_root`, and only regular
+  files inside that directory load, symbolic links in it followed. Any other URL, path or scheme is skipped with a
+  warning, and an entity the SVG declares from a file or URL is never read.
+- An SVG can't make Gamba loop or run out of stack through references (`<use>`, `<tref>`, gradients) or deep
+  nesting. An SVG it loads with `<use>` or `<image>` is checked the same way, SVG images stop 16 levels inside
+  one another, and they draw within the budget of the SVG that embeds them.
+- Fonts an SVG declares with `@font-face` disappear once it is drawn, and one that is not a font is left out. In
+  prawn-svg, an uploaded SVG declaring a "Helvetica" font changed the font of the application's own text.
 - A damaged or malicious PNG, JPEG, TrueType or OpenType file either renders or raises an error Gamba names
-  (`Prawn::Errors::UnsupportedImageType`, `Prawn::Images::JPG::FormatError`, `Gamba::TrueType::Error`). A PNG
+  (`Prawn::Errors::UnsupportedImageType`, `Prawn::Images::JPG::FormatError`, `Gamba::TrueType::Error`, or
+  `Prawn::Errors::CannotFit` when a damaged font makes a glyph wider than the page). A PNG
   inflates no further than the size its header gives. CI corrupts sample files on every run to check this.
 - `Gamba.combine` stops at 64 levels of nested arrays and dictionaries and at 256 MB of decompressed data, and
   ignores references that lead back to themselves, so a crafted PDF can't send it into a loop or fill
@@ -110,7 +117,8 @@ Any of it can be built to attack the server that renders it.
   without them.
 
 Inline formatting still turns `<link href="...">` into a clickable link. Escape user text before you put it inside
-markup.
+markup. A word with no space to break at, thousands of characters long, takes time that grows with the square of its
+length, as in Prawn: limit the length of what users type.
 
 To report a vulnerability, see [SECURITY.md](SECURITY.md).
 

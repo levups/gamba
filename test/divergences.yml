@@ -110,3 +110,9 @@
   prawn_switch: ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK
   examples:
     - graphic_settings_onto_existing_page
+- bug: A table whose rows hold no cell, such as table([[]]), raises NoMethodError
+  proof: 'prawn-table raises EmptyTable, an error it names, for data without rows, and documents table as drawing its cells; rows without one have nothing to draw, so Gamba draws nothing and leaves the cursor where it was'
+  prawn_issue:
+  prawn_raises: NoMethodError
+  examples:
+    - table_without_cells

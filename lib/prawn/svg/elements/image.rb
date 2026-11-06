@@ -82,10 +82,11 @@ class Prawn::SVG::Elements::Image < Prawn::SVG::Elements::Base
 
   def process_image(data, width, height, preserve_aspect_ratio)
     if (handler = find_image_handler(data))
-      image = handler.new(data)
-      ImageData.new([image.width.to_f, image.height.to_f], nil)
+      ImageData.new(raster_dimensions(handler, data), nil)
 
     elsif potentially_svg?(data)
+      raise SkipElementError, "SVG images nested deeper than #{Prawn::SVG::Document::MAXIMUM_EMBEDDING_DEPTH} levels" if @document.embedding_depth >= Prawn::SVG::Document::MAXIMUM_EMBEDDING_DEPTH
+
       attribute_overrides = {}
       attribute_overrides["preserveAspectRatio"] = preserve_aspect_ratio if preserve_aspect_ratio
 
@@ -98,8 +99,10 @@ class Prawn::SVG::Elements::Image < Prawn::SVG::Elements::Base
       document = Prawn::SVG::Document.new(
         data, [width, height], {width:, height:, enable_web_requests: has_web_loader},
         # Gamba: the parent's fonts, without which an embedded SVG holding text failed to render.
-        attribute_overrides:, font_registry: @document.font_registry
+        attribute_overrides:, font_registry: @document.font_registry, embedder: @document
       )
+      # Gamba: drawn again for each <use> of it, and for each image of an image, which a few kilobytes can repeat.
+      @document.draw_again(Prawn::SVG::Document.element_count(document.root)) if state.inside_use || @document.embedding_depth.positive?
 
       dimensions = [document.sizing.output_width, document.sizing.output_height]
       ImageData.new(dimensions, document)
@@ -109,6 +112,18 @@ class Prawn::SVG::Elements::Image < Prawn::SVG::Elements::Base
     end
   rescue Prawn::SVG::Document::InvalidSVGData
     raise_invalid_image_type
+  end
+
+  # Gamba: the image of a data: URL, which the loader keeps, is read once however many times <use> draws it.
+  def raster_dimensions(handler, data)
+    return read_raster_dimensions(handler, data) unless @url[0, 5].casecmp?("data:")
+
+    @document.raster_dimensions_by_data[data] ||= read_raster_dimensions(handler, data)
+  end
+
+  def read_raster_dimensions(handler, data)
+    image = handler.new(data)
+    [image.width.to_f, image.height.to_f]
   end
 
   def extract_fragment(url)
@@ -149,7 +164,7 @@ class Prawn::SVG::Elements::Image < Prawn::SVG::Elements::Base
   end
 
   def find_view_element_attributes(data, fragment)
-    root = REXML::Document.new(data).root
+    root = Prawn::SVG::Document.parse(data)
     return unless root
 
     element = Prawn::SVG::Document.element_by_id(root, fragment)

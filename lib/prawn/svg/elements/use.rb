@@ -101,8 +101,8 @@ class Prawn::SVG::Elements::Use < Prawn::SVG::Elements::Base
       data = @document.url_loader.load(url)
 
       root = begin
-        REXML::Document.new(data).root
-      rescue REXML::ParseException
+        Prawn::SVG::Document.parse(data)
+      rescue REXML::ParseException, Prawn::SVG::Document::InvalidSVGData
         raise SkipElementError, "use tag references external SVG at '#{url}' which could not be parsed"
       end
 

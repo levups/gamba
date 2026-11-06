@@ -53,7 +53,7 @@
       <div class="prose">
 <pre><code class="language-ruby"><span class="c1"># Gemfile</span>
 <span class="n">gem</span> <span class="s2">"gamba"</span> <span class="c1"># instead of prawn, prawn-table and prawn-svg</span></code></pre>
-        <p>Gamba needs Ruby 3.3 or later. It depends on <code>css_parser</code>, <code>matrix</code> and <code>rexml</code>, which only its SVG support loads.</p>
+        <p>Gamba needs Ruby 3.3 or later. It depends on <code>addressable</code>, <code>css_parser</code>, <code>matrix</code> and <code>rexml</code>, which only its SVG support loads.</p>
         <p>Remove <code>prawn</code>, <code>prawn-table</code> and <code>prawn-svg</code> from the Gemfile: Gamba refuses to load next to the prawn gem, with a <code>LoadError</code> saying so, rather than mixing two engines in one process.</p>
       </div>
     </section>
