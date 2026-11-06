@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gamba PDF — Prawn’s API, rewritten for speed</title>
-<meta name="description" content="Prawn’s API, rewritten for speed: the same pages, pixel for pixel, in lighter files, faster. Tables and SVG included.">
-<meta property="og:title" content="Gamba PDF — Prawn’s API, rewritten for speed">
-<meta property="og:description" content="A rewrite of Prawn, prawn-table and prawn-svg: the same pages pixel for pixel, lighter files, faster renders, PDF/A-3 and Factur-X on top.">
+<title>Gamba: PDF files from Ruby, with Prawn’s API, faster</title>
+<meta name="description" content="Gamba is a Ruby library that writes PDF files. It runs code written for Prawn unchanged and draws the same pages, faster and in lighter files. Tables and SVG included.">
+<meta property="og:title" content="Gamba: PDF files from Ruby, with Prawn’s API, faster">
+<meta property="og:description" content="A Ruby library that writes PDF files. It is a rewrite of Prawn, prawn-table and prawn-svg that draws the same pages, faster and in lighter files, with PDF/A-3 and Factur-X on top.">
 <meta property="og:type" content="website">
 <link rel="canonical" href="https://levups.github.io/gamba/">
 <meta property="og:url" content="https://levups.github.io/gamba/">
@@ -36,7 +36,7 @@
       <h1 class="wordmark">Gamba</h1>
       <p class="byline"><span id="byline-speed">Prawn’s API, rewritten for speed.</span><span class="byline-sub">The same pages, pixel for pixel.</span></p>
       <div>
-        <p class="summary">A rewrite of Prawn, prawn-table and prawn-svg in one gem: lighter files, faster renders, and PDF/A-3 and Factur-X on top.</p>
+        <p class="summary">Gamba is a Ruby library that writes PDF files: invoices, reports, labels. It is a rewrite of Prawn, the PDF library most Ruby apps use, and of its companions prawn-table and prawn-svg. Code written for Prawn runs unchanged, and the files come out faster and lighter, with PDF/A-3 and Factur-X on top.</p>
         <code class="install">gem "gamba"</code>
         <p class="links"><a href="guide.html">Get started</a><a href="compatibility.html">Where it differs from Prawn</a><a href="benchmarks.html">Benchmarks</a></p>
       </div>
@@ -86,9 +86,9 @@
           <p><a href="compatibility.html">Compatibility</a></p>
         </div>
         <div class="card">
-          <h3>Safer SVG by default</h3>
-          <p>SVG images fetch nothing from the web unless asked to: a submitted SVG cannot make the server request a URL.</p>
-          <p><a href="compatibility.html#svg">SVG web requests</a></p>
+          <h3>Safe with files users send</h3>
+          <p>An uploaded logo, font or PDF cannot hang the server or fill its memory: a damaged one renders or raises an error Gamba names. SVG images fetch nothing from the web unless asked to.</p>
+          <p><a href="compatibility.html#untrusted">Files from users</a></p>
         </div>
       </div>
     </section>
@@ -121,7 +121,7 @@
 
   <footer class="family">
     <p>Gems by <a href="https://github.com/levups">Level UP Solutions</a></p>
-    <nav aria-label="Level UP Solutionsâ gems">
+    <nav aria-label="Level UP Solutions gems">
       <ul>
         <li><a href="https://levups.github.io/super-slim/">SuperSlim</a></li>
         <li><a href="https://levups.github.io/agentry/">Agentry</a></li>

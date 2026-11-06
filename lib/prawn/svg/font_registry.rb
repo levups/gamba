@@ -99,7 +99,9 @@ module Prawn::SVG
       effective_stretch = (stretch == :normal) ? nil : stretch
 
       font = Font.new(family_name, weight, style, effective_stretch)
-      family = (@font_families[family_name] ||= {})
+      # Gamba: a copy, written to. The families merged from the system's fonts are shared by every document of the
+      # process, and an SVG's @font-face would otherwise change them for all the documents after it.
+      family = @font_families[family_name] = (@font_families[family_name] || {}).dup
       family[font.subfamily] = font_data
       @font_case_mapping[family_name.downcase] = family_name
     end

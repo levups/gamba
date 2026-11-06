@@ -3,6 +3,7 @@ module Prawn::SVG
     def initialize(document)
       @document = document
       @gradients_by_id = {}
+      @resolving = {}
     end
 
     def [](id)
@@ -11,8 +12,17 @@ module Prawn::SVG
 
       if (element = @gradients_by_id[id])
         element
-      elsif (raw_element = find_raw_gradient_element_by_id(id))
-        create_gradient_element(raw_element)
+      # Gamba: a gradient or pattern whose href chain comes back to itself stops there, without a parent, and a
+      # gradient left without stops paints nothing instead of failing to render.
+      elsif !@resolving.key?(id) && (raw_element = find_raw_gradient_element_by_id(id))
+        @resolving[id] = true
+        begin
+          # Gamba: only one that registered itself, which a gradient without stops never does.
+          create_gradient_element(raw_element)
+          @gradients_by_id[id]
+        ensure
+          @resolving.delete(id)
+        end
       end
     end
 
@@ -35,7 +45,7 @@ module Prawn::SVG
     end
 
     def find_raw_element_by_id(id)
-      REXML::XPath.match(@document.root, %(//*[@id="#{id.gsub('"', '\"')}"])).first
+      @document.raw_element_by_id(id)
     end
 
     def gradient_element?(raw_element)

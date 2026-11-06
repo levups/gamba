@@ -283,8 +283,10 @@ module Gamba
       numeric(@reader.resolve(value))
     end
 
+    # A real too large for a Float reads as infinite, and would write NaN into the page's matrix: no number then.
     def numeric(value)
-      (value.is_a?(PDF::Core::Real) || value.is_a?(Numeric)) ? value.to_f : nil
+      number = (value.is_a?(PDF::Core::Real) || value.is_a?(Numeric)) ? value.to_f : nil
+      number if number&.finite?
     end
 
     def intersection(crop, media)

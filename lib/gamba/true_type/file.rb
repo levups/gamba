@@ -18,16 +18,26 @@ module Gamba
       # Reading past the data a malformed font declares raises these: they become a TrueType::Error.
       MALFORMED_FONT_ERRORS = [ArgumentError, TypeError, RangeError, NoMethodError, FloatDomainError].freeze
       MAXIMUM_CODE_POINT = 0x10FFFF
+      # Codes a cmap may walk, overlaps included: four times the 16-bit range for format 4, the Unicode range for
+      # format 12. Valid fonts walk each code once; past these, crafted ranges would hold the parse for minutes.
+      MAXIMUM_CMAP_CODES = {4 => 0x40000, 12 => MAXIMUM_CODE_POINT + 1}.freeze
 
       Header = Data.define(:units_per_em, :x_min, :y_min, :x_max, :y_max, :index_to_location_format)
 
       FILES_BY_KEY = {}
       FILES_LOCK = Mutex.new
+      # Fonts kept parsed, the most recently used last: apps that write each request's font to a new temporary
+      # file would otherwise keep every one of them for the life of the process.
+      MAXIMUM_CACHED_FILES = 64
 
       # Parsed fonts are shared by every document of the process, until their file changes.
       def self.open(path, index: 0, resource: false)
         key = [::File.expand_path(path), index, resource, ::File.mtime(path)]
-        FILES_LOCK.synchronize { FILES_BY_KEY[key] ||= new(::File.binread(path), index:, resource:) }
+        FILES_LOCK.synchronize do
+          file = FILES_BY_KEY.delete(key) || new(::File.binread(path), index:, resource:)
+          FILES_BY_KEY.delete(FILES_BY_KEY.each_key.first) while FILES_BY_KEY.size >= MAXIMUM_CACHED_FILES
+          FILES_BY_KEY[key] = file
+        end
       end
 
       attr_reader :bytes, :offset
@@ -318,6 +328,7 @@ module Gamba
           deltas = cmap.unpack("@#{starts_offset + (segment_count * 2)} n#{segment_count}")
           range_offsets_offset = starts_offset + (segment_count * 4)
           range_offsets = cmap.unpack("@#{range_offsets_offset} n#{segment_count}")
+          check_cmap_size(format, starts.zip(ends))
           segment_count.times do |segment|
             (starts[segment]..ends[segment]).each do |code|
               glyph =
@@ -341,7 +352,9 @@ module Gamba
           cmap.unpack("@#{offset + 20} n#{count}").each_with_index { |glyph, index| glyph_by_code[first_code + index] = glyph }
         when 12
           group_count = [cmap.unpack1("@#{offset + 12} N"), (cmap.bytesize - offset - 16) / 12].min
-          cmap.unpack("@#{offset + 16} N#{group_count * 3}").each_slice(3) do |start_code, end_code, start_glyph|
+          groups = cmap.unpack("@#{offset + 16} N#{group_count * 3}").each_slice(3).to_a
+          check_cmap_size(format, groups.map { |start_code, end_code| [start_code, [end_code, MAXIMUM_CODE_POINT].min] })
+          groups.each do |start_code, end_code, start_glyph|
             (start_code..[end_code, MAXIMUM_CODE_POINT].min).each { |code| glyph_by_code[code] = start_glyph + (code - start_code) }
           end
         end
@@ -350,11 +363,17 @@ module Gamba
         glyph_by_code.freeze
       end
 
+      def check_cmap_size(format, ranges)
+        codes = ranges.sum { |first, last| (last >= first) ? last - first + 1 : 0 }
+        raise Error, "Malformed font: its cmap maps #{codes} codes" if codes > MAXIMUM_CMAP_CODES.fetch(format)
+      end
+
       def name_string(name_id)
         name = table("name")
         return unless name
 
         count, strings_offset = name.unpack("@2 n2")
+        count = count.clamp(0, (name.bytesize - 6) / 12)
         records = Array.new(count) { |record_index| name.unpack("@#{6 + (record_index * 12)} n6") }
         record = records.find { |platform, _, _, id| id == name_id && platform == 3 } ||
           records.find { |platform, _, _, id| id == name_id && platform == 1 } ||
@@ -363,8 +382,10 @@ module Gamba
 
         platform, _encoding, _language, _id, length, offset = record
         raw = name.byteslice(strings_offset + offset, length)
+        return unless raw
+
         (platform == 1) ? raw.force_encoding(::Encoding::MacRoman).encode(::Encoding::UTF_8) : raw.force_encoding(::Encoding::UTF_16BE).encode(::Encoding::UTF_8)
-      rescue ::Encoding::UndefinedConversionError, ::Encoding::InvalidByteSequenceError
+      rescue ::Encoding::UndefinedConversionError, ::Encoding::InvalidByteSequenceError, *MALFORMED_FONT_ERRORS
         nil
       end
     end

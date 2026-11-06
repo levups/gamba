@@ -84,8 +84,8 @@ module Prawn::SVG::CSS
     def associate_xpath_styles_with_elements(xpath_styles)
       element_styles = {}
 
-      xpath_styles.each do |xpath, declarations, _|
-        REXML::XPath.match(root, xpath).each do |element|
+      xpath_styles.each do |steps, declarations, _|
+        matching_elements(steps).each do |element|
           (element_styles[element] ||= []).concat declarations
         end
       end
@@ -93,13 +93,38 @@ module Prawn::SVG::CSS
       element_styles
     end
 
+    # Gamba: one compound selector at a time, each matched once from every element the steps before it found.
+    # Joined into one XPath, "g g g" became //g//g//g, which REXML evaluates without merging the paths that reach
+    # the same element: on nested elements, exponential.
+    def matching_elements(steps)
+      elements = REXML::XPath.match(root, steps.first).uniq
+      steps.drop(1).each do |step|
+        found = {}.compare_by_identity
+        elements.each { |element| REXML::XPath.match(element, ".#{step}").each { found[_1] = true } }
+        elements = found.keys
+      end
+      elements
+    end
+
+    # Gamba: an XPath 1.0 literal has no escape, so a value holding both quotes is a concat() of pieces that do not;
+    # prawn-svg escaped quotes with a backslash, which let a selector's value write its own XPath.
     def xpath_quote(value)
-      %("#{value.gsub("\\", "\\\\").gsub('"', '\\"')}") if value
+      return unless value
+      return %("#{value}") unless value.include?('"')
+      return %('#{value}') unless value.include?("'")
+
+      "concat(#{value.split('"', -1).map { %("#{_1}") }.join(%(, '"', ))})"
     end
 
     RECOGNIZED_PSEUDO_CLASSES = %w[first-child last-child link visited hover active focus].freeze
 
+    # Gamba: REXML's XPath parser splits predicates at brackets, even inside a string literal, so a value holding
+    # one would end the predicate early and write the rest as XPath: such a selector matches nothing.
+    BRACKET = /[\[\]]/
+
     def css_selector_to_xpath(selector)
+      return ["//*[false()]"] if selector.any? { |element| bracketed_value?(element) }
+
       selector.map do |element|
         pseudo_classes = Set.new(element[:pseudo_class])
         require_function_name = false
@@ -183,7 +208,12 @@ module Prawn::SVG::CSS
         result << "[false()]" if never_match
 
         result
-      end.join
+      end
+    end
+
+    def bracketed_value?(element)
+      (element[:attribute] || []).any? { |_key, _operator, value| value&.match?(BRACKET) } ||
+        (element[:pseudo_class] || []).any? { _1.match?(BRACKET) }
     end
 
     def parse_nth_child_expression(expr)

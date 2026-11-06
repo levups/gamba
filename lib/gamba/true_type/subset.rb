@@ -29,11 +29,13 @@ module Gamba
         @new_glyph_by_original.keys
       end
 
-      # Numbers the components of composite glyphs, level by level, in the order of their composites' indices.
+      # Numbers the components of composite glyphs, level by level, in the order of their composites' indices. Each
+      # glyph's components are read once: a composite that contains itself, directly or not, ends the walk.
       def add_components(originals)
+        expanded = {}
         level = originals
         loop do
-          components = level.flat_map { component_glyphs(@file.glyph_data(_1)) }
+          components = level.flat_map { |glyph| expanded.key?(glyph) ? [] : (expanded[glyph] = true) && component_glyphs(@file.glyph_data(glyph)) }
           break if components.empty?
 
           components.each { glyph_for(_1) }

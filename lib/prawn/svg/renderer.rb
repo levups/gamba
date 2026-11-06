@@ -94,6 +94,14 @@ module Prawn
 
       def issue_prawn_command(prawn, calls)
         calls.each do |call, arguments, kwarguments, children|
+          # Gamba: an infinite or NaN number, from a transform such as rotate(1e400), would be written into the page
+          # as NaN or Infinity, which no PDF reader parses: the call and what it holds are left out.
+          if non_finite?(arguments) || non_finite?(kwarguments)
+            warning = "#{call} left out: its arguments are not finite numbers"
+            document.warnings << warning unless document.warnings.include?(warning)
+            next
+          end
+
           skip = false
 
           rewrite_call_arguments(prawn, call, arguments, kwarguments, children) do
@@ -114,6 +122,15 @@ module Prawn
           else
             prawn.send(call, *arguments, **kwarguments, &proc_creator(prawn, children))
           end
+        end
+      end
+
+      def non_finite?(value)
+        case value
+        when Float then !value.finite?
+        when Array then value.any? { non_finite?(_1) }
+        when Hash then value.each_value.any? { non_finite?(_1) }
+        else false
         end
       end
 
@@ -223,13 +240,18 @@ module Prawn
       # Prawn's soft_mask hardcodes BBox to page.dimensions, which causes
       # Chrome and Firefox to clip mask content that extends beyond the page.
       # Temporarily override dimensions to use a large BBox.
+      # Gamba: a mask inside a mask finds the method defined already, and leaves it to the outer one to remove.
       def with_large_page_dimensions(prawn)
         page = prawn.state.page
+        return yield if page.singleton_class.method_defined?(:dimensions, false)
+
         large_bbox = [-10_000, -10_000, 10_000, 10_000]
         page.define_singleton_method(:dimensions) { large_bbox }
-        yield
-      ensure
-        page.singleton_class.remove_method(:dimensions)
+        begin
+          yield
+        ensure
+          page.singleton_class.remove_method(:dimensions)
+        end
       end
 
       def inheritable_options

@@ -142,7 +142,7 @@ class Prawn::SVG::Elements::Base
         add_call "save"
 
         child = element_class.new(@document, elem, @calls, state.dup)
-        child.process
+        @document.nested { child.process }
 
         add_call "restore"
       else

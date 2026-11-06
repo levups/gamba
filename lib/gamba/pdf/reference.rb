@@ -6,12 +6,14 @@ module PDF
     class Reference
       attr_reader :identifier
       attr_accessor :data, :uncompressed
-      attr_writer :stream
+      # Written as a stream even without bytes, as image XObjects must be.
+      attr_writer :stream, :empty_stream
 
       def initialize(identifier, data, stream = nil)
         @identifier = identifier
         @data = data
         @stream = stream
+        @empty_stream = false
       end
 
       def to_s
@@ -24,7 +26,7 @@ module PDF
       end
 
       def stream?
-        !@stream.nil? && !@stream.empty?
+        !@stream.nil? && (@empty_stream || !@stream.empty?)
       end
     end
   end

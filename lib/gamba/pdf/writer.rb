@@ -23,7 +23,7 @@ module PDF
         @trailer = trailer
         return unless encryption || identified
 
-        file_identifier = PDF::Core::ByteString.new(document_digest)
+        file_identifier = PDF::Core::ByteString.new(document_digest(encryption&.identifier_secret))
         @trailer = trailer.merge(ID: [file_identifier, file_identifier])
         return unless encryption
 
@@ -56,9 +56,11 @@ module PDF
 
       attr_reader :objects, :root, :info, :version, :trailer
 
-      # A file identifier derived from the document's content, so the same document always gets the same one.
-      def document_digest
+      # A file identifier derived from the document's content, so the same document always gets the same one; an
+      # encrypted document's mixes in its passwords.
+      def document_digest(secret)
         digest = Digest::MD5.new
+        digest << secret if secret
         objects.each do |reference|
           digest << PDF::Core.serialize(reference.data)
           digest << reference.stream if reference.stream?

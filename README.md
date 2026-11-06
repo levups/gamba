@@ -1,86 +1,135 @@
 # Gamba
 
-Prawn's API, rewritten for speed: the same pages, pixel for pixel, in lighter files, faster.
+Gamba is a Ruby library that writes PDF files: invoices, reports, labels, anything you can lay out as text, tables,
+images and shapes. It is a faster rewrite of [Prawn](https://github.com/prawnpdf/prawn), the most widely used PDF
+library for Ruby, together with its two companion gems, prawn-table and prawn-svg.
 
-https://levups.github.io/gamba/
+Code written for Prawn 2.5 runs on Gamba unchanged and draws the same pages, down to the pixel. The difference is
+speed and size: a one-page invoice renders about five times faster and the file is a quarter lighter (see
+[Performance](#performance)).
+
+Website and guide: https://levups.github.io/gamba/
 
 ## Installation
 
+Gamba needs Ruby 3.3 or later. In your Gemfile, replace `prawn`, `prawn-table` and `prawn-svg` with one line:
+
 ```ruby
-# Gemfile
-gem "gamba" # instead of prawn, prawn-table and prawn-svg
+gem "gamba"
 ```
 
-`pdf.table` and `pdf.svg` work without any other gem; `require "prawn/table"` and `require "prawn-svg"` keep
-working.
+Gamba refuses to load if the prawn gem is in the same bundle, so remove it. Your existing `require "prawn"`,
+`require "prawn/table"` and `require "prawn-svg"` lines keep working, and `pdf.table` and `pdf.svg` are available
+without them.
 
-Gamba needs Ruby 3.3 or later, and refuses to load when the prawn gem is in the bundle too.
-
-The gem has its own version, `Gamba::VERSION`. `Prawn::VERSION` is the version of the Prawn API it reproduces,
-2.5.0, so code that checks Prawn's version keeps working.
-
-## Usage
-
-Code written for Prawn runs unchanged:
+## A first document
 
 ```ruby
+require "prawn"
+
 Prawn::Document.generate("hello.pdf") do
   text "Hello, World!"
   table [%w[SKU Qty], %w[A-1 2]]
 end
 ```
 
-## Beyond Prawn
+This writes `hello.pdf` with a line of text and a two-row table. Everything else Prawn documents works the same
+way: fonts, colors, images, columns, page numbers, links, encryption. Prawn's manual applies as it is, and
+[the guide](https://levups.github.io/gamba/guide.html) covers what Gamba adds.
 
-What would move pixels away from Prawn's stays off unless asked for.
+The constant is still `Prawn`, so you don't have to rename anything. `Prawn::VERSION` reports `2.5.0`, the
+version of the API Gamba reproduces, for code that checks it. Gamba's own version is `Gamba::VERSION`.
+
+## What Gamba adds
+
+Anything that would change how a page looks compared with Prawn is off until you ask for it.
+
+Ligatures and kerning from OpenType fonts, per font:
 
 ```ruby
-# OpenType ligatures and GPOS pair kerning, per font
 font "Inter.ttf", features: %i[liga kern]
+```
 
-# PDF/A-3b: XMP metadata, sRGB output intent, file identifier; standard fonts and encryption raise
+PDF/A-3b archival files, and Factur-X electronic invoices (the French and German standard that embeds the invoice
+data as XML inside the PDF). Gamba embeds the XML your invoicing system produced; it does not build it.
+
+```ruby
 Prawn::Document.new(pdf_a: true, info: {Title: "Invoice INV-2026-0001"}) do
-  font "Inter.ttf"
-  # …
-  factur_x File.read("factur-x.xml"), profile: :en16931 # Factur-X: minimum, basic_wl, basic, en16931, extended
+  font "Inter.ttf" # PDF/A needs embedded fonts: the 14 standard ones raise, and so does encryption
+  # ...
+  factur_x File.read("factur-x.xml"), profile: :en16931 # or minimum, basic_wl, basic, extended
 end
+```
 
-# Before a server forks: load TrueType and SVG support once, shared by every worker
-Gamba.eager_load!
+Merging existing PDFs, such as carrier labels or supplier invoices, one page after another. This replaces the
+combine_pdf gem for that use:
 
-# Pages of PDFs written elsewhere, one after the other: carrier labels, supplier invoices (instead of combine_pdf)
+```ruby
 Gamba.combine([label, other_label], page_size: [288, 432], orientation: :portrait)
 ```
 
-OpenType fonts with CFF outlines (`.otf`) embed like TrueType ones, and render like the font itself. Gamba does
-not build the Factur-X XML: it embeds the one the invoicing system produced.
+Loading font and SVG support once, before a server such as Puma or Unicorn forks its workers, so they share it in
+memory:
 
-SVG images do not fetch anything from the web unless asked to (`svg data, enable_web_requests: true`): prawn-svg
-0.40 fetches by default, which lets a submitted SVG make the server request any URL. prawn-svg 1.0 plans the same
-default.
+```ruby
+Gamba.eager_load!
+```
 
-`Gamba.combine` reads xref tables, cross-reference and object streams, incremental updates, and files encrypted
-with an owner password only (RC4, AES-128, AES-256); a file that needs a user password raises
-`Prawn::Errors::EncryptedPDF`, a damaged one it cannot repair `Prawn::Errors::MalformedPDF`. Content streams are
-copied as they were encoded, and what several sources share (a carrier's fonts and logo) is written once. With
-`page_size`, each page is scaled from its lower left corner to fit, keeping its proportions; with `orientation`, a
-page the other way round turns a quarter counterclockwise, as combine_pdf does. A `/Rotate` is applied to the
-content first, where combine_pdf left it to the viewer. Outlines, forms and tagged structure are not carried over.
+### More on combining PDFs
 
-## Comparing an app's PDFs
+`Gamba.combine` takes the bytes of each PDF and returns the bytes of the merged one. It reads the cross-reference
+formats PDF writers use, including incremental updates, and files encrypted with an owner password only (RC4,
+AES-128 and AES-256). A file that needs a password to open raises `Prawn::Errors::EncryptedPDF`, and a damaged one
+it cannot repair raises `Prawn::Errors::MalformedPDF`.
 
-`script/capture_pdfs.rb` writes every PDF an app's test suite renders, named after its test. Run the suite under
-Prawn, then under Gamba, and compare both directories with `Oracle.pdf_differences`:
+Pages are copied as they were encoded, and resources several files share, like a carrier's fonts and logo, are
+written once. With `page_size`, each page is scaled from its lower left corner to fit, keeping its proportions.
+With `orientation`, a page the other way round turns a quarter counterclockwise, as combine_pdf does. A page's
+`/Rotate` is applied to its content, where combine_pdf left it to the viewer. Outlines, forms and tagged structure
+are not carried over.
+
+## Files your users send
+
+Applications often put user content into PDFs: an uploaded logo, a font, a name typed in a form, a PDF to attach.
+Any of it can be built to attack the server that renders it.
+
+- SVG images fetch nothing from the web unless you pass `enable_web_requests: true`. prawn-svg 0.40 fetched by
+  default, so a submitted SVG could make your server request any URL. prawn-svg 1.0 plans the same default as
+  Gamba.
+- An SVG can't make Gamba loop or run out of stack through references (`<use>`, gradients) or deep nesting, and
+  fonts it declares with `@font-face` disappear once it is drawn. In prawn-svg, an uploaded SVG declaring a
+  "Helvetica" font changed the font of the application's own text.
+- A damaged or malicious PNG, JPEG, TrueType or OpenType file either renders or raises an error Gamba names
+  (`Prawn::Errors::UnsupportedImageType`, `Prawn::Images::JPG::FormatError`, `Gamba::TrueType::Error`). A PNG
+  inflates no further than the size its header gives. CI corrupts sample files on every run to check this.
+- `Gamba.combine` stops at 64 levels of nested arrays and dictionaries and at 256 MB of decompressed data, and
+  ignores references that lead back to themselves, so a crafted PDF can't send it into a loop or fill
+  memory.
+- Text with inline formatting (`inline_format: true`) is parsed in linear time, whatever the markup.
+- The `/ID` of an encrypted PDF depends on its passwords, so it reveals nothing about the content to someone
+  without them.
+
+Inline formatting still turns `<link href="...">` into a clickable link. Escape user text before you put it inside
+markup.
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+## Checking your app's PDFs
+
+Before switching, you can compare what your app produces under both libraries. `script/capture_pdfs.rb` saves
+every PDF your test suite renders, named after the test. Run the suite once with Prawn and once with Gamba:
 
 ```sh
 GAMBA_CAPTURE_DIRECTORY=tmp/prawn RUBYOPT=-r/path/to/gamba/script/capture_pdfs.rb bin/rails test
 ```
 
+Then compare the two directories with `Oracle.pdf_differences`, from Gamba's test support.
+
 ## Performance
 
-`bundle exec rake bench` renders each document of `bench/documents` with Prawn 2.5 and with Gamba in 7 fresh YJIT
-processes each, taking turns, and writes `docs/benchmarks.json`. Each process times 20 renders; the table shows the
-median of the 7 processes, on Ruby 4.0.9:
+`bundle exec rake bench` renders each document in `bench/documents` with Prawn 2.5 and with Gamba, in 7 fresh
+YJIT processes each, taking turns. Each process times 20 renders, and the table shows the median of the 7, on
+Ruby 4.0.9:
 
 | Document | Prawn | Gamba | Allocations, Prawn → Gamba | Weight, Prawn → Gamba |
 |---|---:|---:|---:|---:|
@@ -88,58 +137,71 @@ median of the 7 processes, on Ruby 4.0.9:
 | Report, 101 pages | 559.4 ms | 216.0 ms | 3,350,853 → 2,089,008 | 207,815 → 164,924 bytes |
 | Catalog, 1,000 table rows | 544.9 ms | 265.6 ms | 3,979,977 → 2,078,343 | 147,731 → 134,082 bytes |
 
-Charts and peak memory: https://levups.github.io/gamba/benchmarks.html
+Files are lighter because Gamba compresses streams and packs objects together, which PDF 1.5 allows and Prawn
+doesn't do. Charts and peak memory are on the [benchmarks page](https://levups.github.io/gamba/benchmarks.html).
+
+## How we know the pages are the same
+
+The test suite renders every example of Prawn's and prawn-table's manuals, and every sample SVG of prawn-svg, once
+with the original gems and once with Gamba. For each pair it compares the text and its position to 0.01 pt, the
+pixels at 150 dpi in two unrelated renderers (MuPDF and Poppler), whether `qpdf --check` accepts the file, and its
+size. We call this the oracle.
+
+Gamba does not copy Prawn's bugs. When Prawn crashes, writes an invalid PDF or contradicts its own documentation,
+Gamba fixes it, and the [compatibility page](https://levups.github.io/gamba/compatibility.html) lists each fix with
+its proof.
 
 ## Development
 
-- An oracle renders every example of Prawn's and prawn-table's manuals and every sample SVG of prawn-svg, with
-  Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 and with Gamba, each in its own process, and
-  compares their pages, their text and its positions to 0.01 pt, their pixels at 150 dpi in two renderers that
-  share no code (MuPDF and Poppler), their validity
-  (`qpdf --check`) and their weight. Examples listed in `test/oracle_passing.txt` must stay identical; one that
-  becomes identical must join the list.
-- A seeded fuzzer writes random documents (text in all its options, boxes, columns, tables, shapes, pages) and
-  compares them the same way: `FUZZ_SEED=42 FUZZ_CASES=500 bundle exec ruby -Itest test/fuzz_test.rb`, and
-  `ruby -Itest script/fuzz_minimize.rb tmp/fuzz/documents/fuzz_0042.rb` shrinks a failing one. CI adds 300 from a
-  fresh seed on every run.
-- An input fuzzer corrupts sample PNGs, JPEGs and fonts (flipped bytes, truncations, forged lengths): each must
-  render or raise an error Gamba names, never crash inside a parser, hang or exhaust memory. PNG data inflates
-  no further than its header announces.
-- `test/divergences.yml` lists Prawn's bugs Gamba fixes, each with the specification that proves it and the exact
-  differences the oracle must report. `test/oracle_examples` holds documents of our own for what the manual
-  does not show.
-- PDF/A documents are checked by veraPDF when it is installed (`brew install verapdf`).
-- `test/contract/prawn-2.5.0.yml`, generated by `script/contract_extract.rb`, lists Prawn's public methods; Gamba
-  must accept every call Prawn accepts on those of its contract, settled in `test/contract/decisions.yml`.
-
-Prawn runs from its own bundle, `oracle/Gemfile`. The oracle needs `mutool`, `pdftoppm` and `qpdf` (`brew install
-mupdf-tools poppler qpdf`), and Prawn's manual and data, which `rake corpus:fetch` downloads into the ignored `corpus/cache`.
+Prawn runs from its own bundle, `oracle/Gemfile`, so the oracle can compare the two. The tests need `mutool`,
+`pdftoppm` and `qpdf` (`brew install mupdf-tools poppler qpdf`), and Prawn's manual and sample data, which
+`rake corpus:fetch` downloads into `corpus/cache`. Without that cache, the comparison tests are skipped.
 
 ```sh
 bundle install && BUNDLE_GEMFILE=oracle/Gemfile bundle install
 bundle exec rake corpus:fetch
 bundle exec rake test
-ORACLE_CANDIDATE=prawn bundle exec rake test # Prawn against itself: proves the oracle
-bundle exec rake bench
 bundle exec rubocop
 ```
 
-### Releasing
-
-Pull requests leave `CHANGELOG.md` alone: a release starts by writing its notes under `## [Unreleased]`, from the
-pull requests merged since the last tag, without committing them. Then, from an up-to-date `main` whose CI is
-green:
+Other commands:
 
 ```sh
-bin/release minor --dry-run   # the notes and the changes, nothing written
+ORACLE_CANDIDATE=prawn bundle exec rake test                     # Prawn against itself, to check the oracle
+FUZZ_SEED=42 FUZZ_CASES=500 bundle exec ruby -Itest test/fuzz_test.rb  # random documents, compared with Prawn
+INPUT_FUZZ_SEED=42 INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb  # corrupted images and fonts
+bundle exec rake bench                                           # writes docs/benchmarks.json
+```
+
+`ruby -Itest script/fuzz_minimize.rb tmp/fuzz/documents/fuzz_0042.rb` shrinks a failing fuzz document. PDF/A
+files are also checked by veraPDF when it is installed (`brew install verapdf`).
+
+The files that define what "compatible" means:
+
+- `test/oracle_passing.txt`: examples that must stay identical to Prawn's. One that becomes identical joins it.
+- `test/divergences.yml`: Prawn bugs Gamba fixes, with the specification that proves each one and the exact
+  differences the oracle must find.
+- `test/oracle_examples`: documents of our own, for cases the manuals don't show.
+- `test/contract/prawn-2.5.0.yml`: Prawn's public methods, generated by `script/contract_extract.rb`. Every call
+  Prawn accepts must keep working; exceptions are settled in `test/contract/decisions.yml`.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+### Releasing
+
+Pull requests leave `CHANGELOG.md` alone. A release starts by writing its notes under `## [Unreleased]`, from the
+pull requests merged since the last tag, without committing them. Then, from an up-to-date `main` with green CI:
+
+```sh
+bin/release minor --dry-run   # shows the notes and the changes, writes nothing
 bin/release minor             # or patch, major, or an exact version such as 1.2.0
 ```
 
-`main` takes no direct push, so `bin/release` dates the Unreleased section and bumps the version on a branch
-`release/vX.Y.Z`, opens its pull request, which merges itself once CI is green, and waits for it. It then pushes a
-signed tag `vX.Y.Z` on the merge commit (`bin/release --tag X.Y.Z` does it if you stopped waiting). The tag starts
-the Release workflow, which publishes the gem to RubyGems through trusted publishing and creates the GitHub release
-with the version's notes and the `.gem`.
+`main` takes no direct push, so `bin/release` dates the notes and bumps the version on a `release/vX.Y.Z` branch,
+opens a pull request that merges itself once CI is green, and waits for it. It then pushes a signed `vX.Y.Z` tag on
+the merge commit (`bin/release --tag X.Y.Z` does it if you stopped waiting). The tag starts the Release workflow,
+which publishes the gem to RubyGems through trusted publishing and creates the GitHub release with the notes and
+the `.gem`.
 
 ## License
 

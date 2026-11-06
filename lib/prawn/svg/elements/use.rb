@@ -41,8 +41,10 @@ class Prawn::SVG::Elements::Use < Prawn::SVG::Elements::Base
       source.attributes["height"] = @height || "100%"
     end
 
-    child = referenced_element_class.new(document, source, calls, state.dup)
-    child.process
+    document.drawing_through_use(referenced_element_source) do
+      child = referenced_element_class.new(document, source, calls, state.dup)
+      document.nested { child.process }
+    end
 
     add_call "restore"
   end
@@ -58,7 +60,7 @@ class Prawn::SVG::Elements::Use < Prawn::SVG::Elements::Base
     else
       # Perhaps the element is defined further down in the document.  This is not recommended but still valid SVG,
       # so we'll support it with an exception case that's not particularly performant.
-      raw_element = REXML::XPath.match(@document.root, %(//*[@id="#{id.gsub('"', '\"')}"])).first
+      raw_element = @document.raw_element_by_id(id)
 
       if raw_element
         @referenced_element_class = Prawn::SVG::Elements::TAG_CLASS_MAPPING[raw_element.name.to_sym]
@@ -73,7 +75,7 @@ class Prawn::SVG::Elements::Use < Prawn::SVG::Elements::Base
 
     external_root, external_element_styles = load_external_svg(url)
 
-    raw_element = REXML::XPath.match(external_root, %(//*[@id="#{fragment.gsub('"', '\"')}"])).first
+    raw_element = @document.raw_element_by_id(fragment, external_root)
     return unless raw_element
 
     @referenced_element_class = Prawn::SVG::Elements::TAG_CLASS_MAPPING[raw_element.name.to_sym]

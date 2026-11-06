@@ -104,11 +104,20 @@ module Prawn
 
     def self.load(document, source, options = {})
       case font_format(source, options)
-      when "ttf" then Fonts::TTF.new(document, source, options)
-      when "otf" then Fonts::OTF.new(document, source, options)
+      when "ttf" then outline_class(source, Fonts::TTF).new(document, source, options)
+      when "otf" then outline_class(source, Fonts::OTF).new(document, source, options)
       when "dfont" then Fonts::DFont.new(document, source, options)
       when "ttc" then Fonts::TTC.new(document, source, options)
       else Fonts::AFM.new(document, source, options)
+      end
+    end
+
+    # Outlines decide, not the extension: a .otf may hold TrueType outlines, and a .ttf CFF ones.
+    def self.outline_class(source, by_extension)
+      case (source.respond_to?(:read) ? :unknown : Gamba::TrueType::File.open(source).outline_format)
+      when :true_type then Fonts::TTF
+      when :open_type then Fonts::OTF
+      else by_extension
       end
     end
 

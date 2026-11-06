@@ -191,6 +191,9 @@ module Prawn::SVG
     end
 
     def render_text_directly(prawn, text, font_runs, opts)
+      # Gamba: text placed or turned by an infinite or NaN number would write NaN into the page: it is left out.
+      return unless opts[:at].all?(&:finite?) && opts.fetch(:rotate, 0).finite?
+
       if font_runs.nil?
         prawn.draw_text(text, **opts)
       else

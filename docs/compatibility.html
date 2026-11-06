@@ -37,6 +37,7 @@
       <ul class="toc">
         <li><a href="#bugs">Prawn bugs Gamba fixes</a></li>
         <li><a href="#svg">SVG web requests</a></li>
+        <li><a href="#untrusted">Files from users</a></li>
         <li><a href="#files">Lighter files</a></li>
         <li><a href="#opt-in">Off unless asked for</a></li>
         <li><a href="#loading">Loading and versions</a></li>
@@ -72,6 +73,22 @@
       <h2 id="svg-title">SVG web requests</h2>
       <div class="prose">
         <p>SVG images do not fetch anything from the web unless asked to: <code>svg data, enable_web_requests: true</code>. prawn-svg 0.40 fetches by default, which lets a submitted SVG make the server request any URL. prawn-svg 1.0 plans the same default as Gamba.</p>
+      </div>
+    </section>
+
+    <section id="untrusted" aria-labelledby="untrusted-title">
+      <h2 id="untrusted-title">Files from users</h2>
+      <div class="prose">
+        <p>A font, an image or a PDF a user sends can be built to make a parser loop, crash or fill memory. Where Prawn hangs or crashes on such a file, Gamba raises an error it names. Valid files draw the same pages.</p>
+        <ul>
+          <li><strong>Fonts.</strong> A composite glyph that contains itself hangs Prawn and crashes TTFunk; Gamba embeds it once. A cmap whose ranges overlap until they cover millions of codes, which takes Prawn minutes to read, raises <code>Gamba::TrueType::Error</code>. A <code>.otf</code> file with TrueType outlines, or a <code>.ttf</code> with CFF ones, embeds by its outlines rather than its extension.</li>
+          <li><strong>Images.</strong> A truncated JPEG, or one of zero width, height or bit depth, raises <code>Prawn::Images::JPG::FormatError</code> where Prawn raised NoMethodError or wrote NaN into the page. An indexed PNG needs a palette of 1 to 256 colors, and a transparency chunk too short for its samples is ignored, as viewers do.</li>
+          <li><strong>SVG.</strong> prawn-svg finds an element by its id with an XPath query built from the id, so an id holding a quote ran XPath of its own, and a missing one read the whole document again: Gamba reads the ids once. A <code>&lt;use&gt;</code> that draws its own ancestor is skipped, where prawn-svg overflowed the stack, and <code>&lt;use&gt;</code> elements draw at most 20,000 elements in all, where sixteen levels of two kept prawn-svg drawing for minutes. Gradients that refer to each other paint nothing. A document nesting elements deeper than 256 levels, or whose entities expand past REXML's limits, raises <code>Prawn::SVG::Document::InvalidSVGData</code>. Descendant selectors match in polynomial time, and a selector whose value holds a bracket, which REXML's XPath parser misreads, matches nothing. Faces an SVG declares with <code>@font-face</code> are gone once it is drawn: prawn-svg left them in the document's font families, so an uploaded SVG declaring “Helvetica” changed the application's own text. A transform or text position that is infinite leaves its element out, where prawn-svg wrote NaN into the page. Masks inside masks, and text inside an SVG embedded with <code>&lt;image&gt;</code>, render; and a directory or device inside <code>enable_file_requests_with_root</code> is skipped like a missing file.</li>
+          <li><strong>Inline formatting.</strong> Markup with tags that never close is read in linear time, where Prawn takes minutes on a few hundred kilobytes, and a style opened again and again stays one style.</li>
+          <li><strong>Combined PDFs.</strong> A number too large for a float, in a page's boxes, no longer writes NaN into the combined page.</li>
+          <li><strong>PDF/A metadata.</strong> A title or author holding a control character, or bytes that are not text, raises <code>Prawn::Errors::PdfAViolation</code>: XML cannot hold them, and the XMP would not parse.</li>
+          <li><strong>Encryption.</strong> The file identifier of an encrypted document mixes in its passwords, so it tells nothing about the content to someone without them. Prawn writes no identifier, and gives every document with the same passwords the same key.</li>
+        </ul>
       </div>
     </section>
 
@@ -123,7 +140,7 @@ ruby <span class="nt">-Itest</span> script/fuzz_minimize.rb tmp/fuzz/documents/f
 
   <footer class="family">
     <p>Gems by <a href="https://github.com/levups">Level UP Solutions</a></p>
-    <nav aria-label="Level UP Solutionsâ gems">
+    <nav aria-label="Level UP Solutions gems">
       <ul>
         <li><a href="https://levups.github.io/super-slim/">SuperSlim</a></li>
         <li><a href="https://levups.github.io/agentry/">Agentry</a></li>

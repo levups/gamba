@@ -11,6 +11,8 @@ module Prawn
           "<color[^>]*>|</color>|<font[^>]*>|</font>|<strong>|</strong>|<em>|</em>|<a[^>]*>|</a>|[^<\n]+",
           Regexp::MULTILINE
         )
+        # Past the last ">", no tag can end: only text and newlines are left.
+        TEXT_REGEX = /\n|[^<\n]+/
         ESCAPE_CHARS = {"&" => "&amp;", ">" => "&gt;", "<" => "&lt;"}.freeze
         UNESCAPE_CHARS = ESCAPE_CHARS.invert.freeze
         CMYK_ATTRIBUTES = %w[c m y k].freeze
@@ -25,7 +27,18 @@ module Prawn
         SUFFIX_BY_STYLE = PREFIX_BY_STYLE.transform_values { _1.sub("<", "</") }.freeze
 
         def self.format(string, *_arguments)
-          array_from_tokens(string.gsub(%r{<br\s*/?>}, "\n").scan(PARSER_REGEX))
+          array_from_tokens(tokens(string.gsub(%r{<br\s*/?>}, "\n")))
+        end
+
+        # The same tokens as string.scan(PARSER_REGEX), in linear time: a tag with attributes that never closes
+        # scans to the end of the string from each "<" after the last ">", which made "<a" * n quadratic. From the
+        # first "<" past the last ">", only TEXT_REGEX can match.
+        def self.tokens(string)
+          last_tag_end = string.rindex(">")
+          cut = last_tag_end ? string.index("<", last_tag_end) : string.index("<")
+          return string.scan(PARSER_REGEX) unless cut
+
+          string[0, cut].scan(PARSER_REGEX).concat(string[cut..].scan(TEXT_REGEX))
         end
 
         def self.to_string(array)
@@ -95,7 +108,9 @@ module Prawn
           character_spacings = []
           tokens.each do |token|
             if (style = STYLE_BY_OPENING_TAG[token])
-              styles << style
+              # A style opened twice is still one: a closing tag removes it whole, and copies would grow every
+              # following fragment's styles.
+              styles << style unless styles.include?(style)
             elsif (style = STYLE_BY_CLOSING_TAG[token])
               styles.delete(style)
             else
