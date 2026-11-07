@@ -80,7 +80,9 @@ environment on GitHub.
    Interrupted after the merge: `bin/release --tag X.Y.Z`.
 4. The tag runs `release.yml`, which waits for the user to approve the `release` environment, then publishes to
    RubyGems and GitHub. Open that run in their browser, where they click Review deployments, `release`, Approve:
-   `gh run view --web $(gh run list --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')`.
+   `gh run view --web $(gh run list --workflow release.yml --branch vX.Y.Z --json databaseId -q '.[0].databaseId')`,
+   once the run exists: it starts a few seconds after the tag, and without `--branch` the previous release's run
+   opens.
    Then check RubyGems.
 
 RubyGems trusts only that workflow: never `gem push`, except a new gem name's first version. `bin/release` and
