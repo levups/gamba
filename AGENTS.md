@@ -78,8 +78,10 @@ environment on GitHub.
    `bin/release minor --dry-run`, then `bin/release minor --yes` (or `patch`, `major`). It opens `release/vX.Y.Z`,
    waits for it to merge itself, pushes the signed tag. Signing fails: the user fixes it, never an unsigned tag.
    Interrupted after the merge: `bin/release --tag X.Y.Z`.
-4. The tag runs `release.yml`, which waits for the user to approve the `release` environment (the run's Review
-   deployments), then publishes to RubyGems and GitHub. Tell the user, then check RubyGems.
+4. The tag runs `release.yml`, which waits for the user to approve the `release` environment, then publishes to
+   RubyGems and GitHub. Open that run in their browser, where they click Review deployments, `release`, Approve:
+   `gh run view --web $(gh run list --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')`.
+   Then check RubyGems.
 
 RubyGems trusts only that workflow: never `gem push`, except a new gem name's first version. `bin/release` and
 `release.yml` are identical in all four gems.
