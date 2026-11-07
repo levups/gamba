@@ -163,7 +163,7 @@ if changelog.match?(section(target.to_s))
   abort "#{CHANGELOG} has a #{target} section and Unreleased entries: move them" unless unreleased.empty?
 else
   abort "#{CHANGELOG}'s Unreleased section is empty: nothing to release" if unreleased.empty?
-  changelog = changelog.sub(section("Unreleased"), "## [Unreleased]\n\n## [#{target}] — #{Date.today.iso8601}\n\n#{unreleased}\n\n")
+  changelog = changelog.sub(section("Unreleased")) { "## [Unreleased]\n\n## [#{target}] — #{Date.today.iso8601}\n\n#{unreleased}\n\n" }
 end
 
 # Reference links at the end: Unreleased compares with the new tag, then each version newest first.
