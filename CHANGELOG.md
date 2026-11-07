@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [2.0.2] — 2026-11-07
+
+SVGs that users send can no longer crash or stall a server through `<use>`, `<image>` or `<tref>`.
+
+**Fixed**
+- An SVG loaded through `<use>` or `<image>` is checked like the document, attributes included: a `data:` URL nested
+  thousands of levels deep overflowed the stack, and entities in an attribute raised `RuntimeError`.
+- `<tref>` draws through the `<use>` path: a tref inside its own text no longer overflows the stack, one to a missing
+  id no longer raises `NoMethodError`, and trefs doubling at each level stop at the 20,000-element budget.
+- Embedded SVG images share the budget of the SVG that embeds them and stop at 16 levels, and `data:` URLs are
+  decoded once per document.
+- An `@font-face` that is not a font becomes a warning, and a table with no cells draws nothing instead of raising
+  `NoMethodError`.
+- addressable 2.9.1 or later is required: before it, an `@import` path took quadratic time to resolve
+  (GHSA-qq38-m9mg-xjj5).
+
 ## [2.0.1] — 2026-11-06
 
 Fonts, images, SVGs and PDFs that users send can no longer hang a server, exhaust its memory or crash it.
@@ -88,7 +104,8 @@ speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
   place of combine_pdf.
 - `Gamba::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
 
-[Unreleased]: https://github.com/levups/gamba/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/levups/gamba/compare/v2.0.2...HEAD
+[2.0.2]: https://github.com/levups/gamba/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/levups/gamba/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/levups/gamba/compare/v1.1.0...v2.0.0
 [1.1.0]: https://github.com/levups/gamba/compare/v1.0.1...v1.1.0
