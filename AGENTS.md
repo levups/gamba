@@ -48,7 +48,7 @@ This section and the next two read the same in super-slim, gamba, crumbly and ag
 - Test and bench data are anonymized: `alice`, `Post`, `example.com`.
 - Everything in the repository is in English (code, comments, commits, pull requests, issues, reviews, replies),
   whatever the conversation's language.
-- No AI attribution in anything people read.
+- No AI attribution in anything people read; commits flag AI help with `Assisted-by`, never `Co-Authored-By`.
 
 ## Pull requests and issues
 
