@@ -67,8 +67,8 @@ end
 ```
 
 Code written for Prawn adopts it one block at a time, `gamba { |document| document.text "Total", style: :title }`,
-and `document.prawn` gives a native document all of Prawn's API. Text, styles, components, stacks and rows are there
-today; tables, images, headers and footers as boxes come next
+and `document.prawn` gives a native document all of Prawn's API. Text, styles, components, stacks, rows, tables and
+images are there today; headers, footers and grids come next
 ([the plan](https://github.com/levups/gamba/issues/69)).
 
 Ligatures and kerning from OpenType fonts, per font:

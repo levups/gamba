@@ -4,7 +4,7 @@ module Gamba
   # Boxes described first, measured, then placed: a stack puts its children one under the other and breaks pages
   # between them, a row puts them side by side on one page.
   module Layout
-    FIT_TOLERANCE_POINTS = 0.001
+    FIT_TOLERANCE_POINTS = Prawn::FLOAT_PRECISION
     MEASURING_HEIGHT_POINTS = 100_000_000
 
     # The top of the next box on the current page, in absolute coordinates.
@@ -144,8 +144,113 @@ module Gamba
       end
     end
 
+    # A Prawn table as a box: as wide as its box, broken across pages with its header when a stack flows it.
+    class Table < Node
+      OPTIONS = (Node::OPTIONS + %i[header column_widths cell_style row_colors]).freeze
+      # Prawn starts a new page unless a row is strictly shorter than what is left of the page: a table that
+      # fills the page to the point would be cut. Measured a hair higher, it fits with room to spare or moves.
+      PAGE_BREAK_SLACK_POINTS = 0.001
+
+      def initialize(rows, styling, width: nil, grow: nil, **table_options)
+        Styles.check_options(table_options, OPTIONS)
+        super(width:, grow:)
+        @rows = rows
+        @styling = styling
+        @table_options = table_options.compact
+      end
+
+      def paint(prawn, left, top, width)
+        table = table(prawn, width)
+        prawn.y = top
+        within(prawn, left, width) { table.draw }
+      end
+
+      def flow(prawn, cursor, left, width)
+        paint(prawn, left, cursor.y, width)
+        cursor.y = prawn.y
+      end
+
+      private
+
+      def measure(prawn, width)
+        table(prawn, width).height + PAGE_BREAK_SLACK_POINTS
+      end
+
+      def description
+        "a table"
+      end
+
+      # Columns given all their widths keep them; otherwise the table takes the width of its box.
+      def table(prawn, width)
+        return @table if @table_width == width
+
+        options = @table_options[:column_widths].is_a?(Array) ? @table_options : {width:, **@table_options}
+        @table_width = width
+        @table = within(prawn, prawn.bounds.absolute_left, width) { prawn.make_table(@rows, options) { |table| @styling&.call(table) } }
+      end
+
+      # Prawn's table reads its left edge and the width it may take from the bounds.
+      def within(prawn, left, width, &)
+        bounds = prawn.bounds
+        prawn.indent(left - bounds.absolute_left, bounds.absolute_right - left - width, &)
+      end
+    end
+
+    # An image as a box: at its own size unless told a width or a height, never wider than its box, never distorted.
+    class Image < Node
+      OPTIONS = (Node::OPTIONS + %i[height align]).freeze
+      ALIGNMENTS = %i[left center right].freeze
+
+      def initialize(source, height: nil, align: :left, **)
+        raise ArgumentError, "align is #{align.inspect}: accepted alignments are #{ALIGNMENTS.map(&:inspect).join(", ")}" unless ALIGNMENTS.include?(align)
+
+        super(**)
+        @source = source
+        @height = height
+        @align = align
+      end
+
+      def paint(prawn, left, top, width)
+        image_width, image_height = size(prawn, width)
+        offset = {left: 0, center: (width - image_width) / 2.0, right: width - image_width}.fetch(@align)
+        prawn.embed_image(*image(prawn), at: relative(prawn, left + offset, top), width: image_width, height: image_height)
+      end
+
+      private
+
+      def measure(prawn, width)
+        size(prawn, width).last
+      end
+
+      def description
+        "an image"
+      end
+
+      def image(prawn)
+        @image ||= prawn.build_image_object(@source)
+      end
+
+      def size(prawn, available_width)
+        info = image(prawn).last
+        ratio = info.width / info.height.to_f
+        image_width = @height ? @height * ratio : (width || info.width)
+        image_width = [image_width, available_width].min
+        [image_width, image_width / ratio]
+      end
+    end
+
     # What a document and its containers share: the calls that add a box.
     module Builder
+      # The block receives the Prawn::Table before it is laid out, to style rows, columns and cells.
+      def table(rows, **options, &styling)
+        add(Table.new(rows, styling, **options))
+      end
+
+      def image(source, **options)
+        Styles.check_options(options, Image::OPTIONS)
+        add(Image.new(source, **options))
+      end
+
       def stack(**options)
         container = Stack.new(@styles, **options)
         yield container

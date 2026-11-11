@@ -62,10 +62,12 @@ module Gamba
 
     private
 
-    # A stack or a row of the document is placed as soon as its block ends, from the cursor, which it leaves below.
-    def add(container)
+    # A box of the document is placed as soon as it is described, from the cursor, which it leaves below.
+    def add(box)
+      raise ArgumentError, "grow shares the width of a row: it means nothing on the document" if box.grow
+
       cursor = Layout::Cursor.new(prawn)
-      container.flow(prawn, cursor, prawn.bounds.absolute_left, prawn.bounds.width)
+      box.flow(prawn, cursor, prawn.bounds.absolute_left, [box.width || prawn.bounds.width, prawn.bounds.width].min)
       prawn.y = cursor.y
       self
     end
