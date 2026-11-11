@@ -21,7 +21,7 @@ class NativeContractTest < Minitest::Test
   def test_every_public_method_is_in_the_contract
     WHOLLY_LISTED.each do |class_name, kind|
       owner = Object.const_get(class_name)
-      public_names = (kind == :singleton) ? owner.singleton_methods(false).map { ".#{_1}" } : owner.public_instance_methods(false).map { "##{_1}" }
+      public_names = (kind == :singleton) ? owner.singleton_methods(false).map { ".#{_1}" } : (owner.public_instance_methods - Object.public_instance_methods).map { "##{_1}" }
 
       assert_empty public_names - API.fetch(class_name).keys, "list each one in test/contract/gamba.yml"
     end
