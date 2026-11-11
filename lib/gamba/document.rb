@@ -17,7 +17,7 @@ module Prawn
 
     VALID_OPTIONS = %i[
       page_size page_layout margin left_margin right_margin top_margin bottom_margin skip_page_creation compress
-      background info text_formatter print_scaling pdf_a
+      background info text_formatter print_scaling pdf_a lang
     ].freeze
 
     attr_accessor :margin_box, :page_number, :text_formatter
@@ -159,6 +159,13 @@ module Prawn
 
     def render_file(filename)
       File.binwrite(filename, render)
+    end
+
+    # Gamba's own API on this document, from the cursor where it stands: gamba { |document| document.text "…" }.
+    def gamba
+      @gamba ||= Gamba::Document.new(self)
+      yield @gamba if block_given?
+      @gamba
     end
 
     def bounds

@@ -66,15 +66,23 @@ jobs:
             ~/.cache/gamba-tools
             ~/.cache/apt-archives
           key: gamba-${{ runner.os }}-${{ hashFiles('corpus/manifest.yml', '.github/workflows/ci.yml') }}
+          # A change to this file starts from the previous cache: without its packages, the fallback below has none.
+          restore-keys: gamba-${{ runner.os }}-
       # 2026-11-04: Azure's Ubuntu mirror stalls for minutes on libmupdf (34 MB), which cancelled whole jobs: the
       # packages come from the cache, and a stalled attempt is cut after 90 seconds and resumed.
+      # 2026-11-11: the mirror stopped answering apt-get update for hours: the cached packages are then installed
+      # as they are.
       - name: Install the PDF tools
         timeout-minutes: 6
         run: |
           mkdir -p ~/.cache/apt-archives/partial
           for attempt in 1 2 3; do
-            sudo timeout 90 apt-get update && sudo timeout 90 apt-get install --yes \
-              -o Dir::Cache::Archives="$HOME/.cache/apt-archives" mupdf-tools poppler-utils qpdf && break
+            if sudo timeout 90 apt-get update; then
+              sudo timeout 90 apt-get install --yes \
+                -o Dir::Cache::Archives="$HOME/.cache/apt-archives" mupdf-tools poppler-utils qpdf && break
+            else
+              sudo dpkg --install ~/.cache/apt-archives/*.deb && break
+            fi
             test "$attempt" -lt 3 || exit 1
           done
           sudo chown -R "$USER" ~/.cache/apt-archives

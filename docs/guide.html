@@ -33,10 +33,11 @@
   <main id="main">
     <header>
       <h1 class="page-title">Guide</h1>
-      <p class="lede">Gamba answers to Prawn’s API: installing it is swapping gems. This page covers what it brings on top.</p>
+      <p class="lede">Gamba answers to Prawn’s API: installing it is swapping gems. This page covers what it brings on top, and its own API, which existing code adopts one block at a time.</p>
       <ul class="toc">
         <li><a href="#installation">Installation</a></li>
         <li><a href="#usage">Drop-in usage</a></li>
+        <li><a href="#native">Gamba’s own API</a></li>
         <li><a href="#tables">Tables</a></li>
         <li><a href="#svg">SVG</a></li>
         <li><a href="#fonts">Fonts</a></li>
@@ -72,6 +73,33 @@
 <span class="k">end</span></code></pre>
         <p><code>Prawn::VERSION</code> answers <code>"2.5.0"</code>, the version of the API Gamba mirrors, because Prawn extensions check it. Gamba’s own version is <code>Gamba::VERSION</code>.</p>
         <p>The contract is Prawn 2.5’s public methods, listed in <code>test/contract/prawn-2.5.0.yml</code>: Gamba accepts every call Prawn accepts on those, and <code>test/contract/decisions.yml</code> records, method by method, what is in and why the rest is left out.</p>
+      </div>
+    </section>
+
+    <section id="native" aria-labelledby="native-title">
+      <h2 id="native-title">Gamba’s own API</h2>
+      <div class="prose">
+        <p><code>Gamba.document</code> writes a document without Prawn’s conventions. The block receives the document instead of running inside it, so your own methods and instance variables stay in reach. Options are keywords, and a mistyped one raises an <code>ArgumentError</code> that lists the accepted ones, where Prawn ignores it.</p>
+<pre><code class="language-ruby"><span class="nb">require</span> <span class="s2">"gamba"</span>
+
+<span class="n">document</span> <span class="o">=</span> <span class="no">Gamba</span><span class="p">.</span><span class="nf">document</span><span class="p">(</span><span class="ss">page_size: </span><span class="s2">"A4"</span><span class="p">,</span> <span class="ss">margin: </span><span class="mi">36</span><span class="p">,</span> <span class="ss">lang: </span><span class="s2">"en"</span><span class="p">)</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">register_font</span> <span class="s2">"Inter"</span><span class="p">,</span> <span class="ss">normal: </span><span class="s2">"Inter.ttf"</span><span class="p">,</span> <span class="ss">bold: </span><span class="s2">"Inter-Bold.ttf"</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">style</span> <span class="ss">:default</span><span class="p">,</span> <span class="ss">font: </span><span class="s2">"Inter"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">10</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">style</span> <span class="ss">:title</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">18</span><span class="p">,</span> <span class="ss">weight: :bold</span>
+
+  <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Invoice INV-2026-0001"</span><span class="p">,</span> <span class="ss">style: :title</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Due on 1 December 2026"</span><span class="p">,</span> <span class="ss">color: </span><span class="s2">"666666"</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">draw</span> <span class="no">InvoiceLines</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="n">invoice</span><span class="p">)</span>
+<span class="k">end</span>
+<span class="n">document</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="s2">"invoice.pdf"</span><span class="p">)</span> <span class="c1"># or an IO; document.to_s gives the bytes</span></code></pre>
+        <p>A style names text attributes (<code>font</code>, <code>size</code>, <code>weight</code>, <code>italic</code>, <code>color</code>, <code>align</code>, <code>leading</code>); the <code>:default</code> style applies to every text, and what a call passes wins over its style. <code>draw</code> takes any object that answers <code>call(document)</code>, so a document is made of small classes you can test one by one. Fonts registered here use their ligatures and kerning: there is no Prawn page to match. Pass <code>features: []</code> to <code>register_font</code> to turn them off.</p>
+        <p>You don’t have to rewrite anything to start. In code written for Prawn, <code>gamba</code> opens a native block at the cursor, and leaves the cursor below what it drew:</p>
+<pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"report.pdf"</span><span class="p">)</span> <span class="k">do</span>
+  <span class="n">text</span> <span class="s2">"Existing code, unchanged"</span>
+  <span class="n">gamba</span> <span class="p">{</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span> <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"A first native block"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">18</span><span class="p">,</span> <span class="ss">weight: :bold</span> <span class="p">}</span>
+  <span class="n">text</span> <span class="s2">"More existing code"</span>
+<span class="k">end</span></code></pre>
+        <p>The other way round, <code>document.prawn</code> is the <code>Prawn::Document</code> underneath, with all of Prawn’s API: tables, images, SVG and graphics go through it until the native API covers them. This API is guarded like Prawn’s: <code>test/contract/gamba.yml</code> lists every public method with its signature.</p>
       </div>
     </section>
 

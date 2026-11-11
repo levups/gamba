@@ -98,6 +98,15 @@ end
 
 module Gamba
   autoload :Combine, ::File.expand_path("gamba/combine", __dir__)
+  autoload :Document, ::File.expand_path("gamba/native/document", __dir__)
+
+  # A document written with Gamba's own API: Gamba.document(page_size: "A4") { |document| document.text "Hello" }.
+  # See Gamba::Document::OPTIONS for the options; Prawn's API stays reachable through Gamba::Document#prawn.
+  def self.document(**options)
+    document = Document.new(**options)
+    yield document if block_given?
+    document
+  end
 
   # The pages of other PDF files, one after the other in a new one:
   # Gamba.combine([label, label], page_size: [288, 432]). See Gamba::Combine#initialize for the options.
@@ -108,7 +117,7 @@ module Gamba
   # Loads what Gamba otherwise loads on first use, SVG support included: call it before a server forks its
   # workers, so they share that memory instead of each loading its own copy.
   def self.eager_load!
-    [TrueType::File, TrueType::Subset, Prawn::Fonts::TTF, Combine, PDF::Core::Reader]
+    [TrueType::File, TrueType::Subset, Prawn::Fonts::TTF, Combine, PDF::Core::Reader, Document]
     require "prawn-svg"
   end
 end

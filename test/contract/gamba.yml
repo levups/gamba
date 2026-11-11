@@ -1,0 +1,17 @@
+# Gamba's own public API, as Method#parameters gives it. test/native_contract_test.rb fails when a method listed here
+# changes its signature, and when a public method of these classes is missing from the list: a change here is a
+# decision, breaking when it removes or narrows something.
+Gamba:
+  ".combine": [req sources, key page_size, key orientation]
+  ".document": [keyrest options]
+  ".eager_load!": []
+Gamba::Document:
+  "#draw": [req component]
+  "#prawn": []
+  "#register_font": [req family, keyreq normal, key bold, key italic, key bold_italic, key features]
+  "#style": [req name, keyrest attributes]
+  "#text": [req string, key style, keyrest attributes]
+  "#to_s": []
+  "#write": [req destination]
+Prawn::Document:
+  "#gamba": []

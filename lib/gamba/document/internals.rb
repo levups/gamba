@@ -227,6 +227,7 @@ module Prawn
         @pages_reference = ref!(Type: :Pages, Count: 0, Kids: [])
         @root.data[:Pages] = @pages_reference
         @root.data[:ViewerPreferences] = {PrintScaling: :None} if options[:print_scaling] == :none
+        @root.data[:Lang] = PDF::Core::LiteralString.new(options[:lang]) if options[:lang]
         @version = 1.3
         # One entry per save not yet restored, document-wide.
         @unrestored_graphics_states = []
