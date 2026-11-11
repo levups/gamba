@@ -67,9 +67,15 @@ end
 ```
 
 Code written for Prawn adopts it one block at a time, `gamba { |document| document.text "Total", style: :title }`,
-and `document.prawn` gives a native document all of Prawn's API. Text, styles, components, stacks, rows, tables and
-images are there today; headers, footers and grids come next
-([the plan](https://github.com/levups/gamba/issues/69)).
+and `document.prawn` gives a native document all of Prawn's API. A header and a footer are declared once, and know
+their page:
+
+```ruby
+document.footer(gap: 12) { |footer, page| footer.text "Page #{page.number} of #{page.total}", align: :center }
+```
+
+Text, styles, components, stacks, rows, tables, images, headers and footers are there today; tables with named
+columns and grids come next ([the plan](https://github.com/levups/gamba/issues/69)).
 
 Ligatures and kerning from OpenType fonts, per font:
 
