@@ -8,10 +8,18 @@ Gamba:
 Gamba::Document:
   "#draw": [req component]
   "#prawn": []
+  "#row": [keyrest options]
+  "#stack": [keyrest options]
   "#register_font": [req family, keyreq normal, key bold, key italic, key bold_italic, key features]
   "#style": [req name, keyrest attributes]
   "#text": [req string, key style, keyrest attributes]
   "#to_s": []
   "#write": [req destination]
+# What a stack and a row answer inside their block; the rest of the class is how they are measured and placed.
+Gamba::Layout::Container:
+  "#draw": [req component]
+  "#row": [keyrest options]
+  "#stack": [keyrest options]
+  "#text": [req string, key style, key width, key grow, keyrest attributes]
 Prawn::Document:
   "#gamba": []

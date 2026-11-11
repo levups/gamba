@@ -99,6 +99,7 @@ end
 module Gamba
   autoload :Combine, ::File.expand_path("gamba/combine", __dir__)
   autoload :Document, ::File.expand_path("gamba/native/document", __dir__)
+  autoload :Layout, ::File.expand_path("gamba/native/layout", __dir__)
 
   # A document written with Gamba's own API: Gamba.document(page_size: "A4") { |document| document.text "Hello" }.
   # See Gamba::Document::OPTIONS for the options; Prawn's API stays reachable through Gamba::Document#prawn.
