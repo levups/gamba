@@ -44,6 +44,22 @@ version of the API Gamba reproduces, for code that checks it. Gamba's own versio
 
 Anything that would change how a page looks compared with Prawn is off until you ask for it.
 
+An API of its own, next to Prawn's. The block receives the document instead of running inside it, options are
+keywords, and a mistyped one raises instead of being ignored:
+
+```ruby
+document = Gamba.document(page_size: "A4", lang: "en") do |document|
+  document.style :title, size: 18, weight: :bold
+  document.text "Invoice INV-2026-0001", style: :title
+  document.draw InvoiceLines.new(invoice) # any object with call(document)
+end
+document.write("invoice.pdf")
+```
+
+Code written for Prawn adopts it one block at a time, `gamba { |document| document.text "Total", style: :title }`,
+and `document.prawn` gives a native document all of Prawn's API. Text, styles and components are there today;
+layout comes next ([the plan](https://github.com/levups/gamba/issues/69)).
+
 Ligatures and kerning from OpenType fonts, per font:
 
 ```ruby
