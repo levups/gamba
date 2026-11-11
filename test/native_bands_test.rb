@@ -72,7 +72,7 @@ class NativeBandsTest < Minitest::Test
 
   def test_a_table_in_a_footer_stays_on_its_page
     document = Gamba.document do |yielded|
-      yielded.footer { |footer, page| footer.table([["Page", page.number.to_s]]) }
+      yielded.footer { |footer, page| footer.table([{label: "Page", number: page.number}], header: false) }
       yielded.text "Body"
     end
 

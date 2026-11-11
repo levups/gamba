@@ -144,58 +144,6 @@ module Gamba
       end
     end
 
-    # A Prawn table as a box: as wide as its box, broken across pages with its header when a stack flows it.
-    class Table < Node
-      OPTIONS = (Node::OPTIONS + %i[header column_widths cell_style row_colors]).freeze
-      # Prawn starts a new page unless a row is strictly shorter than what is left of the page: a table that
-      # fills the page to the point would be cut. Measured a hair higher, it fits with room to spare or moves.
-      PAGE_BREAK_SLACK_POINTS = 0.001
-
-      def initialize(rows, styling, width: nil, grow: nil, **table_options)
-        Styles.check_options(table_options, OPTIONS)
-        super(width:, grow:)
-        @rows = rows
-        @styling = styling
-        @table_options = table_options.compact
-      end
-
-      def paint(prawn, left, top, width)
-        table = table(prawn, width)
-        prawn.y = top
-        within(prawn, left, width) { table.draw }
-      end
-
-      def flow(prawn, cursor, left, width)
-        paint(prawn, left, cursor.y, width)
-        cursor.y = prawn.y
-      end
-
-      private
-
-      def measure(prawn, width)
-        table(prawn, width).height + PAGE_BREAK_SLACK_POINTS
-      end
-
-      def description
-        "a table"
-      end
-
-      # Columns given all their widths keep them; otherwise the table takes the width of its box.
-      def table(prawn, width)
-        return @table if @table_width == width
-
-        options = @table_options[:column_widths].is_a?(Array) ? @table_options : {width:, **@table_options}
-        @table_width = width
-        @table = within(prawn, prawn.bounds.absolute_left, width) { prawn.make_table(@rows, options) { |table| @styling&.call(table) } }
-      end
-
-      # Prawn's table reads its left edge and the width it may take from the bounds.
-      def within(prawn, left, width, &)
-        bounds = prawn.bounds
-        prawn.indent(left - bounds.absolute_left, bounds.absolute_right - left - width, &)
-      end
-    end
-
     # An image as a box: at its own size unless told a width or a height, never wider than its box, never distorted.
     class Image < Node
       OPTIONS = (Node::OPTIONS + %i[height align]).freeze
@@ -241,7 +189,8 @@ module Gamba
 
     # What a document and its containers share: the calls that add a box.
     module Builder
-      # The block receives the Prawn::Table before it is laid out, to style rows, columns and cells.
+      # Rows are hashes, or objects answering the columns' names. The block receives the Prawn::Table before it
+      # is laid out, for what the options do not cover: spans, the style of one cell.
       def table(rows, **options, &styling)
         add(Table.new(rows, styling, **options))
       end
@@ -439,6 +388,14 @@ module Gamba
           "accepted options are #{accepted.map(&:inspect).join(", ")}"
       end
 
+      # Prawn's name for a weight and a slant.
+      def self.font_style(weight, italic)
+        weight ||= :normal
+        raise ArgumentError, "weight is #{weight.inspect}: accepted weights are :normal, :bold" unless %i[normal bold].include?(weight)
+
+        FONT_STYLES[((weight == :bold) ? 1 : 0) + (italic ? 2 : 0)]
+      end
+
       def initialize(prawn, default_font_features)
         @prawn = prawn
         @default_font_features = default_font_features
@@ -470,10 +427,7 @@ module Gamba
       end
 
       def text_options(attributes)
-        weight = attributes.delete(:weight) || :normal
-        raise ArgumentError, "weight is #{weight.inspect}: accepted weights are :normal, :bold" unless %i[normal bold].include?(weight)
-
-        font_style = FONT_STYLES[((weight == :bold) ? 1 : 0) + (attributes.delete(:italic) ? 2 : 0)]
+        font_style = self.class.font_style(attributes.delete(:weight), attributes.delete(:italic))
         attributes[:style] = font_style unless font_style == :normal
         attributes.compact
       end
