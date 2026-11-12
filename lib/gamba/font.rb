@@ -219,8 +219,12 @@ module Prawn
       encoded_string = font.measured_string(string)
       width = width_by_string(font, @document.font_size, options[:size], options[:kerning])[encoded_string] ||=
         font.compute_width_of(encoded_string, options)
+      character_spacing = @document.character_spacing
+      # Without spacing the glyphs need no counting, which ligatures make a shaping pass.
+      return width if character_spacing.zero?
+
       character_count = @document.font.character_count(encoded_string)
-      character_count.positive? ? width + (@document.character_spacing * (character_count - 1)) : width
+      character_count.positive? ? width + (character_spacing * (character_count - 1)) : width
     end
 
     private

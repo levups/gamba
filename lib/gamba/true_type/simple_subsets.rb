@@ -14,6 +14,7 @@ module Gamba
       end
 
       SPACE = 32
+      SPACE_CLUSTER = [SPACE].freeze
       FIRST_FREE_CODE = 33
 
       def initialize(glyph_for_cluster)
@@ -33,14 +34,17 @@ module Gamba
       # [[subset index, bytes], …] for clusters of characters, each cluster [glyph, codes].
       def encode(clusters)
         parts = []
-        clusters.each do |glyph, codes|
-          if !parts.empty? && (codes == [SPACE] || codes == SPACE) && glyph == @subsets[0].glyph_by_code[SPACE]
-            parts.last[1] << SPACE
-          else
-            append(parts, *(@location_by_cluster[codes] ||= code_for([glyph, codes])))
-          end
-        end
+        clusters.each { |glyph, codes| append_cluster(parts, glyph, codes) }
         parts
+      end
+
+      # Adds one cluster's code to parts: [[subset index, bytes], …].
+      def append_cluster(parts, glyph, codes)
+        if !parts.empty? && (codes == SPACE || codes == SPACE_CLUSTER) && glyph == @subsets[0].glyph_by_code[SPACE]
+          parts.last[1] << SPACE
+        else
+          append(parts, *(@location_by_cluster[codes] ||= code_for([glyph, codes])))
+        end
       end
 
       # The same for single characters, by code point: the common case, where a character already given its code

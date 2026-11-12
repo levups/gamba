@@ -95,20 +95,7 @@ module Prawn
           return options[:kerning] ? encode_kerned_codepoints(text.codepoints) : @simple_subsets.encode_codepoints(text.codepoints, cmap)
         end
 
-        clusters = @layout ? @layout.shape(text.codepoints) : text.codepoints.map { |code| [cmap[code], code] }
-        return @simple_subsets.encode(clusters) unless options[:kerning]
-
-        encoded = []
-        run = []
-        clusters.each do |cluster|
-          if run.any? && (offset = kerning_between(run.last[0], cluster[0]))
-            append_encoded_run(encoded, run)
-            encoded.last[1] = Array(encoded.last[1]) << -(offset * scale_factor)
-            run = []
-          end
-          run << cluster
-        end
-        append_encoded_run(encoded, run)
+        encode_shaped(text.codepoints, options[:kerning])
       end
 
       def basename
@@ -185,7 +172,11 @@ module Prawn
 
       # Glyphs, which character spacing applies to: fewer than characters once ligatures join some.
       def character_count(string)
-        @layout ? @layout.shape(string.codepoints).size : string.length
+        return string.length unless @layout
+
+        count = 0
+        @layout.each_glyph(string.codepoints) { count += 1 }
+        count
       end
 
       private
@@ -241,7 +232,7 @@ module Prawn
       # PDF word spacing (Tw) only reaches byte 32 of single-byte encodings (ISO 32000-1 §9.3.3): with two-byte
       # codes, each space gets the same shift as a TJ offset instead.
       def space_out_words(runs, word_spacing, font_size)
-        space = @layout ? cluster_string([[cmap[32], [32]]]) : glyph_string([32])
+        space = glyph_string([32])
         # From the spacing as Tw would write it, rounded to five decimals, so spaces land where Prawn's do.
         offset = -(Float(PDF::Core.real(word_spacing)) * 1000.0 / font_size)
         runs.flat_map do |run|
@@ -254,11 +245,12 @@ module Prawn
       def shaped_width_of(string, options)
         width = 0
         previous_glyph = nil
-        @layout.shape(string.codepoints).each do |glyph, codes|
+        codes = string.codepoints
+        @layout.each_glyph(codes) do |glyph, index, length|
           if options[:kerning] && previous_glyph && (offset = kerning_between(previous_glyph, glyph))
             width += offset * scale_factor
           end
-          width += (codes == [LINE_FEED]) ? 0.0 : Integer(@ttf.advance_widths[glyph] * scale_factor)
+          width += (length == 1 && codes[index] == LINE_FEED) ? 0.0 : Integer(@ttf.advance_widths[glyph] * scale_factor)
           previous_glyph = glyph
         end
         width * ((options[:size] || size) / 1000.0)
@@ -303,8 +295,22 @@ module Prawn
       end
 
       # Runs of one subset merge into the previous part when it is of the same subset, as in Prawn's TJ arrays.
-      def append_encoded_run(encoded, run)
-        merge_encoded_parts(encoded, @simple_subsets.encode(run))
+      # Each glyph's code straight into the parts of its run, with no cluster built for it: text is drawn glyph by
+      # glyph, and most glyphs stand for one character.
+      def encode_shaped(codes, kerning)
+        encoded = []
+        run = []
+        previous_glyph = nil
+        @layout.each_glyph(codes) do |glyph, index, length|
+          if kerning && previous_glyph && (offset = kerning_between(previous_glyph, glyph))
+            merge_encoded_parts(encoded, run)
+            encoded.last[1] = Array(encoded.last[1]) << -(offset * scale_factor)
+            run = []
+          end
+          @simple_subsets.append_cluster(run, glyph, Gamba::TrueType::OpenTypeLayout.cluster_codes(codes, index, length))
+          previous_glyph = glyph
+        end
+        merge_encoded_parts(encoded, run)
       end
 
       def merge_encoded_parts(encoded, parts)
