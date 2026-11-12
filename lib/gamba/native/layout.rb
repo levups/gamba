@@ -30,6 +30,12 @@ module Gamba
         y == @page_top
       end
 
+      # What a box has from the top of a page: more cannot be kept together.
+      def page_height
+        bounds = @prawn.bounds
+        @page_top - (bounds.stretchy? ? @prawn.margin_box.absolute_bottom : bounds.absolute_bottom)
+      end
+
       def next_page
         @prawn.bounds.move_past_bottom
         @page_top = @y = @prawn.y
@@ -37,20 +43,26 @@ module Gamba
     end
 
     class Node
-      OPTIONS = %i[width grow].freeze
+      OPTIONS = %i[width grow keep_with_next].freeze
 
-      attr_reader :width, :grow
+      attr_reader :width, :grow, :keep_with_next
 
-      def initialize(width: nil, grow: nil)
+      def initialize(width: nil, grow: nil, keep_with_next: false)
         raise ArgumentError, "width and grow exclude each other: a box is as wide as told, or shares what is left" if width && grow
 
         @width = width
         @grow = grow
+        @keep_with_next = keep_with_next
       end
 
       # A box is measured when it is placed and again by the boxes around it: once per width is enough.
       def height(prawn, width)
         (@height_by_width ||= {})[width] ||= measure(prawn, width)
+      end
+
+      # The least of this box that can start a page: all of it, unless it can be split.
+      def first_height(prawn, width)
+        height(prawn, width)
       end
 
       # A box that cannot be split goes to the next page when the rest of this one is too short for it.
@@ -72,13 +84,20 @@ module Gamba
       end
     end
 
+    # A paragraph: its lines fill the page and the rest goes on to the next ones, never leaving fewer than
+    # `orphans` lines at the bottom of a page nor fewer than `widows` at the top of the next.
     class Text < Node
-      def initialize(string, font:, font_options:, color:, text_options:, **)
+      DEFAULT_WIDOWS = 2
+      DEFAULT_ORPHANS = 2
+
+      def initialize(string, font:, font_options:, color:, text_options:, widows: DEFAULT_WIDOWS, orphans: DEFAULT_ORPHANS, **)
         super(**)
         @fragments = [color ? {text: string, color:} : {text: string}]
         @font = font
         @font_options = font_options
         @text_options = text_options
+        @widows = lines_option(:widows, widows)
+        @orphans = lines_option(:orphans, orphans)
       end
 
       # The lines wrapped to measure the text are drawn as they are, when Prawn's box can draw them again.
@@ -93,16 +112,29 @@ module Gamba
         end
       end
 
-      # Lines fill the page, and the rest goes on to the next ones.
       def flow(prawn, cursor, left, width)
         with_font(prawn) do
           fragments = @fragments
           loop do
-            box = box(prawn, fragments, relative(prawn, left, cursor.y), width, cursor.remaining)
+            probe = laid_out(prawn, fragments, width)
+            height = height_for_this_page(probe, cursor)
+            if height.zero?
+              cursor.next_page
+              next
+            end
+
+            at = relative(prawn, left, cursor.y)
+            # Most paragraphs fit whole: the lines wrapped to place them are drawn as they are.
+            if height == MEASURING_HEIGHT_POINTS && probe.layout_reusable?
+              probe.render_laid_out(at)
+              cursor.y -= advance(probe)
+              break
+            end
+
+            box = box(prawn, fragments, at, width, height)
             unprinted = box.render
-            cursor.y -= advance(box) unless box.nothing_printed?
+            cursor.y -= advance(box)
             break if unprinted.empty?
-            raise Prawn::Errors::CannotFit, "#{description} has a line higher than the page" if box.nothing_printed? && cursor.at_page_top?
 
             fragments = unprinted
             cursor.next_page
@@ -110,15 +142,56 @@ module Gamba
         end
       end
 
+      # A page can start with this paragraph's first `orphans` lines, or with all of it when it is shorter.
+      def first_height(prawn, width)
+        height(prawn, width)
+        bottoms = @measured_box.line_bottoms
+        return height(prawn, width) if bottoms.size <= @orphans
+
+        bottoms[@orphans - 1]
+      end
+
       private
+
+      def lines_option(name, lines)
+        return lines if lines.is_a?(Integer) && lines >= 1
+
+        raise ArgumentError, "#{name} is #{lines.inspect}: give a number of lines, 1 or more"
+      end
 
       def measure(prawn, width)
         with_font(prawn) do
           @measured_width = width
-          @measured_box = box(prawn, @fragments, [0, 0], width, MEASURING_HEIGHT_POINTS)
-          @measured_box.render(dry_run: true, keep_layout: true)
+          @measured_box = laid_out(prawn, @fragments, width)
           advance(@measured_box)
         end
+      end
+
+      # The fragments wrapped at this width, with no height to stop them, their lines kept.
+      def laid_out(prawn, fragments, width)
+        box = box(prawn, fragments, [0, 0], width, MEASURING_HEIGHT_POINTS)
+        box.render(dry_run: true, keep_layout: true)
+        box
+      end
+
+      # The height to give this page's box, 0 when the paragraph moves on to the next page: as many lines as fit,
+      # fewer when the rest would leave widows, none when what fits would leave orphans. At the top of a page,
+      # a paragraph takes what fits whatever its rules: no other page would do better.
+      def height_for_this_page(probe, cursor)
+        return MEASURING_HEIGHT_POINTS if cursor.fits?(probe.height)
+
+        bottoms = probe.line_bottoms
+        fitting = bottoms.count { |bottom| bottom <= cursor.remaining + FIT_TOLERANCE_POINTS }
+        if fitting.zero?
+          raise Prawn::Errors::CannotFit, "#{description} has a line higher than the page" if cursor.at_page_top?
+
+          return 0
+        end
+        return MEASURING_HEIGHT_POINTS if fitting == bottoms.size
+        return bottoms[fitting - 1] if cursor.at_page_top?
+
+        kept = [fitting, bottoms.size - @widows].min
+        (kept >= @orphans) ? bottoms[kept - 1] : 0
       end
 
       def description
@@ -310,12 +383,35 @@ module Gamba
         cursor.y -= @padding_top
         @children.each_with_index do |child, index|
           cursor.y -= @gap unless index.zero? || cursor.at_page_top?
+          keep_with_what_follows(prawn, cursor, width, index)
           child.flow(prawn, cursor, left + @padding_left, child_width(child, width))
         end
         cursor.y -= @padding_bottom
       end
 
+      # A page can start with the top of this stack's first child, when the stack can be split.
+      def first_height(prawn, width)
+        return height(prawn, width) if @keep_together || decorated? || @children.empty?
+
+        first = @children.first
+        @padding_top + first.first_height(prawn, child_width(first, width))
+      end
+
       private
+
+      # Children kept with the next go to the next page together with the start of the one after them, when this
+      # page is too short for all of it and a page is not.
+      def keep_with_what_follows(prawn, cursor, width, index)
+        return if cursor.at_page_top? || (index.positive? && @children[index - 1].keep_with_next)
+
+        kept = @children[index..].take_while(&:keep_with_next)
+        following = @children[index + kept.size]
+        return if kept.empty? || following.nil?
+
+        needed = kept.sum { |child| child.height(prawn, child_width(child, width)) + @gap } +
+          following.first_height(prawn, child_width(following, width))
+        cursor.next_page if !cursor.fits?(needed) && needed <= cursor.page_height + FIT_TOLERANCE_POINTS
+      end
 
       def measure(prawn, width)
         @padding_top + @padding_bottom + (@gap * [@children.size - 1, 0].max) +
@@ -330,6 +426,13 @@ module Gamba
         raise ArgumentError, "grow shares the width of a row: it means nothing in a stack" if child.grow
 
         [child.width || inner_width(width), inner_width(width)].min
+      end
+    end
+
+    # The boxes of a document kept with what follows them, waiting for it to be placed together.
+    class Group < Stack
+      def push(node)
+        add(node)
       end
     end
 
@@ -376,7 +479,9 @@ module Gamba
 
     # Named text attributes, and what they come to for Prawn once a call's own are added.
     class Styles
-      TEXT_ATTRIBUTES = %i[font size weight italic color align leading].freeze
+      TEXT_ATTRIBUTES = %i[font size weight italic color align leading widows orphans keep_with_next].freeze
+      # Attributes of the paragraph's place on the page, not of its glyphs: the layout reads them, Prawn does not.
+      LAYOUT_ATTRIBUTES = %i[widows orphans keep_with_next].freeze
       FONT_STYLES = %i[normal bold italic bold_italic].freeze
       DEFAULT_STYLE = :default
 
@@ -411,9 +516,11 @@ module Gamba
       def text_arguments(style, attributes)
         self.class.check_options(attributes, TEXT_ATTRIBUTES)
         attributes = {**@attributes_by_name.fetch(DEFAULT_STYLE, {}), **named(style), **attributes}
+        layout = attributes.slice(*LAYOUT_ATTRIBUTES)
+        attributes = attributes.except(*LAYOUT_ATTRIBUTES)
         font = attributes.delete(:font)
         font_options = (font.nil? || @prawn.font_families.key?(font)) ? {} : {features: @default_font_features}
-        {font:, font_options:, color: attributes.delete(:color), text_options: text_options(attributes)}
+        {font:, font_options:, color: attributes.delete(:color), text_options: text_options(attributes), **layout}
       end
 
       private

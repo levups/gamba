@@ -41,6 +41,13 @@ module Gamba
         cursor.y = prawn.y unless data.empty?
       end
 
+      # A page can start with the header and the first row.
+      def first_height(prawn, width)
+        return 0 if data.empty?
+
+        table(prawn, width).rows(0..[@header ? 1 : 0, data.size - 1].min).height + PAGE_BREAK_SLACK_POINTS
+      end
+
       private
 
       def measure(prawn, width)

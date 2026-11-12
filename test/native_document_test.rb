@@ -27,7 +27,7 @@ class NativeDocumentTest < Minitest::Test
   def test_an_unknown_text_attribute_raises_with_the_accepted_ones
     error = assert_raises(ArgumentError) { Gamba.document.text("Hello", colour: "ff0000", sise: 3) }
 
-    assert_match(/\Aunknown options :colour, :sise: accepted options are :font, :size, :weight, :italic, :color, :align, :leading\z/, error.message)
+    assert_match(/\Aunknown options :colour, :sise: accepted options are :font, :size, :weight, :italic, :color, :align, :leading, :widows, :orphans, :keep_with_next\z/, error.message)
   end
 
   def test_an_unknown_style_attribute_raises_when_the_style_is_defined
