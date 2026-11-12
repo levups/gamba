@@ -74,8 +74,14 @@ their page:
 document.footer(gap: 12) { |footer, page| footer.text "Page #{page.number} of #{page.total}", align: :center }
 ```
 
-Text, styles, components, stacks, rows, tables, images, headers and footers are there today; tables with named
-columns and grids come next ([the plan](https://github.com/levups/gamba/issues/69)).
+Tables have named columns, and rows that are hashes or objects, so nothing is counted by position:
+
+```ruby
+document.table(lines, columns: {sku: {title: "SKU", width: 60}, description: {}, total: {align: :right, weight: :bold}})
+```
+
+Text, styles, components, stacks, rows, tables, images, headers and footers are there today; grids and finer page
+breaks come next ([the plan](https://github.com/levups/gamba/issues/69)).
 
 Ligatures and kerning from OpenType fonts, per font:
 

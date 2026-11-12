@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "layout"
+require_relative "table"
 require_relative "band"
 
 module Gamba
