@@ -123,6 +123,31 @@ class NativeBreaksTest < Minitest::Test
     assert_equal 3, pages.first
   end
 
+  def test_a_table_kept_with_the_next_moves_with_the_start_of_it
+    rows = [{item: "row"}]
+    kept, loose = [true, false].map do |keep_with_next|
+      texts_by_page do |document|
+        room_for(document, 3)
+        document.table(rows, header: false, keep_with_next:)
+        document.text paragraph(5)
+      end
+    end
+
+    assert_equal "", kept.first
+    assert kept.last.start_with?("rowline 1")
+    assert_equal "row", loose.first
+  end
+
+  def test_a_page_break_starts_what_follows_on_a_new_page_after_the_boxes_waiting_for_it
+    pages = texts_by_page do |document|
+      document.text "Kept", keep_with_next: true
+      document.page_break
+      document.text "Next page"
+    end
+
+    assert_equal ["Kept", "Next page"], pages
+  end
+
   def test_widows_and_orphans_take_a_number_of_lines
     document = Gamba.document
 

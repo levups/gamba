@@ -5,7 +5,7 @@ const METRICS = [
   { key: "bytes", title: "File weight", better: "lower", format: (value) => formatBytes(value) },
   { key: "peak_memory_megabytes", title: "Peak memory of the process", better: "lower", format: (value) => `${formatNumber(value)} MB` }
 ];
-const ENGINE_NAMES = { prawn: "Prawn", gamba: "Gamba" };
+const ENGINE_NAMES = { prawn: "Prawn", gamba: "Gamba", gamba_native: "Gamba, own API" };
 const DOCUMENT_DESCRIPTIONS = {
   invoice: "A one-page invoice: an embedded TrueType font, a JPEG letterhead, a ten-line table.",
   report: "A 101-page report: an embedded TrueType font, a PNG with alpha and a JPEG on every page, justified text.",

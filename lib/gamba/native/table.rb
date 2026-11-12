@@ -16,11 +16,12 @@ module Gamba
       # fills the page to the point would be cut. Measured a hair higher, it fits with room to spare or moves.
       PAGE_BREAK_SLACK_POINTS = 0.001
 
-      def initialize(rows, styling, **options)
+      def initialize(rows, styling, styles, **options)
         Styles.check_options(options, OPTIONS)
-        super(width: options[:width], grow: options[:grow])
+        super(**options.slice(*Node::OPTIONS))
         @rows = rows
         @styling = styling
+        @styles = styles
         @columns = checked_columns(options[:columns] || inferred_columns)
         @header = checked_header(options.fetch(:header, true))
         @stripes = options[:stripes]
@@ -113,7 +114,7 @@ module Gamba
 
       def prawn_options(width)
         widths = @columns.each_value.map { |options| options[:width] }
-        options = {header: !@header.nil?, cell_style: prawn_cell_style(@cell)}
+        options = {header: !@header.nil?, cell_style: prawn_cell_style({**@styles.cell_defaults, **@cell})}
         options[:row_colors] = @stripes if @stripes
         options[:column_widths] = widths.each_with_index.to_h { |column_width, index| [index, column_width] }.compact
         options[:width] = width unless widths.all?

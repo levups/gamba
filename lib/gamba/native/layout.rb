@@ -115,15 +115,24 @@ module Gamba
       def flow(prawn, cursor, left, width)
         with_font(prawn) do
           fragments = @fragments
+          # How high the rest of the paragraph is at most, once a page took its first lines.
+          rest_height = nil
           loop do
-            probe = laid_out(prawn, fragments, width)
+            at = relative(prawn, left, cursor.y)
+            # The rest fits whole: no rule can apply, and nothing needs to be wrapped twice.
+            if rest_height && cursor.fits?(rest_height)
+              cursor.y -= advance(box(prawn, fragments, at, width, MEASURING_HEIGHT_POINTS).tap(&:render))
+              break
+            end
+
+            # Measured already, by a box kept with this one: its lines serve again.
+            probe = (fragments.equal?(@fragments) && @measured_width == width) ? @measured_box : laid_out(prawn, fragments, width)
             height = height_for_this_page(probe, cursor)
             if height.zero?
               cursor.next_page
               next
             end
 
-            at = relative(prawn, left, cursor.y)
             # Most paragraphs fit whole: the lines wrapped to place them are drawn as they are.
             if height == MEASURING_HEIGHT_POINTS && probe.layout_reusable?
               probe.render_laid_out(at)
@@ -136,6 +145,8 @@ module Gamba
             cursor.y -= advance(box)
             break if unprinted.empty?
 
+            # A first line takes no more than the line spacing it had below the line before it.
+            rest_height = probe.height - height
             fragments = unprinted
             cursor.next_page
           end
@@ -265,7 +276,7 @@ module Gamba
       # Rows are hashes, or objects answering the columns' names. The block receives the Prawn::Table before it
       # is laid out, for what the options do not cover: spans, the style of one cell.
       def table(rows, **options, &styling)
-        add(Table.new(rows, styling, **options))
+        add(Table.new(rows, styling, @styles, **options))
       end
 
       def image(source, **options)
@@ -510,6 +521,11 @@ module Gamba
       def define(name, attributes)
         self.class.check_options(attributes, TEXT_ATTRIBUTES)
         @attributes_by_name[name] = attributes.freeze
+      end
+
+      # The default style's font, size and colour, which a table's cells start from.
+      def cell_defaults
+        @attributes_by_name.fetch(DEFAULT_STYLE, {}).slice(:font, :size, :color)
       end
 
       # The font to set around the text, if any, and the options of the Prawn call.

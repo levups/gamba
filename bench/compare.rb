@@ -34,10 +34,20 @@ def median(values)
   values.sort[values.size / 2]
 end
 
-# The engines take turns, so a slower moment of the machine weighs on both.
+# What each column of the results renders: the document with Prawn's API on each engine, and with Gamba's own API
+# where bench/native has it.
+def candidates(document)
+  native = File.join(__dir__, "native", File.basename(document))
+  columns = Oracle::ENGINES.keys.to_h { |engine| [engine, [engine, document]] }
+  columns["gamba_native"] = ["gamba", native] if File.exist?(native)
+  columns
+end
+
+# The engines take turns, so a slower moment of the machine weighs on each.
 def median_measures(document)
-  samples_by_engine = Oracle::ENGINES.keys.to_h { |engine| [engine, []] }
-  PROCESSES.times { samples_by_engine.each { |engine, samples| samples << measure(engine, document) } }
+  columns = candidates(document)
+  samples_by_engine = columns.keys.to_h { |column| [column, []] }
+  PROCESSES.times { columns.each { |column, (engine, path)| samples_by_engine[column] << measure(engine, path) } }
   samples_by_engine.transform_values do |samples|
     unavailable = samples.find { |sample| sample[:unavailable] }
     next unavailable if unavailable
@@ -53,7 +63,7 @@ end
 results.each do |document, measures_by_engine|
   measures_by_engine.each do |engine, measures|
     summary = measures[:unavailable] ? "unavailable (#{measures[:unavailable]})" : measures.map { |name, value| "#{name} #{value}" }.join(", ")
-    puts format("%-10s %-7s %s", document, engine, summary)
+    puts format("%-10s %-12s %s", document, engine, summary)
   end
 end
 File.write(File.expand_path("../docs/benchmarks.json", __dir__), JSON.pretty_generate(ruby: RUBY_DESCRIPTION, iterations: ITERATIONS, processes: PROCESSES, results:) + "\n")
