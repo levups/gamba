@@ -17,41 +17,68 @@ module Gamba
         @features = features.map(&:to_s)
         @ligatures_by_first_glyph = read_ligatures
         @pair_lookups = read_pair_lookups
+        @kerning_by_pair = {}
       end
 
-      # Glyphs and the characters each stands for, ligatures applied: [[glyph, [code, …]], …].
+      # Glyphs and the characters each stands for, ligatures applied: [[glyph, code or [code, …]], …], a glyph
+      # standing for one character carrying its code alone, as unshaped text does.
       def shape(codes)
-        clusters = codes.map { |code| [@file.glyph_by_code[code], [code]] }
-        return clusters if @ligatures_by_first_glyph.empty?
-
         shaped = []
-        index = 0
-        while index < clusters.size
-          ligature = (@ligatures_by_first_glyph[clusters[index][0]] || []).find do |components, _|
-            components.each_with_index.all? { |component, offset| clusters[index + 1 + offset]&.first == component }
-          end
-          if ligature
-            components, glyph = ligature
-            shaped << [glyph, clusters[index, components.size + 1].flat_map(&:last)]
-            index += components.size + 1
-          else
-            shaped << clusters[index]
-            index += 1
-          end
-        end
+        each_glyph(codes) { |glyph, index, length| shaped << [glyph, self.class.cluster_codes(codes, index, length)] }
         shaped
       end
 
-      # The horizontal advance adjustment between two glyphs, in font units, or nil.
+      def self.cluster_codes(codes, index, length)
+        (length == 1) ? codes[index] : codes[index, length]
+      end
+
+      # Each glyph, ligatures applied, with the index of its first character and how many it stands for. Text is
+      # measured word by word: this builds nothing for the glyphs of a word.
+      def each_glyph(codes)
+        glyph_by_code = @file.glyph_by_code
+        index = 0
+        while index < codes.size
+          glyph = glyph_by_code[codes[index]]
+          ligature = ligature_at(codes, index, glyph, glyph_by_code)
+          if ligature
+            length = ligature[0].size + 1
+            yield ligature[1], index, length
+          else
+            length = 1
+            yield glyph, index, length
+          end
+          index += length
+        end
+      end
+
+      # The horizontal advance adjustment between two glyphs, in font units, or nil. Each pair is read from the
+      # font once: a document kerns the same pairs over and over.
       def kerning(left, right)
+        pair = (left << 16) | right
+        adjustment = @kerning_by_pair.fetch(pair) { @kerning_by_pair[pair] = pair_adjustment(left, right) || false }
+        adjustment || nil
+      end
+
+      private
+
+      # The longest ligature starting with this glyph whose other components follow it: [components, glyph].
+      def ligature_at(codes, index, glyph, glyph_by_code)
+        @ligatures_by_first_glyph[glyph]&.find do |components, _ligature_glyph|
+          next false if index + components.size >= codes.size
+
+          matched = 0
+          matched += 1 while matched < components.size && glyph_by_code[codes[index + 1 + matched]] == components[matched]
+          matched == components.size
+        end
+      end
+
+      def pair_adjustment(left, right)
         @pair_lookups.each do |lookup|
           adjustment = lookup.call(left, right)
           return adjustment if adjustment
         end
         nil
       end
-
-      private
 
       def read_ligatures
         table = @file.table("GSUB")
