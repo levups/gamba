@@ -37,7 +37,8 @@ CI also runs `ruby-head` and `truffleruby-head`, and the oracle and both fuzzers
 
 ## Rules for all our gems
 
-This section and the next two read the same in super-slim, gamba, crumbly and agentry: change all four together.
+This section and the next two read the same in super-slim, gamba, crumbly, agentry and mapitaine: change all five
+together.
 
 - Every maintained Ruby and Rails (https://endoflife.date), nothing older. The oldest sets `required_ruby_version`,
   `TargetRubyVersion` and the Rails floor, and leaves in the release after its end of life.
@@ -86,4 +87,4 @@ environment on GitHub.
    Then check RubyGems.
 
 RubyGems trusts only that workflow: never `gem push`, except a new gem name's first version. `bin/release` and
-`release.yml` are identical in all four gems.
+`release.yml` are identical in all five gems.
