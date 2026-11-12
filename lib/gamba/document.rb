@@ -164,7 +164,11 @@ module Prawn
     # Gamba's own API on this document, from the cursor where it stands: gamba { |document| document.text "…" }.
     def gamba
       @gamba ||= Gamba::Document.new(self)
-      yield @gamba if block_given?
+      if block_given?
+        yield @gamba
+        # Boxes kept with a next one the block never added are placed before Prawn's code goes on.
+        @gamba.prawn
+      end
       @gamba
     end
 

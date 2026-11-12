@@ -93,6 +93,11 @@ module Prawn
             @overflow != :shrink_to_fit && self.class.extensions.empty? && @original_array.none? { _1[:color] }
         end
 
+        # How far below the box's top each line of the last kept layout ends, its descender included.
+        def line_bottoms
+          @laid_out_lines.map { |baseline_y, _drawn_fragments, descender| descender - baseline_y }
+        end
+
         # Draws, with its top left corner at `at`, the lines the last kept layout wrapped, without wrapping them again.
         def render_laid_out(at)
           @at = at.dup

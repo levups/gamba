@@ -80,8 +80,11 @@ Tables have named columns, and rows that are hashes or objects, so nothing is co
 document.table(lines, columns: {sku: {title: "SKU", width: 60}, description: {}, total: {align: :right, weight: :bold}})
 ```
 
-Text, styles, components, stacks, rows, tables, images, headers and footers are there today; grids and finer page
-breaks come next ([the plan](https://github.com/levups/gamba/issues/69)).
+Pages break where a reader expects them: a paragraph leaves no single line at the bottom or the top of a page
+(`widows` and `orphans`, 2 unless told), and a heading with `keep_with_next: true` moves with what follows it.
+
+Text, styles, components, stacks, rows, tables, images, headers, footers and these page breaks are there today; grids
+come next ([the plan](https://github.com/levups/gamba/issues/69)).
 
 Ligatures and kerning from OpenType fonts, per font:
 

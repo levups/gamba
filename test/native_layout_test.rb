@@ -8,8 +8,8 @@ require "prawn"
 class NativeLayoutTest < Minitest::Test
   PARAGRAPHS = Array.new(30) { |index| "Paragraph #{index} #{"word " * 60}".strip }
 
-  def test_a_stack_of_texts_draws_what_prawn_text_calls_draw_across_pages
-    native = Gamba.document { |document| document.stack { |stack| PARAGRAPHS.each { |paragraph| stack.text paragraph, size: 10 } } }
+  def test_a_stack_of_texts_without_widow_or_orphan_rules_draws_what_prawn_text_calls_draw_across_pages
+    native = Gamba.document { |document| document.stack { |stack| PARAGRAPHS.each { |paragraph| stack.text paragraph, size: 10, widows: 1, orphans: 1 } } }
     prawn = Prawn::Document.new { PARAGRAPHS.each { |paragraph| text paragraph, size: 10 } }
 
     assert_operator native.prawn.page_count, :>, 1
@@ -131,7 +131,7 @@ class NativeLayoutTest < Minitest::Test
   def test_unknown_or_contradictory_options_raise
     document = Gamba.document
 
-    assert_match(/\Aunknown option :gab: accepted options are :width, :grow, :gap, /, assert_raises(ArgumentError) { document.stack(gab: 2) { nil } }.message)
+    assert_match(/\Aunknown option :gab: accepted options are :width, :grow, :keep_with_next, :gap, /, assert_raises(ArgumentError) { document.stack(gab: 2) { nil } }.message)
     assert_raises(ArgumentError) { document.row(keep_together: true) { nil } }
     assert_raises(ArgumentError) { document.stack(padding: [1, 2, 3]) { nil } }
     assert_raises(ArgumentError) { document.row { |row| row.text "A", width: 10, grow: 1 } }

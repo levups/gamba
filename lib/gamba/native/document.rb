@@ -18,12 +18,17 @@ module Gamba
     # No Prawn page to match here, so fonts that have ligatures and GPOS kerning use them.
     DEFAULT_FONT_FEATURES = %i[liga kern].freeze
 
-    attr_reader :prawn
-
     def initialize(prawn = nil, **options)
       Layout::Styles.check_options(options, OPTIONS)
       @prawn = prawn || Prawn::Document.new(options)
       @styles = Layout::Styles.new(@prawn, DEFAULT_FONT_FEATURES)
+    end
+
+    # The Prawn document underneath. Boxes still waiting for the one they are kept with are placed first, so what
+    # Prawn draws next comes after them.
+    def prawn
+      place_kept
+      @prawn
     end
 
     def register_font(family, normal:, bold: nil, italic: nil, bold_italic: nil, features: DEFAULT_FONT_FEATURES)
@@ -39,14 +44,7 @@ module Gamba
     end
 
     def text(string, style: nil, **attributes)
-      @styles.text_arguments(style, attributes) => {font:, font_options:, color:, text_options:}
-      text_options[:color] = color if color
-      if font
-        prawn.font(font, font_options) { prawn.text(string, text_options) }
-      else
-        prawn.text(string, text_options)
-      end
-      self
+      add(Layout::Text.new(string, **@styles.text_arguments(style, attributes)))
     end
 
     # Drawn at the top of every page from this one on. The block receives a stack to fill and the page, which
@@ -82,14 +80,33 @@ module Gamba
       self
     end
 
-    # A box of the document is placed as soon as it is described, from the cursor, which it leaves below.
+    # A box of the document is placed as soon as it is described, from the cursor, which it leaves below; one
+    # kept with the next waits for it, and they are placed together.
     def add(box)
       raise ArgumentError, "grow shares the width of a row: it means nothing on the document" if box.grow
 
-      cursor = Layout::Cursor.new(prawn)
-      box.flow(prawn, cursor, prawn.bounds.absolute_left, [box.width || prawn.bounds.width, prawn.bounds.width].min)
-      prawn.y = cursor.y
+      if @kept.nil? && !box.keep_with_next
+        place(box)
+      else
+        (@kept ||= Layout::Group.new(@styles)).push(box)
+        place_kept unless box.keep_with_next
+      end
       self
+    end
+
+    def place_kept
+      return unless @kept
+
+      kept = @kept
+      @kept = nil
+      place(kept)
+    end
+
+    def place(box)
+      bounds = @prawn.bounds
+      cursor = Layout::Cursor.new(@prawn)
+      box.flow(@prawn, cursor, bounds.absolute_left, [box.width || bounds.width, bounds.width].min)
+      @prawn.y = cursor.y
     end
   end
 end

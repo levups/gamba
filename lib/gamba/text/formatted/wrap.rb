@@ -55,7 +55,7 @@ module Prawn
             drawn_fragments << drawn_fragment if @laid_out_lines
             accumulated_width += fragment.width
           end
-          @laid_out_lines << [@baseline_y, drawn_fragments] if @laid_out_lines
+          @laid_out_lines << [@baseline_y, drawn_fragments, @descender] if @laid_out_lines
           @printed_lines << printed_fragments.map { _1.dup.force_encoding(::Encoding::UTF_8) }.join
         end
 
