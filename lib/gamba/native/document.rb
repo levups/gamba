@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "layout"
+require_relative "band"
 
 module Gamba
   # Gamba's own API, over a Prawn::Document that stays reachable through #prawn. Blocks receive this object,
@@ -47,6 +48,16 @@ module Gamba
       self
     end
 
+    # Drawn at the top of every page from this one on. The block receives a stack to fill and the page, which
+    # answers number and total; gap is the room left between the header and the body.
+    def header(gap: 0, &block)
+      declare_band(:header, gap, block)
+    end
+
+    def footer(gap: 0, &block)
+      declare_band(:footer, gap, block)
+    end
+
     def to_s
       prawn.render
     end
@@ -61,6 +72,14 @@ module Gamba
     end
 
     private
+
+    def declare_band(name, gap, block)
+      raise ArgumentError, "the #{name} takes a block, which receives a stack and the page" unless block
+      raise ArgumentError, "the #{name} is already declared: a document has one" if (@bands ||= {}).key?(name)
+
+      @bands[name] = Layout::Band.new(prawn, @styles, name, gap, block).tap(&:reserve)
+      self
+    end
 
     # A box of the document is placed as soon as it is described, from the cursor, which it leaves below.
     def add(box)
