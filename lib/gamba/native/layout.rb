@@ -289,6 +289,45 @@ module Gamba
       end
     end
 
+    # A QR code as a box: size wide, its quiet zone included, or as many points per module as module_size says;
+    # never wider than its box.
+    class QRCode < Node
+      OPTIONS = (Node::OPTIONS + %i[size module_size level quiet_zone color align]).freeze
+
+      def initialize(text, size: nil, module_size: Prawn::Barcodes::DEFAULT_MODULE_SIZE, level: :m, quiet_zone: true, color: "000000", align: :left, **)
+        raise ArgumentError, "align is #{align.inspect}: accepted alignments are #{Image::ALIGNMENTS.map(&:inspect).join(", ")}" unless Image::ALIGNMENTS.include?(align)
+
+        super(**)
+        @symbol = Gamba::Barcodes::QRCode.new(text, level:)
+        @size = size
+        @module_size = module_size
+        @quiet_zone = quiet_zone
+        @color = color
+        @align = align
+      end
+
+      def paint(prawn, left, top, width)
+        size = side(width)
+        offset = {left: 0, center: (width - size) / 2.0, right: width - size}.fetch(@align)
+        prawn.draw_qr_code(@symbol, at: relative(prawn, left + offset, top), size:, quiet_zone: @quiet_zone, color: @color)
+      end
+
+      private
+
+      def measure(_prawn, width)
+        side(width)
+      end
+
+      def side(available_width)
+        modules = @symbol.size + (@quiet_zone ? 2 * Prawn::Barcodes::QR_QUIET_ZONE_MODULES : 0)
+        [@size || width || (modules * @module_size), available_width].min
+      end
+
+      def description
+        "a QR code"
+      end
+    end
+
     # What a document and its containers share: the calls that add a box.
     module Builder
       # Rows are hashes, or objects answering the columns' names. The block receives the Prawn::Table before it
@@ -300,6 +339,11 @@ module Gamba
       def image(source, **options)
         Styles.check_options(options, Image::OPTIONS)
         add(Image.new(source, **options))
+      end
+
+      def qr_code(text, **options)
+        Styles.check_options(options, QRCode::OPTIONS)
+        add(QRCode.new(text, **options))
       end
 
       # A page of another PDF (a path, an IO or its bytes), from 1, as a box sized like an image.

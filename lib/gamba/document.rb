@@ -10,6 +10,7 @@ module Prawn
     include PDF::Core::Destinations
     include Security
     include Images
+    include Barcodes
     include Gamba::PdfA
     include Table::Interface
     include Stamp
