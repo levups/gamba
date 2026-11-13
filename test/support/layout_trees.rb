@@ -66,6 +66,7 @@ class LayoutTrees
   def text_options(parent, inline)
     options = ", size: #{FONT_SIZES.sample(random: @random)}"
     options << ", widows: #{@random.rand(1..3)}, orphans: #{@random.rand(1..3)}" if chance(0.4)
+    options << ", role: :h#{@random.rand(1..6)}" if chance(0.1)
     options << ", keep_with_next: true" if chance(0.15)
     options + width_options(parent, inline)
   end

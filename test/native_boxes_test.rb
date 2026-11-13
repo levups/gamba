@@ -182,7 +182,7 @@ class NativeBoxesTest < Minitest::Test
   def test_unknown_table_and_image_options_raise
     document = Gamba.document
 
-    assert_match(/\Aunknown option :headr: accepted options are :width, :grow, :keep_with_next, :columns, :header, :stripes, :cell\z/, assert_raises(ArgumentError) { document.table(LINES, headr: true) }.message)
+    assert_match(/\Aunknown option :headr: accepted options are :width, :grow, :keep_with_next, :role, :alt, :columns, :header, :stripes, :cell\z/, assert_raises(ArgumentError) { document.table(LINES, headr: true) }.message)
     assert_raises(ArgumentError) { document.image(IMAGE, hight: 40) }
     assert_raises(ArgumentError) { document.image(IMAGE, align: :middle) }
     assert_raises(ArgumentError) { document.image(IMAGE, grow: 1) }

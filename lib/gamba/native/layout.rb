@@ -126,17 +126,27 @@ module Gamba
       end
     end
 
+    # A box. Its role says what it is to a reader, for tagged PDF: a heading of a level, a paragraph, a list and
+    # its items, a table, a figure with its alternative text, or an artifact, which only decorates the page.
     class Node
-      OPTIONS = %i[width grow keep_with_next].freeze
+      OPTIONS = %i[width grow keep_with_next role alt].freeze
+      ROLES = %i[artifact].freeze
+      DEFAULT_ROLE = nil
+      KIND = "a box"
 
-      attr_reader :width, :grow, :keep_with_next
+      attr_reader :width, :grow, :keep_with_next, :role, :alt
 
-      def initialize(width: nil, grow: nil, keep_with_next: false)
+      def initialize(width: nil, grow: nil, keep_with_next: false, role: self.class::DEFAULT_ROLE, alt: nil)
         raise ArgumentError, "width and grow exclude each other: a box is as wide as told, or shares what is left" if width && grow
+        accepted = self.class::ROLES + (self.class::DEFAULT_ROLE ? [] : [nil])
+        raise ArgumentError, "role is #{role.inspect}: #{self.class::KIND} takes #{self.class::ROLES.map(&:inspect).join(", ")}" unless accepted.include?(role)
+        raise ArgumentError, "alt is the alternative text of a figure: give it with role: :figure, not #{role.inspect}" if alt && role != :figure
 
         @width = width
         @grow = grow
         @keep_with_next = keep_with_next
+        @role = role
+        @alt = alt
       end
 
       # A box is measured when it is placed and again by the boxes around it: once per width is enough.
@@ -173,9 +183,14 @@ module Gamba
     class Text < Node
       DEFAULT_WIDOWS = 2
       DEFAULT_ORPHANS = 2
+      HEADINGS = %i[h1 h2 h3 h4 h5 h6].freeze
+      ROLES = (%i[p] + HEADINGS + %i[list_item artifact]).freeze
+      DEFAULT_ROLE = :p
+      KIND = "a text"
 
-      def initialize(string, font:, font_options:, color:, text_options:, widows: DEFAULT_WIDOWS, orphans: DEFAULT_ORPHANS, **)
+      def initialize(string, font:, font_options:, color:, text_options:, widows: DEFAULT_WIDOWS, orphans: DEFAULT_ORPHANS, bookmarks: nil, **)
         super(**)
+        @bookmarks = bookmarks if HEADINGS.include?(role)
         @fragments = [color ? {text: string, color:} : {text: string}]
         @font = font
         @font_options = font_options
@@ -186,6 +201,7 @@ module Gamba
 
       # The lines wrapped to measure the text are drawn as they are, when Prawn's box can draw them again.
       def paint(prawn, left, top, width)
+        bookmark(prawn, top)
         at = relative(prawn, left, top)
         with_font(prawn) do
           if @measured_width == width && @measured_box.layout_reusable?
@@ -217,6 +233,7 @@ module Gamba
               next
             end
 
+            bookmark(prawn, cursor.y) if fragments.equal?(@fragments)
             # Most paragraphs fit whole: the lines wrapped to place them are drawn as they are.
             if height == MEASURING_HEIGHT_POINTS && probe.layout_reusable?
               probe.render_laid_out(at)
@@ -247,6 +264,11 @@ module Gamba
       end
 
       private
+
+      # A heading is bookmarked where its first line is drawn, under the last heading of a higher level.
+      def bookmark(prawn, top)
+        @bookmarks&.add(HEADINGS.index(role) + 1, @fragments.sum("") { _1[:text] }.split.join(" "), top)
+      end
 
       def lines_option(name, lines)
         return lines if lines.is_a?(Integer) && lines >= 1
@@ -316,6 +338,9 @@ module Gamba
     class Image < Node
       OPTIONS = (Node::OPTIONS + %i[height align]).freeze
       ALIGNMENTS = %i[left center right].freeze
+      ROLES = %i[figure artifact].freeze
+      DEFAULT_ROLE = :figure
+      KIND = "an image"
 
       def initialize(source, height: nil, align: :left, **)
         raise ArgumentError, "align is #{align.inspect}: accepted alignments are #{ALIGNMENTS.map(&:inspect).join(", ")}" unless ALIGNMENTS.include?(align)
@@ -377,6 +402,9 @@ module Gamba
     # module_size says; never wider than its box.
     class MatrixCode < Node
       OPTIONS = (Node::OPTIONS + %i[size module_size quiet_zone color align]).freeze
+      ROLES = Image::ROLES
+      DEFAULT_ROLE = :figure
+      KIND = "a code"
 
       def initialize(symbol, size: nil, module_size: Prawn::Barcodes::DEFAULT_MODULE_SIZE, quiet_zone: true, color: "000000", align: :left, **)
         raise ArgumentError, "align is #{align.inspect}: accepted alignments are #{Image::ALIGNMENTS.map(&:inspect).join(", ")}" unless Image::ALIGNMENTS.include?(align)
@@ -416,6 +444,9 @@ module Gamba
     # module_size says; never wider than its box.
     class Barcode < Node
       OPTIONS = (Node::OPTIONS + %i[type module_size height text text_size color quiet_zone align]).freeze
+      ROLES = Image::ROLES
+      DEFAULT_ROLE = :figure
+      KIND = "a barcode"
 
       def initialize(data, type:, align: :left, **options)
         raise ArgumentError, "align is #{align.inspect}: accepted alignments are #{Image::ALIGNMENTS.map(&:inspect).join(", ")}" unless Image::ALIGNMENTS.include?(align)
@@ -514,6 +545,9 @@ module Gamba
 
       OPTIONS = (Node::OPTIONS + %i[gap padding background border_width border_color]).freeze
       DEFAULT_BORDER_COLOR = "000000"
+      # Without a role, a container only groups its children.
+      ROLES = %i[list list_item figure artifact].freeze
+      KIND = "a container"
 
       def initialize(styles, gap: 0, padding: 0, background: nil, border_width: nil, border_color: nil, **)
         super(**)
@@ -813,11 +847,38 @@ module Gamba
       end
     end
 
+    # The PDF's outline built from the headings as they are placed: each one under the last heading of a higher
+    # level, pointing at the top of its first line.
+    class Bookmarks
+      def initialize(prawn)
+        @prawn = prawn
+        # The headings that can still receive subsections, by level: [level, outline item].
+        @open = []
+      end
+
+      # Prawn's outline adds after its current item: it is pointed at the parent, then back at the end of the root.
+      def add(level, title, top)
+        @open.pop while @open.any? && @open.last.first >= level
+        outline = @prawn.outline
+        root = @prawn.outlines_reference
+        parent = @open.empty? ? root : @open.last.last
+        begin
+          outline.parent = parent
+          outline.prev = parent.data.last
+          outline.section(title, destination: [@prawn.page.dictionary, :XYZ, nil, top, nil])
+        ensure
+          outline.parent = root
+          outline.prev = root.data.last
+        end
+        @open << [level, parent.data.last]
+      end
+    end
+
     # Named text attributes, and what they come to for Prawn once a call's own are added.
     class Styles
-      TEXT_ATTRIBUTES = %i[font size weight italic color align leading widows orphans keep_with_next].freeze
+      TEXT_ATTRIBUTES = %i[font size weight italic color align leading widows orphans keep_with_next role].freeze
       # Attributes of the paragraph's place on the page, not of its glyphs: the layout reads them, Prawn does not.
-      LAYOUT_ATTRIBUTES = %i[widows orphans keep_with_next].freeze
+      LAYOUT_ATTRIBUTES = %i[widows orphans keep_with_next role].freeze
       FONT_STYLES = %i[normal bold italic bold_italic].freeze
       DEFAULT_STYLE = :default
 
@@ -841,6 +902,12 @@ module Gamba
         @prawn = prawn
         @default_font_features = default_font_features
         @attributes_by_name = {}
+        @bookmarks = Bookmarks.new(prawn)
+      end
+
+      # The same styles for a header or a footer, whose headings are drawn on every page and bookmark none.
+      def without_bookmarks
+        dup.tap { _1.instance_variable_set(:@bookmarks, nil) }
       end
 
       def define(name, attributes)
@@ -861,7 +928,7 @@ module Gamba
         attributes = attributes.except(*LAYOUT_ATTRIBUTES)
         font = attributes.delete(:font)
         font_options = (font.nil? || @prawn.font_families.key?(font)) ? {} : {features: @default_font_features}
-        {font:, font_options:, color: attributes.delete(:color), text_options: text_options(attributes), **layout}
+        {font:, font_options:, color: attributes.delete(:color), text_options: text_options(attributes), bookmarks: @bookmarks, **layout}
       end
 
       private

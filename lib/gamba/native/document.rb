@@ -82,7 +82,7 @@ module Gamba
       raise ArgumentError, "the #{name} takes a block, which receives a stack and the page" unless block
       raise ArgumentError, "the #{name} is already declared: a document has one" if (@bands ||= {}).key?(name)
 
-      @bands[name] = Layout::Band.new(prawn, @styles, name, gap, block).tap(&:reserve)
+      @bands[name] = Layout::Band.new(prawn, @styles.without_bookmarks, name, gap, block).tap(&:reserve)
       self
     end
 
