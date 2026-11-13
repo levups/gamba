@@ -37,7 +37,9 @@ module Gamba
         within(prawn, left, width) { table.draw }
       end
 
+      # Prawn draws a row higher than a page past its bottom: here it raises, as any box that cannot be split does.
       def flow(prawn, cursor, left, width)
+        check_rows_fit(prawn, cursor, width) unless data.empty?
         paint(prawn, left, cursor.y, width)
         cursor.y = prawn.y unless data.empty?
       end
@@ -57,6 +59,16 @@ module Gamba
 
       def description
         "a table"
+      end
+
+      def check_rows_fit(prawn, cursor, width)
+        heights = table(prawn, width).row_heights
+        header = @header ? heights.first : 0
+        tallest = (@header ? heights.drop(1) : heights).max || 0
+        return if header + tallest <= cursor.page_height + FIT_TOLERANCE_POINTS
+
+        raise Prawn::Errors::CannotFit, "#{description} has a row #{tallest.round(1)} pt high#{" under a #{header.round(1)} pt header" if @header}, " \
+          "the page has #{cursor.page_height.to_f.round(1)} pt"
       end
 
       # Without columns, a table of hashes has those of its first row.

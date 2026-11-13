@@ -157,6 +157,16 @@ class NativeBoxesTest < Minitest::Test
     assert_equal [0, 3], lines_by_page(document.to_s)
   end
 
+  def test_a_table_row_higher_than_a_page_raises_instead_of_running_past_the_bottom
+    error = assert_raises(Prawn::Errors::CannotFit) do
+      Gamba.document(page_size: [400, 300]) do |document|
+        document.stack(width: 60) { |stack| stack.table([{name: "alice " * 40, quantity: 1}]) }
+      end
+    end
+
+    assert_match(/\Aa table has a row [\d.]+ pt high under a [\d.]+ pt header, the page has 228\.0 pt\z/, error.message)
+  end
+
   def test_rows_as_arrays_missing_columns_and_unknown_options_raise
     document = Gamba.document
 

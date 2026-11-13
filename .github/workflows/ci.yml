@@ -110,6 +110,8 @@ jobs:
         run: FUZZ_SEED=$GITHUB_RUN_ID FUZZ_CASES=300 bundle exec ruby -Itest test/fuzz_test.rb
       - name: Fuzz 400 malformed inputs
         run: INPUT_FUZZ_SEED=$GITHUB_RUN_ID INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb
+      - name: Fuzz 1000 trees of boxes
+        run: LAYOUT_FUZZ_SEED=$GITHUB_RUN_ID LAYOUT_FUZZ_CASES=1000 bundle exec ruby -Itest test/layout_fuzz_test.rb
 
   # Allowed to fail, and truffleruby-head takes twice as long as the others: CI passed doesn't wait for them.
   head:

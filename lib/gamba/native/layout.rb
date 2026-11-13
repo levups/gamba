@@ -632,7 +632,15 @@ module Gamba
           keep_with_what_follows(prawn, cursor, width, index)
           child.flow(prawn, cursor, left + @padding_left, child_width(child, width))
         end
-        cursor.y -= @padding_bottom
+        # The bottom padding of a plain stack ends with the page, so that a decorated stack holding it is not drawn
+        # past the page. A decorated stack's own is kept clear on every page, and the gap below its last line ends
+        # where its padding starts.
+        if decorated?
+          cursor.y -= cursor.remaining if cursor.remaining.negative?
+          cursor.y -= @padding_bottom
+        else
+          cursor.y -= @padding_bottom.clamp(0, [cursor.remaining, 0].max)
+        end
       end
 
       # Children kept with the next go to the next page together with the start of the one after them, when this
