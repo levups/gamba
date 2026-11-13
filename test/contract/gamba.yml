@@ -6,6 +6,7 @@ Gamba:
   ".document": [keyrest options]
   ".eager_load!": []
 Gamba::Document:
+  "#barcode": [req data, keyrest options]
   "#draw": [req component]
   "#page_break": []
   "#prawn": []
@@ -25,6 +26,7 @@ Gamba::Document:
   "#write": [req destination]
 # What a stack, a row and a grid answer inside their block; the rest of the class is how they are measured and placed.
 Gamba::Layout::Container:
+  "#barcode": [req data, keyrest options]
   "#draw": [req component]
   "#grid": [keyreq columns, keyrest options]
   "#image": [req source, keyrest options]

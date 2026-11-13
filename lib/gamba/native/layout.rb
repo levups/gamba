@@ -328,6 +328,43 @@ module Gamba
       end
     end
 
+    # A linear barcode as a box: as wide as told, quiet zones included, or as many points per module as
+    # module_size says; never wider than its box.
+    class Barcode < Node
+      OPTIONS = (Node::OPTIONS + %i[type module_size height text text_size color quiet_zone align]).freeze
+
+      def initialize(data, type:, align: :left, **options)
+        raise ArgumentError, "align is #{align.inspect}: accepted alignments are #{Image::ALIGNMENTS.map(&:inspect).join(", ")}" unless Image::ALIGNMENTS.include?(align)
+
+        super(**options.slice(*Node::OPTIONS))
+        @symbol = Gamba::Barcodes::Linear.new(data, type:)
+        @options = options.except(*Node::OPTIONS)
+        @align = align
+      end
+
+      def paint(prawn, left, top, width)
+        options = drawn(width)
+        offset = {left: 0, center: (width - options[:width]) / 2.0, right: width - options[:width]}.fetch(@align)
+        prawn.draw_barcode(@symbol, at: relative(prawn, left + offset, top), **options)
+      end
+
+      private
+
+      def measure(_prawn, width)
+        Prawn::Barcodes.linear_dimensions(@symbol, drawn(width)).last
+      end
+
+      # The options to draw it with: its width at most the box's.
+      def drawn(available_width)
+        natural = Prawn::Barcodes.linear_dimensions(@symbol, {width: width}.compact.merge(@options))[4]
+        @options.merge(width: [natural, available_width].min)
+      end
+
+      def description
+        "a barcode"
+      end
+    end
+
     # What a document and its containers share: the calls that add a box.
     module Builder
       # Rows are hashes, or objects answering the columns' names. The block receives the Prawn::Table before it
@@ -339,6 +376,11 @@ module Gamba
       def image(source, **options)
         Styles.check_options(options, Image::OPTIONS)
         add(Image.new(source, **options))
+      end
+
+      def barcode(data, **options)
+        Styles.check_options(options, Barcode::OPTIONS)
+        add(Barcode.new(data, **options))
       end
 
       def qr_code(text, **options)

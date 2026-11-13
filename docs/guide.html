@@ -42,7 +42,7 @@
         <li><a href="#svg">SVG</a></li>
         <li><a href="#fonts">Fonts</a></li>
         <li><a href="#images">Images</a></li>
-        <li><a href="#barcodes">QR codes</a></li>
+        <li><a href="#barcodes">QR codes and barcodes</a></li>
         <li><a href="#pdf-a">PDF/A and Factur-X</a></li>
         <li><a href="#output">Output</a></li>
         <li><a href="#servers">Servers that fork</a></li>
@@ -235,11 +235,14 @@
     </section>
 
     <section id="barcodes" aria-labelledby="barcodes-title">
-      <h2 id="barcodes-title">QR codes</h2>
+      <h2 id="barcodes-title">QR codes and barcodes</h2>
       <div class="prose">
         <p>A QR code is drawn as vector rectangles, one path and one fill, so it stays sharp at any size and a sheet of labels stays small. The encoder is pure Ruby, with no dependency: every version and level of error correction, numeric, alphanumeric and byte modes, and UTF-8 text announced to scanners.</p>
 <pre><code class="language-ruby"><span class="n">qr_code</span> <span class="s2">"https://example.com/pay/INV-2026-0001"</span><span class="p">,</span> <span class="ss">at: </span><span class="p">[</span><span class="mi">400</span><span class="p">,</span> <span class="mi">700</span><span class="p">],</span> <span class="ss">size: </span><span class="mi">80</span><span class="p">,</span> <span class="ss">level: :m</span></code></pre>
         <p><code>size</code> is the width of the whole symbol, its quiet zone of four modules included; <code>module_size</code> gives the width of one module instead (2 points unless told). <code>level</code> is <code>:l</code>, <code>:m</code> (the default), <code>:q</code> or <code>:h</code>, and the smallest version that holds the text at that level is chosen; text too long for any raises <code>ArgumentError</code>. Without <code>at</code>, the code is placed as an image is, with <code>position</code> and <code>vposition</code>. <code>quiet_zone: false</code> leaves the margin to the layout, and <code>color</code> sets the colour of the modules. In Gamba’s own API, <code>qr_code</code> is a box, with <code>size</code> or <code>module_size</code>, <code>level</code>, <code>quiet_zone</code>, <code>color</code> and <code>align</code>.</p>
+        <p>Linear barcodes are drawn the same way, one fill per symbol: Code 128, with its sets A, B and C chosen as the text goes, EAN-13, EAN-8, Code 39 and ITF-14. A check digit left out is added, and one given is checked.</p>
+<pre><code class="language-ruby"><span class="n">barcode</span> <span class="s2">"0123456789012"</span><span class="p">,</span> <span class="ss">type: :ean13</span><span class="p">,</span> <span class="ss">width: </span><span class="mi">120</span><span class="p">,</span> <span class="ss">height: </span><span class="mi">40</span><span class="p">,</span> <span class="ss">text: </span><span class="kp">true</span></code></pre>
+        <p><code>width</code> counts the quiet zones, or <code>module_size</code> sets the narrowest bar (2 points unless told); <code>height</code> is the bars’, 50 modules unless told. <code>text: true</code> writes the encoded text under the bars, check digit included, at <code>text_size</code> (8 modules unless told). <code>at</code>, <code>position</code>, <code>vposition</code>, <code>quiet_zone</code> and <code>color</code> work as for QR codes, and in Gamba’s own API <code>barcode</code> is a box too.</p>
       </div>
     </section>
 
