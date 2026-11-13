@@ -79,7 +79,7 @@ jobs:
           for attempt in 1 2 3; do
             if sudo timeout 90 apt-get update; then
               sudo timeout 90 apt-get install --yes \
-                -o Dir::Cache::Archives="$HOME/.cache/apt-archives" mupdf-tools poppler-utils qpdf && break
+                -o Dir::Cache::Archives="$HOME/.cache/apt-archives" mupdf-tools poppler-utils qpdf zbar-tools && break
             else
               sudo dpkg --install ~/.cache/apt-archives/*.deb && break
             fi

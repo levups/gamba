@@ -119,6 +119,12 @@ Prawn::Document.new(background_pdf: "letterhead.pdf") do
 end
 ```
 
+QR codes in pure Ruby, drawn as vectors: one path and one fill per code, read back by zbar in CI:
+
+```ruby
+qr_code "https://example.com/pay/INV-2026-0001", at: [400, 700], size: 80, level: :m
+```
+
 Loading font and SVG support once, before a server such as Puma or Unicorn forks its workers, so they share it in
 memory:
 
@@ -214,8 +220,8 @@ its proof.
 ## Development
 
 Prawn runs from its own bundle, `oracle/Gemfile`, so the oracle can compare the two. The tests need `mutool`,
-`pdftoppm` and `qpdf` (`brew install mupdf-tools poppler qpdf`), and Prawn's manual and sample data, which
-`rake corpus:fetch` downloads into `corpus/cache`. Without that cache, the comparison tests are skipped.
+`pdftoppm`, `qpdf` and `zbarimg` (`brew install mupdf-tools poppler qpdf zbar`), and Prawn's manual and sample data,
+which `rake corpus:fetch` downloads into `corpus/cache`. Without that cache, the comparison tests are skipped.
 
 ```sh
 bundle install && BUNDLE_GEMFILE=oracle/Gemfile bundle install

@@ -10,7 +10,7 @@ files. `lib/prawn*.rb` and `lib/pdf` answer Prawn's requires; the code lives in 
 ```sh
 bundle install && BUNDLE_GEMFILE=oracle/Gemfile bundle install  # Prawn runs from its own bundle
 bundle exec rake corpus:fetch                                   # Prawn's manual and data, into corpus/cache
-bundle exec rake test                                           # needs: brew install mupdf-tools poppler qpdf
+bundle exec rake test                                           # needs: brew install mupdf-tools poppler qpdf zbar
 ORACLE_CANDIDATE=prawn FUZZ_CASES=0 bundle exec rake test       # Prawn against itself: proves the oracle
 FUZZ_SEED=42 FUZZ_CASES=500 bundle exec ruby -Itest test/fuzz_test.rb
 INPUT_FUZZ_SEED=42 INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb

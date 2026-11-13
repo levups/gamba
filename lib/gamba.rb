@@ -55,6 +55,7 @@ require_relative "gamba/view"
 require_relative "gamba/images"
 require_relative "gamba/images/png_decoder"
 require_relative "gamba/images/image"
+require_relative "gamba/barcodes"
 require_relative "gamba/repeater"
 require_relative "gamba/grid"
 require_relative "gamba/outline"
@@ -121,7 +122,7 @@ module Gamba
   # Loads what Gamba otherwise loads on first use, SVG support included: call it before a server forks its
   # workers, so they share that memory instead of each loading its own copy.
   def self.eager_load!
-    [TrueType::File, TrueType::Subset, Prawn::Fonts::TTF, Combine, ImportedPage, PDF::Core::Reader, Document]
+    [TrueType::File, TrueType::Subset, Prawn::Fonts::TTF, Combine, ImportedPage, Barcodes::QRCode, PDF::Core::Reader, Document]
     require "prawn-svg"
   end
 end
