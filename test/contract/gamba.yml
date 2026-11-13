@@ -7,6 +7,7 @@ Gamba:
   ".eager_load!": []
 Gamba::Document:
   "#barcode": [req data, keyrest options]
+  "#data_matrix": [req data, keyrest options]
   "#draw": [req component]
   "#page_break": []
   "#prawn": []
@@ -17,7 +18,7 @@ Gamba::Document:
   "#header": [key gap, block block]
   "#image": [req source, keyrest options]
   "#pdf_page": [req source, key page, keyrest options]
-  "#qr_code": [req text, keyrest options]
+  "#qr_code": [req text, key level, keyrest options]
   "#register_font": [req family, keyreq normal, key bold, key italic, key bold_italic, key features]
   "#style": [req name, keyrest attributes]
   "#table": [req rows, keyrest options, block styling]
@@ -27,11 +28,12 @@ Gamba::Document:
 # What a stack, a row and a grid answer inside their block; the rest of the class is how they are measured and placed.
 Gamba::Layout::Container:
   "#barcode": [req data, keyrest options]
+  "#data_matrix": [req data, keyrest options]
   "#draw": [req component]
   "#grid": [keyreq columns, keyrest options]
   "#image": [req source, keyrest options]
   "#pdf_page": [req source, key page, keyrest options]
-  "#qr_code": [req text, keyrest options]
+  "#qr_code": [req text, key level, keyrest options]
   "#row": [keyrest options]
   "#stack": [keyrest options]
   "#table": [req rows, keyrest options, block styling]

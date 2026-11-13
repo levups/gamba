@@ -7,6 +7,8 @@ module Gamba
     # is not ASCII, and the mask the standard's penalty rules prefer.
     class QRCode
       LEVELS = %i[l m q h].freeze
+      # The light margin scanners need around the symbol, in modules (§6.3.8).
+      QUIET_ZONE = 4
       # The two bits a level writes in the format information.
       FORMAT_BITS = {l: 1, m: 0, q: 3, h: 2}.freeze
       # Per version 1 to 40: error correction codewords in each block, then the number of blocks (tables 9).
@@ -78,6 +80,10 @@ module Gamba
 
       def dark?(x, y)
         @modules[y][x]
+      end
+
+      def quiet_zone
+        QUIET_ZONE
       end
 
       private
