@@ -119,10 +119,12 @@ Prawn::Document.new(background_pdf: "letterhead.pdf") do
 end
 ```
 
-QR codes in pure Ruby, drawn as vectors: one path and one fill per code, read back by zbar in CI:
+QR codes and barcodes (Code 128, EAN-13, EAN-8, Code 39, ITF-14) in pure Ruby, drawn as vectors: one fill per
+code, read back by zbar in CI:
 
 ```ruby
 qr_code "https://example.com/pay/INV-2026-0001", at: [400, 700], size: 80, level: :m
+barcode "0123456789012", type: :ean13, width: 120, height: 40, text: true
 ```
 
 Loading font and SVG support once, before a server such as Puma or Unicorn forks its workers, so they share it in
