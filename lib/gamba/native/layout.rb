@@ -296,6 +296,13 @@ module Gamba
         add(container)
       end
 
+      # Cells side by side, `columns` to a line, all as wide; a line is as high as its tallest cell.
+      def grid(columns:, **options)
+        container = Grid.new(@styles, columns:, **options)
+        yield container
+        add(container)
+      end
+
       # Draws anything that answers call(builder): a document is made of small objects, each tested alone.
       def draw(component)
         component.call(self)
@@ -485,6 +492,81 @@ module Gamba
         raise Prawn::Errors::CannotFit, "a row's children are #{-shared.round(1)} pt wider than the row" if shared.negative?
 
         @children.map { |child| child.width || (shared * (child.grow || 1) / total_grow.to_f) }
+      end
+    end
+
+    # Cells in lines of `columns`: a stack of rows whose cells are all as wide, the last line's included. Pages
+    # break between lines, never inside one. gap is one number, or [between lines, between columns].
+    class Grid < Stack
+      OPTIONS = (Stack::OPTIONS + %i[columns]).freeze
+
+      def initialize(styles, columns:, gap: 0, **options)
+        unless columns.is_a?(Integer) && columns.positive?
+          raise ArgumentError, "columns is #{columns.inspect}: give the number of cells on a line, 1 or more"
+        end
+
+        Styles.check_options(options, OPTIONS)
+        line_gap, @column_gap = grid_gaps(gap)
+        @columns = columns
+        super(styles, gap: line_gap, **options)
+      end
+
+      private
+
+      def add(node)
+        if node.width || node.grow
+          raise ArgumentError, "width and grow mean nothing in a grid: its columns share its width equally"
+        end
+
+        @children << Line.new(@styles, @columns, @column_gap) if @children.empty? || @children.last.full?
+        @children.last.push(node)
+        self
+      end
+
+      def description
+        "a grid kept together"
+      end
+
+      def grid_gaps(gap)
+        case gap
+        in Numeric then [gap, gap]
+        in [Numeric => line_gap, Numeric => column_gap] then [line_gap, column_gap]
+        else raise ArgumentError, "gap is #{gap.inspect}: give one number, or [between lines, between columns]"
+        end
+      end
+
+      # A line of a grid: a row whose cells take a column each, however many it holds.
+      class Line < Row
+        def initialize(styles, columns, column_gap)
+          super(styles, gap: column_gap)
+          @columns = columns
+        end
+
+        def push(node)
+          @children << node
+        end
+
+        def full?
+          @children.size == @columns
+        end
+
+        # Kept with the next line when one of its cells is, a heading in a cell for instance.
+        def keep_with_next
+          @children.any?(&:keep_with_next)
+        end
+
+        private
+
+        def description
+          "a line of a grid"
+        end
+
+        def child_widths(width)
+          gaps = @gap * (@columns - 1)
+          raise Prawn::Errors::CannotFit, "a grid's gaps are #{(gaps - width).round(1)} pt wider than the grid" if gaps > width
+
+          Array.new(@children.size, (width - gaps) / @columns.to_f)
+        end
       end
     end
 
