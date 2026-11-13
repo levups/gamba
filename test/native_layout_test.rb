@@ -134,6 +134,25 @@ class NativeLayoutTest < Minitest::Test
     assert_equal [0, 6], lines_by_page(document.to_s)
   end
 
+  # Found by the layout fuzzer: the gap below a last line, or the bottom padding of a plain stack inside, reached
+  # past the page and took the frame with it. Three lines of 13.872 pt leave 1.5 pt of the last one's gap past the
+  # page, and a padding of 30 pt runs past it.
+  def test_a_decorated_stack_ending_at_the_bottom_of_a_page_stays_within_its_margins
+    [0, 30].each do |inner_padding|
+      document = Gamba.document(page_size: [400, 300], margin: 45) do |yielded|
+        yielded.prawn.move_down 210 - ((3 * 13.872) - 1.5)
+        yielded.stack(border_width: 1) do |frame|
+          2.times { frame.text "word" }
+          frame.stack(padding: [0, 0, inner_padding, 0]) { |inner| inner.text "word" }
+        end
+      end
+      bottoms = page_contents(document.to_s).flat_map { _1.scan(/^[\d.]+ ([\d.]+) [\d.]+ [\d.]+ re$/).flatten }
+
+      assert_equal 1, bottoms.size
+      assert_in_delta 45, Float(bottoms.first), 0.001, "inner padding #{inner_padding}"
+    end
+  end
+
   def test_nested_decorated_stacks_and_tables_split_inside_a_decorated_stack
     document = Gamba.document do |yielded|
       yielded.stack(padding: 12, border_color: "ff0000") do |outer|

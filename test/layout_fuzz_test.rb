@@ -96,7 +96,7 @@ class LayoutFuzzTest < Minitest::Test
   def split_kept_stack(kept, pages)
     page_numbers_by_id = Hash.new { |hash, id| hash[id] = [] }
     pages.each_with_index do |(_paths, runs), page_index|
-      runs.each { |text, _box| text.scan(/[tc]\d+/) { page_numbers_by_id[_1] |= [page_index + 1] } }
+      runs.each { |text, _box| text.scan(/\b[tc]\d{4}\b/) { page_numbers_by_id[_1] |= [page_index + 1] } }
     end
     kept.each do |fits, ids|
       page_numbers = ids.flat_map { page_numbers_by_id[_1] }.uniq.sort

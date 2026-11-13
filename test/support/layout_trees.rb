@@ -2,7 +2,8 @@
 
 # Random documents of native boxes from a seed, as Ruby source: stacks, rows and grids nested a few levels deep,
 # with gaps, paddings, backgrounds, borders and page break rules, holding texts and tables. Every word of a text
-# or a cell is its id, t1 or c1, so each line drawn says which box it belongs to.
+# or a cell is its id, t0001 or c0001, so each line drawn says which box it belongs to: a word broken across lines
+# leaves pieces too short to pass for an id.
 class LayoutTrees
   PAGE_SIZES = ["LETTER", "A5", [400, 300]].freeze
   MAX_DEPTH = 3
@@ -100,7 +101,7 @@ class LayoutTrees
   end
 
   def words(prefix, count)
-    id = "#{prefix}#{@id += 1}"
+    id = format("%s%04d", prefix, @id += 1)
     ([id] * count).join(" ")
   end
 
