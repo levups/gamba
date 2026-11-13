@@ -47,6 +47,12 @@ module Gamba
       add(Layout::Text.new(string, **@styles.text_arguments(style, attributes)))
     end
 
+    # What follows starts at the top of a new page, the boxes waiting for a next one placed first.
+    def page_break
+      prawn.start_new_page
+      self
+    end
+
     # Drawn at the top of every page from this one on. The block receives a stack to fill and the page, which
     # answers number and total; gap is the room left between the header and the body.
     def header(gap: 0, &block)

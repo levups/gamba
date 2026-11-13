@@ -18,8 +18,14 @@ DATA_DIRECTORY = File.expand_path("../corpus/cache/prawn/data", __dir__)
 
 document_path, iterations = ARGV
 body = File.read(document_path)
-# Prawn compresses only when asked: compared at its lightest.
-render = -> { Prawn::Document.new(compress: true).tap { _1.instance_eval(body, document_path) }.render }
+render =
+  if File.basename(File.dirname(document_path)) == "native"
+    # A document of Gamba's own API, which compresses unasked, is written against `document`.
+    -> { Gamba.document { |document| eval(body, binding, document_path) }.to_s } # rubocop:disable Security/Eval
+  else
+    # Prawn compresses only when asked: compared at its lightest.
+    -> { Prawn::Document.new(compress: true).tap { _1.instance_eval(body, document_path) }.render }
+  end
 
 pdf = render.call
 GC.start

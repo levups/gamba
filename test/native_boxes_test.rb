@@ -70,6 +70,17 @@ class NativeBoxesTest < Minitest::Test
     assert_in_delta 38, glyphs(document.to_s).first[3], 0.01
   end
 
+  def test_cells_start_from_the_default_style_and_the_cell_option_wins
+    document = Gamba.document do |yielded|
+      yielded.style :default, font: "Courier", size: 9, color: "336699"
+      yielded.table([{name: "A"}], header: false)
+      yielded.table([{name: "B"}], header: false, cell: {size: 14, font: "Times-Roman"})
+    end
+
+    assert_equal [["A", "Courier", 9.0], ["B", "Times-Roman", 14.0]], glyphs(document.to_s).map { _1.first(3) }
+    assert_includes uncompressed(document.to_s), "0.2 0.4 0.6 scn"
+  end
+
   def test_the_block_receives_the_prawn_table_before_it_is_laid_out
     document = Gamba.document do |yielded|
       yielded.table([{name: "A"}], header: false) do |table|
