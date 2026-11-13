@@ -5,6 +5,7 @@ module Gamba
   module Barcodes
     autoload :QRCode, ::File.expand_path("barcodes/qr_code", __dir__)
     autoload :Linear, ::File.expand_path("barcodes/linear", __dir__)
+    autoload :DataMatrix, ::File.expand_path("barcodes/data_matrix", __dir__)
   end
 end
 
@@ -13,8 +14,7 @@ module Prawn
   # stays small.
   module Barcodes
     QR_OPTIONS = %i[at position vposition size module_size level quiet_zone color].freeze
-    # The light margin scanners need around a QR code, in modules (ISO/IEC 18004 §6.3.8).
-    QR_QUIET_ZONE_MODULES = 4
+    DATA_MATRIX_OPTIONS = (QR_OPTIONS - %i[level]).freeze
     DEFAULT_MODULE_SIZE = 2
     BARCODE_OPTIONS = %i[type at position vposition width module_size height text text_size color quiet_zone].freeze
     # Bars this many modules high unless told, and their digits this many modules high.
@@ -27,7 +27,16 @@ module Prawn
     def qr_code(text, options = {})
       Prawn.verify_options(QR_OPTIONS, options)
       symbol = Gamba::Barcodes::QRCode.new(text, level: options.fetch(:level, :m))
-      draw_qr_code(symbol, options)
+      draw_matrix_code(symbol, options)
+      symbol
+    end
+
+    # A square DataMatrix ECC 200 symbol of the data, the smallest that holds it, with the options of qr_code but
+    # level: its error correction is fixed by its size. Returns the symbol.
+    def data_matrix(data, options = {})
+      Prawn.verify_options(DATA_MATRIX_OPTIONS, options)
+      symbol = Gamba::Barcodes::DataMatrix.new(data)
+      draw_matrix_code(symbol, options)
       symbol
     end
 
@@ -74,9 +83,9 @@ module Prawn
       [quiet_left, module_size, bar_height, text_size, modules * module_size, height]
     end
 
-    # A symbol already encoded, with the options of qr_code but level.
-    def draw_qr_code(symbol, options)
-      quiet_zone = options.fetch(:quiet_zone, true) ? QR_QUIET_ZONE_MODULES : 0
+    # A QR code or a DataMatrix already encoded, with the options of qr_code but level.
+    def draw_matrix_code(symbol, options)
+      quiet_zone = options.fetch(:quiet_zone, true) ? symbol.quiet_zone : 0
       modules = symbol.size + (2 * quiet_zone)
       module_size = options[:size] ? options[:size] / modules.to_f : options.fetch(:module_size, DEFAULT_MODULE_SIZE)
       width = modules * module_size

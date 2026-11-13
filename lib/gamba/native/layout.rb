@@ -289,16 +289,16 @@ module Gamba
       end
     end
 
-    # A QR code as a box: size wide, its quiet zone included, or as many points per module as module_size says;
-    # never wider than its box.
-    class QRCode < Node
-      OPTIONS = (Node::OPTIONS + %i[size module_size level quiet_zone color align]).freeze
+    # A QR code or a DataMatrix as a box: size wide, its quiet zone included, or as many points per module as
+    # module_size says; never wider than its box.
+    class MatrixCode < Node
+      OPTIONS = (Node::OPTIONS + %i[size module_size quiet_zone color align]).freeze
 
-      def initialize(text, size: nil, module_size: Prawn::Barcodes::DEFAULT_MODULE_SIZE, level: :m, quiet_zone: true, color: "000000", align: :left, **)
+      def initialize(symbol, size: nil, module_size: Prawn::Barcodes::DEFAULT_MODULE_SIZE, quiet_zone: true, color: "000000", align: :left, **)
         raise ArgumentError, "align is #{align.inspect}: accepted alignments are #{Image::ALIGNMENTS.map(&:inspect).join(", ")}" unless Image::ALIGNMENTS.include?(align)
 
         super(**)
-        @symbol = Gamba::Barcodes::QRCode.new(text, level:)
+        @symbol = symbol
         @size = size
         @module_size = module_size
         @quiet_zone = quiet_zone
@@ -309,7 +309,7 @@ module Gamba
       def paint(prawn, left, top, width)
         size = side(width)
         offset = {left: 0, center: (width - size) / 2.0, right: width - size}.fetch(@align)
-        prawn.draw_qr_code(@symbol, at: relative(prawn, left + offset, top), size:, quiet_zone: @quiet_zone, color: @color)
+        prawn.draw_matrix_code(@symbol, at: relative(prawn, left + offset, top), size:, quiet_zone: @quiet_zone, color: @color)
       end
 
       private
@@ -319,12 +319,12 @@ module Gamba
       end
 
       def side(available_width)
-        modules = @symbol.size + (@quiet_zone ? 2 * Prawn::Barcodes::QR_QUIET_ZONE_MODULES : 0)
+        modules = @symbol.size + (@quiet_zone ? 2 * @symbol.quiet_zone : 0)
         [@size || width || (modules * @module_size), available_width].min
       end
 
       def description
-        "a QR code"
+        @symbol.is_a?(Gamba::Barcodes::QRCode) ? "a QR code" : "a DataMatrix"
       end
     end
 
@@ -383,9 +383,14 @@ module Gamba
         add(Barcode.new(data, **options))
       end
 
-      def qr_code(text, **options)
-        Styles.check_options(options, QRCode::OPTIONS)
-        add(QRCode.new(text, **options))
+      def qr_code(text, level: :m, **options)
+        Styles.check_options(options, MatrixCode::OPTIONS)
+        add(MatrixCode.new(Gamba::Barcodes::QRCode.new(text, level:), **options))
+      end
+
+      def data_matrix(data, **options)
+        Styles.check_options(options, MatrixCode::OPTIONS)
+        add(MatrixCode.new(Gamba::Barcodes::DataMatrix.new(data), **options))
       end
 
       # A page of another PDF (a path, an IO or its bytes), from 1, as a box sized like an image.
