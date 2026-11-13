@@ -190,7 +190,7 @@ class NativeLayoutTest < Minitest::Test
   def test_unknown_or_contradictory_options_raise
     document = Gamba.document
 
-    assert_match(/\Aunknown option :gab: accepted options are :width, :grow, :keep_with_next, :gap, /, assert_raises(ArgumentError) { document.stack(gab: 2) { nil } }.message)
+    assert_match(/\Aunknown option :gab: accepted options are :width, :grow, :keep_with_next, :role, :alt, :gap, /, assert_raises(ArgumentError) { document.stack(gab: 2) { nil } }.message)
     assert_raises(ArgumentError) { document.row(keep_together: true) { nil } }
     assert_raises(ArgumentError) { document.stack(padding: [1, 2, 3]) { nil } }
     assert_raises(ArgumentError) { document.row { |row| row.text "A", width: 10, grow: 1 } }

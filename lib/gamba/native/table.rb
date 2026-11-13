@@ -10,6 +10,9 @@ module Gamba
       HEADER_OPTIONS = %i[align weight italic size color background].freeze
       CELL_OPTIONS = %i[padding size font color background borders border_width border_color].freeze
       DEFAULT_HEADER = {weight: :bold}.freeze
+      ROLES = %i[table artifact].freeze
+      DEFAULT_ROLE = :table
+      KIND = "a table"
       # A native name on the left, the name of Prawn's cell on the right.
       PRAWN_CELL_NAMES = {color: :text_color, background: :background_color}.freeze
       # Prawn starts a new page unless a row is strictly shorter than what is left of the page: a table that
