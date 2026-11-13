@@ -136,3 +136,5 @@ end
 
 Prawn.image_handler.register(Prawn::Images::JPG)
 Prawn.image_handler.register(Prawn::Images::PNG)
+
+require_relative "gamba/railtie" if defined?(Rails::Railtie)

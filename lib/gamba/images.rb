@@ -86,7 +86,10 @@ module Prawn
 
     private
 
+    # An IO, a path, or anything answering download, as Active Storage attachments and blobs do.
     def verify_and_read_image(io_or_path)
+      return io_or_path.download if io_or_path.respond_to?(:download) && !io_or_path.respond_to?(:rewind)
+
       if io_or_path.respond_to?(:rewind)
         io_or_path.rewind
         io_or_path.binmode if io_or_path.respond_to?(:binmode)

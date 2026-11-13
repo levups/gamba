@@ -20,7 +20,7 @@ end
 
 check = ARGV.include?("--check")
 stale_paths = Dir[File.expand_path("../docs/*.html", __dir__)].sort.select do |path|
-  page = File.read(path)
+  page = File.read(path, encoding: Encoding::UTF_8)
   highlighted = highlight(page, path)
   next false if highlighted == page
 

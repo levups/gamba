@@ -4,3 +4,4 @@
 /pkg/
 *.gem
 /.claude/settings.local.json
+/gemfiles/*.lock

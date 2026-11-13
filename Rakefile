@@ -6,6 +6,13 @@ Rake::TestTask.new(:test) do |task|
   task.libs << "lib" << "test"
   task.test_files = FileList["test/*_test.rb"]
 end
+
+# Rails in a process of its own: its core extensions would otherwise change the Ruby the other tests run on.
+Rake::TestTask.new("test:rails") do |task|
+  task.libs << "lib" << "test"
+  task.test_files = FileList["test/rails/*_test.rb"]
+end
+task test: "test:rails"
 task default: :test
 
 namespace :corpus do
