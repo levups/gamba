@@ -128,8 +128,15 @@ barcode "0123456789012", type: :ean13, width: 120, height: 40, text: true
 data_matrix "alice@example.com", size: 40
 ```
 
-Loading font and SVG support once, before a server such as Puma or Unicorn forks its workers, so they share it in
-memory:
+Rails, 8.0 and later, with nothing to configure: controllers render PDFs, `.pdf.rb` templates draw them with the
+view's helpers and translations, and Gamba loads before the server forks when the application eager loads:
+
+```ruby
+render pdf: InvoiceDocument.new(@invoice), filename: "invoice.pdf" # anything answering to_pdf, or a document
+```
+
+Outside Rails, loading font and SVG support once, before a server such as Puma or Unicorn forks its workers, so they
+share it in memory:
 
 ```ruby
 Gamba.eager_load!

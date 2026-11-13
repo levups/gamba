@@ -6,6 +6,7 @@ gemspec
 
 group :development, :test do
   gem "minitest"
+  gem "railties" # test/rails boots an application on it
   gem "rake"
   gem "rubocop-performance", require: false
   gem "standard", require: false

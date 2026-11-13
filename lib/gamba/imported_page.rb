@@ -15,9 +15,11 @@ module Gamba
 
     attr_reader :width, :height, :form
 
-    # source: a path, an IO, or the bytes of a PDF.
+    # source: a path, an IO, the bytes of a PDF, or anything answering download, as Active Storage attachments do.
     def self.bytes(source)
-      if source.respond_to?(:read)
+      if source.respond_to?(:download) && !source.respond_to?(:read)
+        source.download.b
+      elsif source.respond_to?(:read)
         source.rewind if source.respond_to?(:rewind)
         source.read.b
       elsif source.is_a?(String) && source.b.start_with?("%PDF-")

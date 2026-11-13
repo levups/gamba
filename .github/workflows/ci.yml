@@ -46,6 +46,7 @@ jobs:
       matrix:
         # Every Ruby the core team still maintains (https://endoflife.date/ruby); the -head ones are in head.
         ruby: ["3.3", "3.4", "4.0"]
+        rails: [{version: "8.1", gemfile: Gemfile}, {version: "8.0", gemfile: gemfiles/rails_8_0.gemfile}]
     env:
       BUNDLE_GEMFILE: ${{ matrix.rails.gemfile != 'Gemfile' && matrix.rails.gemfile || '' }}
     steps: &test-steps

@@ -45,6 +45,7 @@
         <li><a href="#barcodes">QR codes, DataMatrix and barcodes</a></li>
         <li><a href="#pdf-a">PDF/A and Factur-X</a></li>
         <li><a href="#output">Output</a></li>
+        <li><a href="#rails">Rails</a></li>
         <li><a href="#servers">Servers that fork</a></li>
         <li><a href="#comparing">Comparing an app’s PDFs</a></li>
       </ul>
@@ -278,11 +279,27 @@
       </div>
     </section>
 
+    <section id="rails" aria-labelledby="rails-title">
+      <h2 id="rails-title">Rails</h2>
+      <div class="prose">
+        <p>In a Rails application, 8.0 or later, Gamba needs no configuration. A controller renders a document, an object of the application answering <code>to_pdf</code>, or a PDF’s bytes; the response is <code>application/pdf</code>, shown in the browser unless <code>disposition: :attachment</code>, and the filename is encoded for any language:</p>
+<pre><code class="language-ruby"><span class="k">def</span> <span class="nf">show</span>
+  <span class="n">render</span> <span class="ss">pdf: </span><span class="no">InvoiceDocument</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="vi">@invoice</span><span class="p">),</span> <span class="ss">filename: </span><span class="s2">"Facture </span><span class="si">#{</span><span class="vi">@invoice</span><span class="p">.</span><span class="nf">number</span><span class="si">}</span><span class="s2">.pdf"</span>
+<span class="k">end</span></code></pre>
+        <p>Teams that prefer views write <code>show.pdf.rb</code> templates. The code runs in the view, with helpers and translations at hand, and draws on <code>document</code>, a <code>Gamba::Document</code>; Prawn’s API is at <code>document.prawn</code>. A template that ends with a document of its own, Gamba’s or Prawn’s, renders that one.</p>
+<pre><code class="language-ruby"><span class="c1"># app/views/invoices/show.pdf.rb</span>
+<span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="n">t</span><span class="p">(</span><span class="s2">".title"</span><span class="p">,</span> <span class="ss">number: </span><span class="vi">@invoice</span><span class="p">.</span><span class="nf">number</span><span class="p">),</span> <span class="ss">size: </span><span class="mi">18</span>
+<span class="n">document</span><span class="p">.</span><span class="nf">table</span> <span class="vi">@invoice</span><span class="p">.</span><span class="nf">lines</span><span class="p">,</span> <span class="ss">columns: </span><span class="p">{</span><span class="ss">description: </span><span class="p">{},</span> <span class="ss">amount: </span><span class="p">{</span><span class="ss">align: :right</span><span class="p">}}</span>
+<span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="n">number_to_currency</span><span class="p">(</span><span class="vi">@invoice</span><span class="p">.</span><span class="nf">total</span><span class="p">)</span></code></pre>
+        <p>Active Storage attachments go straight to <code>image</code> and <code>pdf_page</code>, without a temporary file: anything that answers <code>download</code> is read that way. When the application eager loads, as in production, Gamba loads with it, before the server forks its workers.</p>
+      </div>
+    </section>
+
     <section id="servers" aria-labelledby="servers-title">
       <h2 id="servers-title">Servers that fork</h2>
       <div class="prose">
         <p>TrueType and SVG support load on first use, so a document of standard fonts never pays for them. Before a server forks its workers, load them once, so every worker shares that memory instead of loading its own copy:</p>
-<pre><code class="language-ruby"><span class="c1"># config/puma.rb, before_fork, or an initializer</span>
+<pre><code class="language-ruby"><span class="c1"># outside Rails: config/puma.rb, before_fork, or an initializer</span>
 <span class="no">Gamba</span><span class="p">.</span><span class="nf">eager_load!</span></code></pre>
       </div>
     </section>
