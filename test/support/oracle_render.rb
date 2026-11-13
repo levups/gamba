@@ -382,7 +382,7 @@ end
 
 # An SVG of prawn-svg's samples, drawn across the page, without fetching anything from the web.
 def svg_example(path)
-  data = File.read(path)
+  data = File.read(path, encoding: Encoding::UTF_8)
   OracleExample.new(name: "svg-#{File.basename(path, ".svg")}", options: {},
     block: proc { svg data, at: [bounds.left, bounds.top], width: bounds.width, enable_web_requests: false })
 end
@@ -390,7 +390,7 @@ end
 def examples_from(path)
   return [svg_example(path)] if path.end_with?(".svg")
 
-  source = File.read(path)
+  source = File.read(path, encoding: Encoding::UTF_8)
     .sub(%r{^require ["']prawn/manual_builder["']$}, "")
     .gsub("Prawn::ManualBuilder::DATADIR", File.join(CACHE_DIRECTORY, "prawn-manual_builder/data").inspect)
     .gsub("Prawn::DATADIR", File.join(CACHE_DIRECTORY, "prawn/data").inspect)

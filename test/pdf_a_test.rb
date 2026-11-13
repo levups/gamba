@@ -11,7 +11,7 @@ class PdfATest < Minitest::Test
   MUSTANG_JAR = ENV.fetch("MUSTANG_JAR", File.expand_path("~/.cache/gamba-tools/Mustang-CLI.jar"))
   JAVA = ENV.fetch("JAVA", ["/opt/homebrew/opt/openjdk/bin/java", "java"].find { system(_1, "-version", err: File::NULL, out: File::NULL) })
   DATA_DIRECTORY = File.join(Oracle::ROOT, "corpus/cache/prawn/data")
-  INVOICE_XML = File.read(File.join(__dir__, "fixtures/factur_x_en16931.xml"))
+  INVOICE_XML = File.read(File.join(__dir__, "fixtures/factur_x_en16931.xml"), encoding: Encoding::UTF_8)
 
   def setup
     skip CORPUS_MISSING_MESSAGE unless File.directory?(DATA_DIRECTORY)
