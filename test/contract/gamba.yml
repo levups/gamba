@@ -12,6 +12,7 @@ Gamba::Document:
   "#row": [keyrest options]
   "#stack": [keyrest options]
   "#footer": [key gap, block block]
+  "#grid": [keyreq columns, keyrest options]
   "#header": [key gap, block block]
   "#image": [req source, keyrest options]
   "#register_font": [req family, keyreq normal, key bold, key italic, key bold_italic, key features]
@@ -20,9 +21,10 @@ Gamba::Document:
   "#text": [req string, key style, keyrest attributes]
   "#to_s": []
   "#write": [req destination]
-# What a stack and a row answer inside their block; the rest of the class is how they are measured and placed.
+# What a stack, a row and a grid answer inside their block; the rest of the class is how they are measured and placed.
 Gamba::Layout::Container:
   "#draw": [req component]
+  "#grid": [keyreq columns, keyrest options]
   "#image": [req source, keyrest options]
   "#row": [keyrest options]
   "#stack": [keyrest options]
