@@ -17,7 +17,7 @@ module Prawn
 
     VALID_OPTIONS = %i[
       page_size page_layout margin left_margin right_margin top_margin bottom_margin skip_page_creation compress
-      background info text_formatter print_scaling pdf_a lang
+      background info text_formatter print_scaling pdf_a lang background_pdf background_pdf_page
     ].freeze
 
     attr_accessor :margin_box, :page_number, :text_formatter
@@ -46,6 +46,8 @@ module Prawn
       @pdf_a = options.delete(:pdf_a) == true
       @background = options[:background]
       @background_scale = options[:background_scale] || 1
+      @background_pdf = options[:background_pdf]
+      @background_pdf_page = options[:background_pdf_page] || 1
       @font_size = 12
       @bounding_box = nil
       @margin_box = nil
@@ -85,6 +87,7 @@ module Prawn
       insert_page(page, @page_number)
       @page_number += 1
       canvas { image(@background, scale: @background_scale, at: bounds.top_left) } if @background
+      draw_background_pdf(options)
       @y = @bounding_box.absolute_top
       float { @on_page_create&.call(self) }
       header_blend_mode = page.stack.last&.blend_mode
@@ -239,6 +242,13 @@ module Prawn
     end
 
     private
+
+    # A page of another PDF under each page, at its own size from the top left corner: the document's, unless
+    # start_new_page names another (background_pdf:, background_pdf_page:) or none (background_pdf: false).
+    def draw_background_pdf(options)
+      source, number = options.key?(:background_pdf) ? [options[:background_pdf], options[:background_pdf_page] || 1] : [@background_pdf, @background_pdf_page]
+      canvas { pdf_page(source, page: number, at: bounds.top_left) } if source
+    end
 
     # A gradient set as the fill or stroke stays it on the new page, in place of the colour Prawn writes.
     def use_graphic_settings(override_settings = false)

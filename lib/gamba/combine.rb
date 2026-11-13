@@ -4,18 +4,11 @@ module Gamba
   # Each page keeps its resources and content streams as they were encoded; only the page dictionaries and the
   # document structure are written anew. Outlines, forms and tagged structure of the sources are not carried over.
   class Combine
+    include PageBoxes
+
     BOXES = %i[MediaBox CropBox BleedBox TrimBox ArtBox].freeze
-    DEFAULT_MEDIA_BOX = [0.0, 0.0, 612.0, 792.0].freeze
     # A quarter turn counterclockwise, the way combine_pdf turns a page to the requested orientation.
-    QUARTER_TURN = ->(width, height) { [0.0, 1.0, -1.0, 0.0, height, 0.0] }
-    ROTATIONS = {
-      90 => ->(width, height) { [0.0, -1.0, 1.0, 0.0, 0.0, width] },
-      180 => ->(width, height) { [-1.0, 0.0, 0.0, -1.0, width, height] },
-      270 => QUARTER_TURN
-    }.freeze
-    # References followed to tell whether two objects are the same: a chain deeper than this is copied unshared,
-    # instead of overflowing the stack on a file that links its objects into a list as long as it likes.
-    MAX_DESCRIBED_DEPTH = 32
+    QUARTER_TURN = ROTATIONS.fetch(270)
 
     # page_size: a name from PDF::Core::PageGeometry::SIZES or [width, height] in points; each page is scaled to fit
     # it, keeping its proportions, from the lower left corner. orientation: :portrait or :landscape; a page the other
@@ -64,22 +57,16 @@ module Gamba
     # Page references first, so a link from one page to another lands on the copy instead of dragging the old tree.
     def copy_pages(reader)
       @reader = reader
-      @copies = {}
-      @pending = []
-      @content_identifiers = {}
-      @description_depth = 0
+      @copier = Copier.new(reader, shared: @shared, identifiers: @identifiers) { reference(_1) }
       pages = reader.pages.map do |source_reference, page|
         copy = reference(nil)
-        if source_reference.is_a?(PDF::Core::Reader::Ref)
-          @copies[source_reference.number] = copy
-          @content_identifiers[source_reference.number] = nil
-        end
+        @copier.place(source_reference.number, copy) if source_reference.is_a?(PDF::Core::Reader::Ref)
         [copy, page]
       end
       annotations_to_move = []
       pages.each do |copy, page|
         matrix, *sizes = transformation(page)
-        copy.data = copy_value(matrix ? page.except(:Parent, :B, *BOXES, :Rotate, :Contents) : page.except(:Parent, :B))
+        copy.data = @copier.copy(matrix ? page.except(:Parent, :B, *BOXES, :Rotate, :Contents) : page.except(:Parent, :B))
         copy.data[:Parent] = @pages_reference
         if matrix
           reshape(copy.data, page, matrix, *sizes)
@@ -87,99 +74,22 @@ module Gamba
         end
         @kids << copy
       end
-      copy_pending
+      @copier.finish
       moved = {}.compare_by_identity
       annotations_to_move.each { |annotations, matrix| move_annotations(annotations, matrix, moved) }
       reader.version
-    end
-
-    def copy_value(value)
-      case value
-      when PDF::Core::Reader::Ref
-        @copies[value.number] ||= begin
-          identifier = content_identifier(value.number)
-          identifier ? (@shared[identifier] ||= pending_copy(value.number)) : pending_copy(value.number)
-        end
-      when Hash then value.transform_values { copy_value(_1) }
-      when Array then value.map { copy_value(_1) }
-      else value
-      end
-    end
-
-    def pending_copy(number)
-      reference(nil).tap { @pending << [number, _1] }
-    end
-
-    # Objects with the same content, references included, are written once: the fonts, images and glyph procedures a
-    # carrier repeats on every label. Pages, and annotations (whose place is their own), are never shared.
-    def content_identifier(number)
-      return @content_identifiers[number] if @content_identifiers.key?(number)
-      return nil if @description_depth >= MAX_DESCRIBED_DEPTH
-
-      @content_identifiers[number] = nil # an object reached again while describing it stays unshared
-      @description_depth += 1
-      begin
-        value = @reader.object(number)
-        key = if value.is_a?(PDF::Core::Reader::Stream)
-          description = describe(value.dictionary.except(:Length))
-          [description, value.data] if description
-        elsif !(value.is_a?(Hash) && value.key?(:Rect))
-          describe(value)
-        end
-      ensure
-        @description_depth -= 1
-      end
-      @content_identifiers[number] = key && (@identifiers[key] ||= @identifiers.size)
-    end
-
-    def describe(value, description = +"")
-      case value
-      when PDF::Core::Reader::Ref
-        identifier = content_identifier(value.number)
-        identifier && description << "R" << identifier.to_s << " "
-      when Hash
-        description << "<<"
-        value.each { |key, entry| describe(entry, description << PDF::Core.escape_name(key.name) << " ") || (return nil) }
-        description << ">>"
-      when Array
-        description << "["
-        value.each { describe(_1, description) || (return nil) }
-        description << "]"
-      when PDF::Core::ByteString then description << "(" << value.bytesize.to_s << ":" << value << ")"
-      when PDF::Core::Name then description << PDF::Core.escape_name(value.value) << " "
-      when PDF::Core::Real then description << value.source << " "
-      else description << value.inspect << " "
-      end
-    end
-
-    def copy_pending
-      until @pending.empty?
-        number, copy = @pending.pop
-        value = @reader.object(number)
-        if value.is_a?(PDF::Core::Reader::Stream)
-          dictionary = value.dictionary.except(:Length)
-          # The writer packs streams without bytes as plain objects: keep one byte of data instead.
-          dictionary = dictionary.except(:Filter, :DecodeParms) if value.data.empty?
-          copy.data = copy_value(dictionary)
-          copy.stream = value.data.empty? ? +" " : +value.data
-        else
-          copy.data = copy_value(value)
-        end
-      end
     end
 
     # The matrix that draws the page's visible box at its new place, and the new page's size; nil when it stays put.
     def transformation(page)
       return nil unless @page_size || @orientation
 
-      media = box(page[:MediaBox]) || DEFAULT_MEDIA_BOX
-      crop = box(page[:CropBox])
-      visible = crop ? intersection(crop, media) : media
+      media = media_box(page)
+      visible = visible_box(page)
       left, bottom, right, top = visible
       width = right - left
       height = top - bottom
-      rotation = number(page[:Rotate]).to_i % 360
-      rotation = 0 unless (rotation % 90).zero?
+      rotation = rotation(page)
       shown_width, shown_height = (rotation % 180).zero? ? [width, height] : [height, width]
       turn = @orientation && shown_width != shown_height && (shown_width > shown_height) != (@orientation == :landscape)
       final_width, final_height = turn ? [shown_height, shown_width] : [shown_width, shown_height]
@@ -208,7 +118,7 @@ module Gamba
     def contents(value)
       resolved = @reader.resolve(value)
       value = resolved if resolved.is_a?(Array)
-      Array(value).filter_map { |content| copy_value(content) if content.is_a?(PDF::Core::Reader::Ref) }
+      Array(value).filter_map { |content| @copier.copy(content) if content.is_a?(PDF::Core::Reader::Ref) }
     end
 
     # Annotation rectangles follow the content they sit on.
@@ -260,45 +170,11 @@ module Gamba
       numbers.all? ? numbers : nil
     end
 
-    def box(value)
-      values = @reader.resolve(value)
-      return nil unless values.is_a?(Array) && values.size == 4
-
-      numbers = values.map { number(_1) }
-      return nil if numbers.any?(&:nil?) || numbers[0] == numbers[2] || numbers[1] == numbers[3]
-
-      left, right = [numbers[0], numbers[2]].minmax
-      bottom, top = [numbers[1], numbers[3]].minmax
-      [left, bottom, right, top]
-    end
-
     def plain_box(values)
       return nil unless values.is_a?(Array) && values.size == 4
 
       numbers = values.map { numeric(_1) }
       numbers.any?(&:nil?) ? nil : numbers
-    end
-
-    def number(value)
-      numeric(@reader.resolve(value))
-    end
-
-    # A real too large for a Float reads as infinite, and would write NaN into the page's matrix: no number then.
-    def numeric(value)
-      number = (value.is_a?(PDF::Core::Real) || value.is_a?(Numeric)) ? value.to_f : nil
-      number if number&.finite?
-    end
-
-    def intersection(crop, media)
-      left, bottom = [crop[0], media[0]].max, [crop[1], media[1]].max
-      right, top = [crop[2], media[2]].min, [crop[3], media[3]].min
-      (right > left && top > bottom) ? [left, bottom, right, top] : media
-    end
-
-    def multiply(first, second)
-      a, b, c, d, e, f = first
-      a2, b2, c2, d2, e2, f2 = second
-      [a * a2 + b * c2, a * b2 + b * d2, c * a2 + d * c2, c * b2 + d * d2, e * a2 + f * c2 + e2, e * b2 + f * d2 + f2]
     end
 
     def apply(matrix, x, y)

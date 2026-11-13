@@ -271,6 +271,24 @@ module Gamba
       end
     end
 
+    # A page of another PDF as a box, sized and aligned as an image is.
+    class PdfPage < Image
+      def initialize(source, page: 1, **)
+        super(source, **)
+        @page = page
+      end
+
+      private
+
+      def description
+        "a PDF page"
+      end
+
+      def image(prawn)
+        @image ||= prawn.build_pdf_page_object(@source, @page)
+      end
+    end
+
     # What a document and its containers share: the calls that add a box.
     module Builder
       # Rows are hashes, or objects answering the columns' names. The block receives the Prawn::Table before it
@@ -282,6 +300,12 @@ module Gamba
       def image(source, **options)
         Styles.check_options(options, Image::OPTIONS)
         add(Image.new(source, **options))
+      end
+
+      # A page of another PDF (a path, an IO or its bytes), from 1, as a box sized like an image.
+      def pdf_page(source, page: 1, **options)
+        Styles.check_options(options, Image::OPTIONS)
+        add(PdfPage.new(source, page:, **options))
       end
 
       def stack(**options)

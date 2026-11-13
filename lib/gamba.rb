@@ -98,6 +98,9 @@ end
 
 module Gamba
   autoload :Combine, ::File.expand_path("gamba/combine", __dir__)
+  autoload :Copier, ::File.expand_path("gamba/copier", __dir__)
+  autoload :ImportedPage, ::File.expand_path("gamba/imported_page", __dir__)
+  autoload :PageBoxes, ::File.expand_path("gamba/page_boxes", __dir__)
   autoload :Document, ::File.expand_path("gamba/native/document", __dir__)
   autoload :Layout, ::File.expand_path("gamba/native/layout", __dir__)
 
@@ -118,7 +121,7 @@ module Gamba
   # Loads what Gamba otherwise loads on first use, SVG support included: call it before a server forks its
   # workers, so they share that memory instead of each loading its own copy.
   def self.eager_load!
-    [TrueType::File, TrueType::Subset, Prawn::Fonts::TTF, Combine, PDF::Core::Reader, Document]
+    [TrueType::File, TrueType::Subset, Prawn::Fonts::TTF, Combine, ImportedPage, PDF::Core::Reader, Document]
     require "prawn-svg"
   end
 end

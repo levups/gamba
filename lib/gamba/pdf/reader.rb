@@ -129,6 +129,12 @@ module PDF
         pages
       end
 
+      # A stream's bytes decoded, Flate being the only filter read, as for object streams: a page's content in
+      # several streams is joined this way.
+      def decoded(stream)
+        decode(stream)
+      end
+
       private
 
       # Objects read so far were read as stored: forget them, so they are read again and decrypted.
@@ -393,14 +399,14 @@ module PDF
         end
       end
 
-      # Object and cross-reference streams only: Flate, optionally with a PNG predictor (§7.4.4.4). Every filter's
+      # Flate, optionally with a PNG predictor (§7.4.4.4). Every filter's
       # output counts against what the file may decode in all.
       def decode(stream)
         filters = [resolve(stream.dictionary[:Filter])].flatten
         filters.compact!
         parameters = [resolve(stream.dictionary[:DecodeParms])].flatten
         filters.each_with_index.reduce(stream.data) do |data, (filter, position)|
-          raise Prawn::Errors::MalformedPDF, "Unsupported filter #{filter.inspect} on an object stream" unless filter == FLATE
+          raise Prawn::Errors::MalformedPDF, "Unsupported filter #{filter.inspect}: only Flate is read" unless filter == FLATE
 
           inflated = inflate(data)
           @decoded_bytes_left -= inflated.bytesize

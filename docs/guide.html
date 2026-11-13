@@ -222,6 +222,14 @@
       <div class="prose">
         <p>JPEG images are embedded as they are; PNG images in every variant Prawn reads, alpha included, are decoded. The same image placed twice in a document is embedded once.</p>
         <p>A corrupt or hostile file raises <code>Prawn::Errors::UnsupportedImageType</code> or a named font error, never a crash inside a parser: PNG data inflates no further than its header announces. An input fuzzer checks it on flipped bytes, truncations and forged lengths.</p>
+        <h3 id="pdf-pages">Pages of other PDFs</h3>
+        <p>A page of an existing PDF, such as a designer’s letterhead or a pre-printed form, is drawn like an image: <code>pdf_page</code> takes a path, an IO or the bytes of a PDF, a <code>page</code> counted from 1, and the options <code>image</code> takes for position and size. <code>background_pdf</code> puts one under every page, at its own size from the top left corner; <code>start_new_page</code> takes another one, or <code>false</code> for none.</p>
+<pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="ss">page_size: </span><span class="s2">"A4"</span><span class="p">,</span> <span class="ss">top_margin: </span><span class="mi">120</span><span class="p">,</span> <span class="ss">background_pdf: </span><span class="s2">"letterhead.pdf"</span><span class="p">)</span> <span class="k">do</span>
+  <span class="n">text</span> <span class="s2">"Invoice INV-2026-0001"</span>
+  <span class="n">pdf_page</span> <span class="s2">"terms.pdf"</span><span class="p">,</span> <span class="ss">page: </span><span class="mi">2</span><span class="p">,</span> <span class="ss">width: </span><span class="mi">200</span>
+  <span class="n">start_new_page</span><span class="p">(</span><span class="ss">background_pdf: </span><span class="kp">false</span><span class="p">)</span>
+<span class="k">end</span></code></pre>
+        <p>The page appears as a viewer shows it, its crop box turned by its <code>/Rotate</code>. It is written once however many pages draw it, and pages of one file share their fonts and images. The reader is the one behind <code>Gamba.combine</code>, with its limits and errors; under <code>pdf_a: true</code>, a page whose fonts are not embedded raises <code>Prawn::Errors::PdfAViolation</code>. Gamba’s own API takes <code>background_pdf</code> and <code>background_pdf_page</code> as document options, and <code>pdf_page</code> as a box sized like an image.</p>
       </div>
     </section>
 
