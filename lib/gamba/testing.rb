@@ -29,12 +29,7 @@ module Gamba
         return "the PDF has #{pages.size} pages, not #{page}" if candidates.empty?
 
         pattern = text.is_a?(Regexp) ? text : Regexp.new(text.split.map { Regexp.escape(_1) }.join("\\s+"))
-        found = candidates.any? do |candidate|
-          lines(candidate).any? do |glyphs|
-            line = glyphs.map(&:first).join
-            line.to_enum(:scan, pattern).any? { at.nil? || near?(glyphs[Regexp.last_match.begin(0)], at) }
-          end
-        end
+        found = candidates.any? { |candidate| lines(candidate).any? { |glyphs| occurs?(glyphs, pattern, at) } }
         return nil if found
 
         place = page ? "page #{page}" : "the PDF"
@@ -60,6 +55,18 @@ module Gamba
 
       def lines(page)
         page.glyphs.group_by(&:last).sort.map!(&:last)
+      end
+
+      # Whether the pattern matches the line, from a glyph near `at` when told.
+      def occurs?(glyphs, pattern, at)
+        line = glyphs.map(&:first).join
+        position = 0
+        while (match = pattern.match(line, position))
+          return true if at.nil? || near?(glyphs[match.begin(0)], at)
+
+          position = match.begin(0) + 1
+        end
+        false
       end
 
       def near?(glyph, (x, y))
