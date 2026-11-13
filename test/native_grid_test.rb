@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "test_helper"
+require "open3"
 require "prawn"
 
 # Grids of Gamba's own API: cells in lines of a given number of equal columns, pages broken between lines.
@@ -38,6 +39,21 @@ class NativeGridTest < Minitest::Test
 
     assert_equal "n", next_line.first
     assert_in_delta 4 * line_advance, next_line[4] - first[4], 0.01
+  end
+
+  def test_cells_with_a_background_or_a_border_are_drawn_as_high_as_their_line
+    document = Gamba.document do |yielded|
+      yielded.grid(columns: 3) do |grid|
+        grid.stack(border_color: "cccccc") { |card| card.text "short" }
+        grid.stack(background: "eeeeee") { |card| 3.times { card.text "tall" } }
+        grid.text "plain"
+      end
+    end
+    heights = uncompressed(document.to_s).scan(/^[\d.]+ [\d.]+ [\d.]+ ([\d.]+) re$/).flatten.map(&:to_f)
+
+    assert_equal 2, heights.size
+    assert_in_delta 3 * line_advance, heights.first, 0.01
+    assert_equal heights.first, heights.last
   end
 
   def test_pages_break_between_lines_never_inside_one
@@ -110,11 +126,19 @@ class NativeGridTest < Minitest::Test
   end
 
   def pages(pdf)
+    with_file(pdf) { |path| Oracle.text_layout(path).map(&:glyphs) }
+  end
+
+  def uncompressed(pdf)
+    with_file(pdf) { |path| Open3.capture2("qpdf", "--qdf", "--object-streams=disable", path, "-").first.b }
+  end
+
+  def with_file(pdf)
     Tempfile.create(["grid", ".pdf"]) do |file|
       file.binmode
       file.write(pdf)
       file.flush
-      Oracle.text_layout(file.path).map(&:glyphs)
+      yield file.path
     end
   end
 end

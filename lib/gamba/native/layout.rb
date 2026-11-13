@@ -383,8 +383,9 @@ module Gamba
         super
       end
 
-      def paint(prawn, left, top, width)
-        decorate(prawn, left, top, width, height(prawn, width))
+      # In a line of a grid, the background and the border reach down to the bottom of the line.
+      def paint(prawn, left, top, width, stretched_height = nil)
+        decorate(prawn, left, top, width, stretched_height || height(prawn, width))
         child_top = top - @padding_top
         @children.each do |child|
           child_width = child_width(child, width)
@@ -460,16 +461,20 @@ module Gamba
         super
       end
 
-      def paint(prawn, left, top, width)
-        decorate(prawn, left, top, width, height(prawn, width))
+      def paint(prawn, left, top, width, stretched_height = nil)
+        decorate(prawn, left, top, width, stretched_height || height(prawn, width))
         child_left = left + @padding_left
+        paint_children(prawn, child_left, top, width)
+      end
+
+      private
+
+      def paint_children(prawn, child_left, top, width)
         @children.zip(child_widths(width)) do |child, child_width|
           child.paint(prawn, child_left, top - @padding_top, child_width)
           child_left += child_width + @gap
         end
       end
-
-      private
 
       def measure(prawn, width)
         widths = child_widths(width)
@@ -556,6 +561,19 @@ module Gamba
         end
 
         private
+
+        # Cells with a background or a border are drawn as high as the line, like those of a CSS grid.
+        def paint_children(prawn, child_left, top, width)
+          line_height = height(prawn, width)
+          @children.zip(child_widths(width)) do |child, child_width|
+            if child.is_a?(Container)
+              child.paint(prawn, child_left, top, child_width, line_height)
+            else
+              child.paint(prawn, child_left, top, child_width)
+            end
+            child_left += child_width + @gap
+          end
+        end
 
         def description
           "a line of a grid"
