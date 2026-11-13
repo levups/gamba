@@ -110,6 +110,15 @@ combine_pdf gem for that use:
 Gamba.combine([label, other_label], page_size: [288, 432], orientation: :portrait)
 ```
 
+Drawing on a page of an existing PDF, such as a letterhead or a pre-printed form, under every page or anywhere at
+any size. It is written once, however many pages use it:
+
+```ruby
+Prawn::Document.new(background_pdf: "letterhead.pdf") do
+  pdf_page "terms.pdf", page: 2, width: 200
+end
+```
+
 Loading font and SVG support once, before a server such as Puma or Unicorn forks its workers, so they share it in
 memory:
 
@@ -147,11 +156,12 @@ Any of it can be built to attack the server that renders it.
   one another, and they draw within the budget of the SVG that embeds them.
 - Fonts an SVG declares with `@font-face` disappear once it is drawn, and one that is not a font is left out. In
   prawn-svg, an uploaded SVG declaring a "Helvetica" font changed the font of the application's own text.
-- A damaged or malicious PNG, JPEG, TrueType or OpenType file either renders or raises an error Gamba names
-  (`Prawn::Errors::UnsupportedImageType`, `Prawn::Images::JPG::FormatError`, `Gamba::TrueType::Error`, or
-  `Prawn::Errors::CannotFit` when a damaged font makes a glyph wider than the page). A PNG
+- A damaged or malicious PNG, JPEG, TrueType, OpenType or PDF file either renders or raises an error Gamba names
+  (`Prawn::Errors::UnsupportedImageType`, `Prawn::Images::JPG::FormatError`, `Gamba::TrueType::Error`,
+  `Prawn::Errors::MalformedPDF`, or `Prawn::Errors::CannotFit` when a damaged font makes a glyph wider than the
+  page). A PNG
   inflates no further than the size its header gives. CI corrupts sample files on every run to check this.
-- `Gamba.combine` stops at 64 levels of nested arrays and dictionaries and at 256 MB of decompressed data, and
+- `Gamba.combine` and `pdf_page` stop at 64 levels of nested arrays and dictionaries and at 256 MB of decompressed data, and
   ignores references that lead back to themselves, so a crafted PDF can't send it into a loop or fill
   memory.
 - Text with inline formatting (`inline_format: true`) is parsed in linear time, whatever the markup.

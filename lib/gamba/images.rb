@@ -52,6 +52,24 @@ module Prawn
       [entry[:obj], entry[:info]]
     end
 
+    # A page of another PDF, placed and sized as an image is, written once however many times it is drawn: a
+    # letterhead, a form to fill in. source: a path, an IO, or the bytes of a PDF; page: from 1.
+    def pdf_page(source, options = {})
+      options = options.dup
+      number = options.delete(:page) || 1
+      Prawn.verify_options(%i[at position vposition height width scale fit], options)
+      pdf_object, info = build_pdf_page_object(source, number)
+      embed_image(pdf_object, info, options)
+      info
+    end
+
+    def build_pdf_page_object(source, number = 1)
+      bytes = Gamba::ImportedPage.bytes(source)
+      imported = (@imported_pdfs ||= {})[Digest::SHA1.hexdigest(bytes)] ||= {source: Gamba::ImportedPage.source(self, bytes), pages: {}}
+      page = imported[:pages][number] ||= Gamba::ImportedPage.new(self, imported[:source], number)
+      [page.form, page]
+    end
+
     def embed_image(pdf_object, info, options)
       width, height = info.calc_image_dimensions(options)
       if options[:at]
@@ -62,7 +80,8 @@ module Prawn
       end
       label = "I#{@image_counter = (@image_counter || 0) + 1}"
       page.xobjects[label] = pdf_object
-      add_content("\nq\n#{PDF::Core.real_params([width, 0, 0, height, x, y - height])} cm\n/#{label} Do\nQ")
+      matrix = info.respond_to?(:placement) ? info.placement(width, height, x, y - height) : [width, 0, 0, height, x, y - height]
+      add_content("\nq\n#{PDF::Core.real_params(matrix)} cm\n/#{label} Do\nQ")
     end
 
     private

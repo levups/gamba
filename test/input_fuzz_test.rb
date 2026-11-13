@@ -5,7 +5,7 @@ require_relative "support/corrupt_inputs"
 require "prawn"
 require "timeout"
 
-# Images and fonts may come from users: corrupted ones must render or fail with an error Gamba names, never crash
+# Images, fonts and PDF pages may come from users: corrupted ones must render or fail with an error Gamba names, never crash
 # inside a parser, hang or exhaust memory. INPUT_FUZZ_SEED and INPUT_FUZZ_CASES choose them.
 class InputFuzzTest < Minitest::Test
   SEED = Integer(ENV.fetch("INPUT_FUZZ_SEED", "20261102"))
@@ -14,11 +14,11 @@ class InputFuzzTest < Minitest::Test
   # CannotFit: a corrupted advance width can make a glyph wider than the page, as Prawn reports it.
   EXPECTED_ERRORS = [
     Prawn::Errors::UnsupportedImageType, Prawn::Images::JPG::FormatError, Gamba::TrueType::Error,
-    Prawn::Errors::IncompatibleStringEncoding, Prawn::Errors::CannotFit
+    Prawn::Errors::IncompatibleStringEncoding, Prawn::Errors::CannotFit, Prawn::Errors::MalformedPDF, Prawn::Errors::EncryptedPDF
   ].freeze
   DATA_DIRECTORY = File.join(Oracle::ROOT, "corpus/cache/prawn/data")
 
-  def test_corrupted_images_and_fonts_fail_cleanly
+  def test_corrupted_images_fonts_and_pdfs_fail_cleanly
     skip CORPUS_MISSING_MESSAGE unless File.directory?(DATA_DIRECTORY)
 
     samples = Dir["#{DATA_DIRECTORY}/images/*.{png,jpg}"] + Dir["#{DATA_DIRECTORY}/fonts/*.{ttf,otf}"]
@@ -26,6 +26,7 @@ class InputFuzzTest < Minitest::Test
     picker = Random.new(SEED)
     failures = []
     Dir.mktmpdir do |directory|
+      samples += pdf_samples(directory)
       CASES.times do |index|
         sample = samples.sample(random: picker)
         path = File.join(directory, "case_#{index}#{File.extname(sample)}")
@@ -39,11 +40,26 @@ class InputFuzzTest < Minitest::Test
 
   private
 
+  # PDFs Gamba wrote, as pages to draw on: text in a TrueType subset, an image, compressed or not.
+  def pdf_samples(directory)
+    [true, false].map do |compress|
+      path = File.join(directory, "sample_#{compress}.pdf")
+      Prawn::Document.new(compress:) do
+        font "#{DATA_DIRECTORY}/fonts/DejaVuSans.ttf"
+        text "Letterhead, café"
+        image "#{DATA_DIRECTORY}/images/dice.png", width: 50
+      end.render_file(path)
+      path
+    end
+  end
+
   def unclean_failure(path)
     Timeout.timeout(SECONDS_PER_CASE) do
       Prawn::Document.new do
         if path.end_with?(".png", ".jpg")
           image path, width: 100
+        elsif path.end_with?(".pdf")
+          pdf_page path, width: 100
         else
           font path
           text "Avocado, café €"
