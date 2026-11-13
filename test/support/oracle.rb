@@ -4,6 +4,7 @@ require "bundler"
 require "fileutils"
 require "open3"
 require "tmpdir"
+require_relative "../../lib/gamba/pdf_check"
 
 # Renders the same examples with Prawn and with Gamba, each in its own process, and lists what tells their PDFs
 # apart: pages, text and its positions, pixels, validity, weight.
@@ -11,10 +12,9 @@ module Oracle
   ROOT = File.expand_path("../..", __dir__)
   MANUAL_DIRECTORY = File.join(ROOT, "corpus/cache/prawn/manual")
   RENDER_SCRIPT = File.join(__dir__, "oracle_render.rb")
-  RESOLUTION_DPI = 150
-  POSITION_PRECISION_DIGITS = 2
-  # Every encrypted example of Prawn's security chapter uses this user password; mutool and qpdf ignore it elsewhere.
+  # Every encrypted example of Prawn's security chapter uses this user password; the tools ignore it elsewhere.
   MANUAL_USER_PASSWORD = "foo"
+  Gamba::PdfCheck.password = MANUAL_USER_PASSWORD
 
   ENGINES = {
     "prawn" => {gemfile: File.join(ROOT, "oracle/Gemfile"), load_path: []},
@@ -108,134 +108,37 @@ module Oracle
     (reference_class == candidate_class) ? [] : ["raises #{candidate_class} instead of #{reference_class}"]
   end
 
-  # qpdf exits with 3 for warnings: a PDF readers have to repair is not a valid one. qpdf does not check the operands
-  # of content stream operators: Poppler does, reporting a syntax error.
+  # The comparisons themselves are Gamba::PdfCheck's, which applications' tests use too: one implementation.
   def self.invalidity(pdf)
-    output, status = Open3.capture2e("qpdf", "--check", pdf)
-    output, status = Open3.capture2e("qpdf", "--check", "--password=#{MANUAL_USER_PASSWORD}", pdf) if output.include?("invalid password")
-    return output.lines.grep(/WARNING|ERROR|error/).first(3).join.strip.then { |problem| problem.empty? ? "qpdf exit #{status.exitstatus}" : problem } unless status.success?
-
-    errors, _status = Open3.capture2e("pdftotext", "-upw", MANUAL_USER_PASSWORD, pdf, File::NULL)
-    errors.lines.grep(/Syntax Error/).first(3).join.strip.then { |problem| problem unless problem.empty? }
+    Gamba::PdfCheck.invalidity(pdf)
   end
 
   def self.text_differences(reference_pdf, candidate_pdf)
-    reference_pages = text_layout(reference_pdf)
-    candidate_pages = text_layout(candidate_pdf)
-    return ["#{candidate_pages.size} pages instead of #{reference_pages.size}"] if reference_pages.size != candidate_pages.size
-
-    reference_pages.zip(candidate_pages).each_with_index.filter_map do |(reference_page, candidate_page), index|
-      next if reference_page.size == candidate_page.size && reference_page.glyphs.size == candidate_page.glyphs.size &&
-        reference_page.glyphs.zip(candidate_page.glyphs).all? { |reference_glyph, candidate_glyph| same_glyph?(reference_glyph, candidate_glyph) }
-      next "page #{index + 1}: size #{candidate_page.size} instead of #{reference_page.size}" if reference_page.size != candidate_page.size
-
-      position = reference_page.glyphs.zip(candidate_page.glyphs).index { |reference_glyph, candidate_glyph| !same_glyph?(reference_glyph, candidate_glyph) }
-      next "page #{index + 1}: #{candidate_page.glyphs.size} glyphs instead of #{reference_page.glyphs.size}" unless position
-
-      "page #{index + 1}: glyph #{position} is #{candidate_page.glyphs[position].inspect} instead of #{reference_page.glyphs[position].inspect}"
-    end
+    Gamba::PdfCheck.text_differences(reference_pdf, candidate_pdf)
   end
-
-  POSITION_TOLERANCE = 0.0101
-
-  # Same character, font and size, at most 0.01 pt apart: positions round to 0.01 on either side of a boundary.
-  def self.same_glyph?(reference_glyph, candidate_glyph)
-    return false if candidate_glyph.nil? || reference_glyph.first(3) != candidate_glyph.first(3)
-
-    reference_glyph.last(2).zip(candidate_glyph.last(2)).all? { |reference, candidate| (reference - candidate).abs <= POSITION_TOLERANCE }
-  end
-
-  # Each glyph is [character, font without its subset tag, font size, x, y].
-  Page = Data.define(:size, :glyphs)
 
   def self.text_layout(pdf)
-    xml = mutool("draw", "-F", "stext", "-o", "-", pdf)
-    xml.split("<page ").drop(1).map do |page|
-      font = nil
-      glyphs = []
-      page.scan(/<(font|char) ([^>]*)>/) do |element, attributes|
-        value_by_name = attributes.scan(/(\w+)="([^"]*)"/).to_h
-        if element == "font"
-          font = [value_by_name.fetch("name").sub(/\A[A-Z]{6}\+/, ""), value_by_name.fetch("size").to_f.round(POSITION_PRECISION_DIGITS)]
-        else
-          position = value_by_name.fetch_values("x", "y").map { _1.to_f.round(POSITION_PRECISION_DIGITS) }
-          glyphs << [value_by_name.fetch("c"), *font, *position]
-        end
-      end
-      Page.new(size: page[/width="[^"]*" height="[^"]*"/], glyphs:)
-    end
+    Gamba::PdfCheck.text_layout(pdf)
   end
 
-  # Two renderers that share no code, MuPDF and Poppler, must each draw both documents identically.
-  RENDERERS = {"MuPDF" => :rasterize, "Poppler" => :rasterize_with_poppler}.freeze
-  QPDF_WARNINGS_EXIT_STATUS = 3
-
   def self.pixel_differences(reference_pdf, candidate_pdf)
-    Dir.mktmpdir do |tagged_directory|
-      reference_pdf = with_neutral_subset_tags(reference_pdf, File.join(tagged_directory, "reference.pdf"))
-      candidate_pdf = with_neutral_subset_tags(candidate_pdf, File.join(tagged_directory, "candidate.pdf"))
-      rendered_pixel_differences(reference_pdf, candidate_pdf)
-    end
+    Gamba::PdfCheck.pixel_differences(reference_pdf, candidate_pdf)
   end
 
   def self.rendered_pixel_differences(reference_pdf, candidate_pdf)
-    RENDERERS.flat_map do |renderer, rasterizer|
-      Dir.mktmpdir do |directory|
-        reference_images = send(rasterizer, reference_pdf, File.join(directory, "reference"))
-        candidate_images = send(rasterizer, candidate_pdf, File.join(directory, "candidate"))
-        reference_images.zip(candidate_images).each_with_index.filter_map do |(reference_image, candidate_image), index|
-          next if candidate_image.nil? || File.binread(reference_image) == File.binread(candidate_image)
-
-          "page #{index + 1}: #{differing_rows(reference_image, candidate_image)} pixel rows differ at #{RESOLUTION_DPI} dpi#{" in #{renderer}" unless renderer == "MuPDF"}"
-        end
-      end
-    end
+    Gamba::PdfCheck.rendered_pixel_differences(reference_pdf, candidate_pdf)
   end
 
-  # MuPDF hints some glyphs differently whether a font's subset tag is valid or not, and Prawn's lowercase hexadecimal
-  # tags are not ("exactly six uppercase letters", ISO 32000-1 §9.6.4): both documents get the same tag before drawing.
-  # Only names after /BaseFont or /FontName change: compressed stream data can hold a tag's bytes by chance, and
-  # rewriting them there would corrupt that stream.
   def self.with_neutral_subset_tags(pdf, path)
-    _output, status = Open3.capture2e("qpdf", "--qdf", "--object-streams=disable", "--stream-data=preserve", pdf, path)
-    return pdf unless status.success? || status.exitstatus == QPDF_WARNINGS_EXIT_STATUS
-
-    File.binwrite(path, File.binread(path).gsub(%r{(/(?:BaseFont|FontName)\s*)/[0-9A-Za-z]{6}\+}n, '\1/AAAAAA+'))
-    path
-  end
-
-  def self.rasterize_with_poppler(pdf, prefix)
-    _output, status = Open3.capture2e("pdftoppm", "-r", RESOLUTION_DPI.to_s, pdf, prefix)
-    Open3.capture2e("pdftoppm", "-r", RESOLUTION_DPI.to_s, "-upw", MANUAL_USER_PASSWORD, pdf, prefix) unless status.success?
-    Dir["#{prefix}-*.ppm"].sort
+    Gamba::PdfCheck.with_neutral_subset_tags(pdf, path)
   end
 
   def self.rasterize(pdf, prefix)
-    mutool("draw", "-r", RESOLUTION_DPI.to_s, "-o", "#{prefix}-%04d.pnm", pdf)
-    Dir["#{prefix}-*.pnm"].sort
-  end
-
-  def self.differing_rows(reference_image, candidate_image)
-    reference_rows = pnm_rows(reference_image)
-    candidate_rows = pnm_rows(candidate_image)
-    return "all" if reference_rows.size != candidate_rows.size
-
-    reference_rows.zip(candidate_rows).count { |reference_row, candidate_row| reference_row != candidate_row }
-  end
-
-  def self.pnm_rows(image)
-    content = File.binread(image)
-    header = content[/\AP\d\s+\d+\s+\d+\s+\d+\s/]
-    _format, width, height = header.split.map { Integer(_1[/\d+/]) }
-    row_bytes = width * (content.start_with?("P5") ? 1 : 3)
-    Array.new(height) { |row| content.byteslice(header.bytesize + (row * row_bytes), row_bytes) }
+    Gamba::PdfCheck.rasterize(pdf, prefix)
   end
 
   def self.mutool(*arguments, pdf)
-    output, errors, status = Open3.capture3("mutool", *arguments.take(1), "-q", "-p", MANUAL_USER_PASSWORD, *arguments.drop(1), pdf, binmode: true)
-    raise "mutool #{arguments.first} failed on #{pdf}: #{errors}" unless status.success?
-
-    output
+    Gamba::PdfCheck.mutool(*arguments, pdf)
   end
 
   def self.read_if_present(directory, filename)
