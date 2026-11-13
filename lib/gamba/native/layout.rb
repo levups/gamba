@@ -40,6 +40,90 @@ module Gamba
         @prawn.bounds.move_past_bottom
         @page_top = @y = @prawn.y
       end
+
+      # Flows a decorated stack's children within its bounds, which keep its padding clear on every page.
+      def within(bounds)
+        @prawn.bounds = bounds
+        @page_top = bounds.absolute_top
+        yield
+      ensure
+        @prawn.bounds = bounds.outer
+        @page_top = @prawn.bounds.absolute_top
+      end
+    end
+
+    # The bounds of a stack with a background or a border while it flows across pages: its padding kept clear at
+    # the top and the bottom of each page, its decoration drawn on each page beneath what that page holds of it,
+    # as CSS's box-decoration-break: clone does. Text and tables break pages through these bounds, so each break
+    # closes the stack's part on one page and opens it on the next.
+    class DecoratedBounds < Prawn::Document::BoundingBox
+      def initialize(prawn, stack, left, width, padding_top, padding_bottom)
+        parent = prawn.bounds
+        super(prawn, parent, [parent.absolute_left, parent.absolute_top], width: parent.width, height: 0)
+        # The margin box is made anew on each page: bounds within it follow the current one.
+        @within_margins = parent.equal?(prawn.margin_box)
+        @stack = stack
+        @left = left
+        @box_width = width
+        @padding_top = padding_top
+        @padding_bottom = padding_bottom
+      end
+
+      def outer
+        @within_margins ? @document.margin_box : @parent
+      end
+
+      def absolute_left
+        outer.absolute_left + total_left_padding
+      end
+
+      def width
+        outer.width - total_left_padding - total_right_padding
+      end
+
+      def absolute_top
+        outer.absolute_top - @padding_top
+      end
+
+      def absolute_bottom
+        outer_bottom + @padding_bottom
+      end
+
+      def height
+        absolute_top - absolute_bottom
+      end
+
+      def stretchy?
+        false
+      end
+
+      # The stack's part on this page reaches down to the bottom of what holds it, and its next part starts at the
+      # top of the next page.
+      def move_past_bottom
+        end_part(outer_bottom, skip_empty: true)
+        outer.move_past_bottom
+        start_part(outer.absolute_top)
+        @document.y = absolute_top
+      end
+
+      # The stack's part on this page starts at top: what is drawn from here is drawn over its decoration.
+      def start_part(top)
+        @top = top
+        @offset = @document.page.content_stream.bytesize
+        @graphic_state = @document.graphic_state.dup
+      end
+
+      def end_part(bottom, skip_empty: false)
+        return if skip_empty && @document.page.content_stream.bytesize == @offset
+
+        @stack.decorate_beneath(@document, @offset, @graphic_state, @left, @top, @box_width, @top - bottom)
+      end
+
+      private
+
+      def outer_bottom
+        outer.stretchy? ? @document.margin_box.absolute_bottom : outer.absolute_bottom
+      end
     end
 
     class Node
@@ -446,6 +530,15 @@ module Gamba
         add(Text.new(string, width:, grow:, **@styles.text_arguments(style, attributes)))
       end
 
+      # Draws the decoration under what the page's content stream holds from offset on, in the graphic state the
+      # stream was in there.
+      def decorate_beneath(prawn, offset, graphic_state, left, top, width, height)
+        stream = prawn.page.content_stream
+        start = stream.bytesize
+        decorate(prawn, left, top, width, height, graphic_state)
+        stream.insert(offset, stream.slice!(start..))
+      end
+
       private
 
       def add(node)
@@ -457,10 +550,10 @@ module Gamba
         @background || @border_width
       end
 
-      def decorate(prawn, left, top, width, height)
+      def decorate(prawn, left, top, width, height, graphic_state = nil)
         return unless decorated?
 
-        prawn.save_graphics_state do
+        prawn.save_graphics_state(graphic_state) do
           corner = relative(prawn, left, top)
           if @background
             prawn.fill_color(@background)
@@ -509,11 +602,30 @@ module Gamba
         end
       end
 
-      # A plain stack breaks pages between its children; one kept together, or with a background or a border to
-      # draw around the whole of it, moves as one box.
+      # A stack breaks pages between its children, and a text among them between its lines; one kept together
+      # moves as one box. A background or a border is drawn on each page around what it holds of the stack.
       def flow(prawn, cursor, left, width)
-        return super if @keep_together || decorated?
+        return super if @keep_together || (decorated? && cursor.fits?(height(prawn, width)))
+        return flow_children(prawn, cursor, left, width) unless decorated?
 
+        cursor.next_page unless cursor.at_page_top? || cursor.fits?(first_height(prawn, width) + @padding_bottom)
+        bounds = DecoratedBounds.new(prawn, self, left, width, @padding_top, @padding_bottom)
+        bounds.start_part(cursor.y)
+        cursor.within(bounds) { flow_children(prawn, cursor, left, width) }
+        bounds.end_part(cursor.y)
+      end
+
+      # A page can start with the top of this stack's first child, unless the stack is kept together.
+      def first_height(prawn, width)
+        return height(prawn, width) if @keep_together || @children.empty?
+
+        first = @children.first
+        @padding_top + first.first_height(prawn, child_width(first, width))
+      end
+
+      private
+
+      def flow_children(prawn, cursor, left, width)
         cursor.y -= @padding_top
         @children.each_with_index do |child, index|
           cursor.y -= @gap unless index.zero? || cursor.at_page_top?
@@ -522,16 +634,6 @@ module Gamba
         end
         cursor.y -= @padding_bottom
       end
-
-      # A page can start with the top of this stack's first child, when the stack can be split.
-      def first_height(prawn, width)
-        return height(prawn, width) if @keep_together || decorated? || @children.empty?
-
-        first = @children.first
-        @padding_top + first.first_height(prawn, child_width(first, width))
-      end
-
-      private
 
       # Children kept with the next go to the next page together with the start of the one after them, when this
       # page is too short for all of it and a page is not.

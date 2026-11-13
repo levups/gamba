@@ -103,13 +103,53 @@ class NativeLayoutTest < Minitest::Test
     assert_equal glyphs(plain.to_s), glyphs(decorated.to_s)
   end
 
-  def test_a_decorated_stack_moves_whole_to_the_next_page
+  def test_a_decorated_stack_splits_across_pages_drawn_around_each_part_with_its_padding
+    document = Gamba.document do |yielded|
+      yielded.prawn.move_down 640
+      yielded.stack(padding: 10, background: "eeeeee", border_color: "ff0000") do |stack|
+        stack.text "line 0", color: "0000ff"
+        5.times { |index| stack.text "line #{index + 1}" }
+      end
+    end
+    first_page, second_page = pages(document.to_s)
+    contents = page_contents(document.to_s)
+
+    assert_equal [4, 2], lines_by_page(document.to_s)
+    # Each part reaches the page's margin where the stack is cut, and keeps the padding clear on either side.
+    assert_equal 2, contents[0].scan(/^36\.0 36\.0 540\.0 80\.0 re$/).size
+    assert_equal 2, contents[1].scan(/^36\.0 708\.256 540\.0 47\.744 re$/).size
+    assert_operator 792 - first_page.last[4] - 36, :>=, 10
+    assert_in_delta second_page.first[4], 36 + 10 + Prawn::Document.new.font.ascender, 0.01
+    # Each part is drawn under the text, in the colour space of the page where it starts.
+    contents.each { |content| assert_operator content.index(" re\n"), :<, content.index("BT") }
+    assert_nil with_file(document.to_s) { |path| Oracle.invalidity(path) }
+  end
+
+  def test_a_decorated_stack_kept_together_moves_whole_to_the_next_page
     document = Gamba.document do |yielded|
       yielded.prawn.move_down 660
-      yielded.stack(background: "eeeeee") { |stack| 6.times { |index| stack.text "line #{index}" } }
+      yielded.stack(background: "eeeeee", keep_together: true) { |stack| 6.times { |index| stack.text "line #{index}" } }
     end
 
     assert_equal [0, 6], lines_by_page(document.to_s)
+  end
+
+  def test_nested_decorated_stacks_and_tables_split_inside_a_decorated_stack
+    document = Gamba.document do |yielded|
+      yielded.stack(padding: 12, border_color: "ff0000") do |outer|
+        outer.stack(padding: 6, background: "ccddff") { |inner| 30.times { |index| inner.text "inner #{index}" } }
+        outer.table(Array.new(60) { |index| {name: "row #{index}"} })
+      end
+    end
+    pages = pages(document.to_s)
+
+    assert_equal 3, pages.size
+    pages.each do |glyphs|
+      # Positions from the top: no line enters the outer stack's padding at either end of a page.
+      assert_operator glyphs.map(&:last).max, :<=, 792 - 36 - 12
+      assert_operator glyphs.map(&:last).min, :>=, 36 + 12
+    end
+    assert_nil with_file(document.to_s) { |path| Oracle.invalidity(path) }
   end
 
   def test_a_box_that_cannot_be_split_and_is_higher_than_a_page_raises
@@ -218,6 +258,10 @@ class NativeLayoutTest < Minitest::Test
 
   def pages(pdf)
     with_file(pdf) { |path| Oracle.text_layout(path).map(&:glyphs) }
+  end
+
+  def page_contents(pdf)
+    uncompressed(pdf).split("%% Contents for page ").drop(1)
   end
 
   def uncompressed(pdf)

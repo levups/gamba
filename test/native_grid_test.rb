@@ -78,13 +78,18 @@ class NativeGridTest < Minitest::Test
     assert_equal [0, 2], lines_by_page(document.to_s)
   end
 
-  def test_a_decorated_grid_moves_whole_to_the_next_page
-    document = Gamba.document do |yielded|
+  def test_a_decorated_grid_breaks_between_its_lines_unless_kept_together
+    split = Gamba.document do |yielded|
       yielded.prawn.move_down 700
       yielded.grid(columns: 2, background: "eeeeee") { |grid| 4.times { |index| grid.text "cell #{index}" } }
     end
+    kept = Gamba.document do |yielded|
+      yielded.prawn.move_down 700
+      yielded.grid(columns: 2, background: "eeeeee", keep_together: true) { |grid| 4.times { |index| grid.text "cell #{index}" } }
+    end
 
-    assert_equal [0, 2], lines_by_page(document.to_s)
+    assert_equal [1, 1], lines_by_page(split.to_s)
+    assert_equal [0, 2], lines_by_page(kept.to_s)
   end
 
   def test_a_grid_is_a_box_like_the_others
