@@ -192,14 +192,37 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Checking your app's PDFs
 
+Tests that check a PDF's bytes break on every harmless change. Gamba's own checks, those its oracle compares it with
+Prawn by, come as assertions for Minitest and matchers for RSpec, loaded only on request. They need `mutool`, and
+`pdftoppm` and `qpdf` for pages and validity; a missing tool fails with its install command, or skips the check
+with `Gamba::Testing.missing_tools = :skip`.
+
+```ruby
+require "gamba/minitest" # in test_helper.rb
+
+assert_pdf_text pdf, "Invoice INV-2026-0001", page: 1 # bytes or a path; a Regexp works too
+assert_same_pages expected_pdf, pdf                   # text, positions and pixels in MuPDF and Poppler
+assert_valid_pdf pdf                                  # qpdf and Poppler
+assert_pdf_a pdf                                      # veraPDF
+```
+
+```ruby
+require "gamba/rspec" # in spec_helper.rb
+
+expect(pdf).to have_pdf_text("Invoice INV-2026-0001", page: 1)
+expect(pdf).to have_same_pages_as(expected_pdf)
+expect(pdf).to be_a_valid_pdf
+```
+
 Before switching, you can compare what your app produces under both libraries. `script/capture_pdfs.rb` saves
-every PDF your test suite renders, named after the test. Run the suite once with Prawn and once with Gamba:
+every PDF your test suite renders, named after the test. Run the suite once with Prawn and once with Gamba, then
+compare the two directories with the same checks:
 
 ```sh
 GAMBA_CAPTURE_DIRECTORY=tmp/prawn RUBYOPT=-r/path/to/gamba/script/capture_pdfs.rb bin/rails test
+GAMBA_CAPTURE_DIRECTORY=tmp/gamba RUBYOPT=-r/path/to/gamba/script/capture_pdfs.rb bin/rails test
+ruby /path/to/gamba/script/capture_pdfs.rb tmp/prawn tmp/gamba
 ```
-
-Then compare the two directories with `Oracle.pdf_differences`, from Gamba's test support.
 
 ## Performance
 

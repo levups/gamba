@@ -2,7 +2,30 @@
 
 # Loaded with RUBYOPT=-r…/capture_pdfs.rb into an app's test run: every PDF a test renders is written to
 # GAMBA_CAPTURE_DIRECTORY, named after the test, so the same run under Prawn and under Gamba can be compared.
+# Run as `ruby capture_pdfs.rb tmp/prawn tmp/gamba`, it compares them with the checks of gamba/minitest and
+# gamba/rspec, and exits 1 when a PDF differs.
 require "fileutils"
+
+if $PROGRAM_NAME == __FILE__
+  require_relative "../lib/gamba/pdf_check"
+
+  expected_directory, actual_directory = ARGV
+  abort "usage: ruby #{$PROGRAM_NAME} PRAWN_DIRECTORY GAMBA_DIRECTORY" unless actual_directory
+
+  names = (Dir.children(expected_directory) | Dir.children(actual_directory)).grep(/\.pdf\z/).sort
+  differing = names.count do |name|
+    expected = File.join(expected_directory, name)
+    actual = File.join(actual_directory, name)
+    differences = if !File.exist?(actual) then ["missing from #{actual_directory}"]
+    elsif !File.exist?(expected) then ["missing from #{expected_directory}"]
+    else Gamba::PdfCheck.page_differences(expected, actual)
+    end
+    puts "#{name}: #{differences.join("; ")}" unless differences.empty?
+    !differences.empty?
+  end
+  puts "#{names.size} PDFs, #{differing} differing"
+  exit(differing.zero? ? 0 : 1)
+end
 
 module GambaCapture
   DIRECTORY = ENV.fetch("GAMBA_CAPTURE_DIRECTORY")

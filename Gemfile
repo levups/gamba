@@ -8,6 +8,8 @@ group :development, :test do
   gem "minitest"
   gem "railties" # test/rails boots an application on it
   gem "rake"
+  gem "rspec-core" # test/testing_test.rb runs Gamba's matchers in RSpec
+  gem "rspec-expectations"
   gem "rubocop-performance", require: false
   gem "standard", require: false
   gem "vernier"

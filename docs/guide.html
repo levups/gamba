@@ -307,8 +307,16 @@
     <section id="comparing" aria-labelledby="comparing-title">
       <h2 id="comparing-title">Comparing an app’s PDFs</h2>
       <div class="prose">
-        <p><code>script/capture_pdfs.rb</code> writes every PDF an app’s test suite renders, named after its test. Run the suite under Prawn, then under Gamba, and compare both directories with <code>Oracle.pdf_differences</code>:</p>
-<pre><code class="language-sh"><span class="nv">GAMBA_CAPTURE_DIRECTORY</span><span class="o">=</span>tmp/prawn <span class="nv">RUBYOPT</span><span class="o">=</span><span class="nt">-r</span>/path/to/gamba/script/capture_pdfs.rb bin/rails <span class="nb">test</span></code></pre>
+        <p>The checks Gamba’s oracle compares it with Prawn by come as assertions for Minitest and matchers for RSpec, loaded only on request. A PDF is given as its bytes or a file’s path. A tool that is missing fails with its install command, or skips the check with <code>Gamba::Testing.missing_tools = :skip</code>; a check never passes unchecked.</p>
+<pre><code class="language-ruby"><span class="nb">require</span> <span class="s2">"gamba/minitest"</span> <span class="c1"># or "gamba/rspec": have_pdf_text, have_same_pages_as, be_a_valid_pdf, be_pdf_a</span>
+
+<span class="n">assert_pdf_text</span> <span class="n">pdf</span><span class="p">,</span> <span class="s2">"Invoice INV-2026-0001"</span><span class="p">,</span> <span class="ss">page: </span><span class="mi">1</span><span class="p">,</span> <span class="ss">at: </span><span class="p">[</span><span class="mi">36</span><span class="p">,</span> <span class="mi">52</span><span class="p">]</span> <span class="c1"># at: a baseline, from the top left</span>
+<span class="n">assert_same_pages</span> <span class="n">expected_pdf</span><span class="p">,</span> <span class="n">pdf</span>
+<span class="n">assert_valid_pdf</span> <span class="n">pdf</span>
+<span class="n">assert_pdf_a</span> <span class="n">pdf</span></code></pre>
+        <p>A failure says what the page reads instead, or names the page and the glyph that moved, or the pixel rows that differ in MuPDF or Poppler. <code>script/capture_pdfs.rb</code> writes every PDF an app’s test suite renders, named after its test. Run the suite under Prawn, then under Gamba, and compare both directories with the same checks:</p>
+<pre><code class="language-sh"><span class="nv">GAMBA_CAPTURE_DIRECTORY</span><span class="o">=</span>tmp/prawn <span class="nv">RUBYOPT</span><span class="o">=</span><span class="nt">-r</span>/path/to/gamba/script/capture_pdfs.rb bin/rails <span class="nb">test
+</span>ruby /path/to/gamba/script/capture_pdfs.rb tmp/prawn tmp/gamba</code></pre>
       </div>
     </section>
   </main>

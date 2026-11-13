@@ -7,6 +7,8 @@ gemspec path: ".."
 gem "minitest"
 gem "railties", "~> 8.0.0"
 gem "rake"
+gem "rspec-core"
+gem "rspec-expectations"
 gem "rubocop-performance", require: false
 gem "standard", require: false
 gem "vernier"
