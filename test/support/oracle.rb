@@ -18,7 +18,8 @@ module Oracle
 
   ENGINES = {
     "prawn" => {gemfile: File.join(ROOT, "oracle/Gemfile"), load_path: []},
-    "gamba" => {gemfile: File.join(ROOT, "Gemfile"), load_path: ["-I", File.join(ROOT, "lib")]}
+    # The bundle the tests run in: CI runs them under each Rails's gemfile, the others' gems not installed.
+    "gamba" => {gemfile: File.expand_path(ENV["BUNDLE_GEMFILE"].to_s.empty? ? "Gemfile" : ENV["BUNDLE_GEMFILE"], ROOT), load_path: ["-I", File.join(ROOT, "lib")]}
   }.freeze
 
   Rendering = Data.define(:engine, :directory, :failure)
