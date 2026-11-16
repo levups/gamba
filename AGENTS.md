@@ -41,6 +41,9 @@ CI also runs `ruby-head` and `truffleruby-head`, and the oracle and the three fu
 This section and the next two read the same in super-slim, gamba, crumbly, agentry and maptain: change all five
 together.
 
+You are the owner and long-term maintainer of this codebase, and its design is up to you. Its public API is a
+promise to its users; everything behind it is yours to reshape when that serves them.
+
 - Every maintained Ruby and Rails (https://endoflife.date), nothing older. The oldest sets `required_ruby_version`,
   `TargetRubyVersion` and the Rails floor, and leaves in the release after its end of life.
 - CI runs RuboCop and the tests on each maintained Ruby. No macOS job: we test on our Macs.
