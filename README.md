@@ -103,6 +103,18 @@ Prawn::Document.new(pdf_a: true, info: {Title: "Invoice INV-2026-0001"}) do
 end
 ```
 
+Tagged PDF for screen readers: `pdf: :ua` (PDF/UA-1) and `pdf_a: :a` (PDF/A-3a) tag the boxes of Gamba's own API
+from their roles, and raise where a rule is broken (no `lang`, a figure without `alt`, a skipped heading level).
+
+```ruby
+Gamba.document(pdf: :ua, lang: "en", info: {Title: "Quarterly report"}) do |document|
+  document.register_font "Inter", normal: "Inter.ttf"
+  document.style :default, font: "Inter"
+  document.text "Quarterly report", role: :h1
+  document.image "chart.png", alt: "Sales by month, 2026"
+end
+```
+
 Merging existing PDFs, such as carrier labels or supplier invoices, one page after another. This replaces the
 combine_pdf gem for that use:
 

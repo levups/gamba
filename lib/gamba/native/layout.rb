@@ -126,17 +126,44 @@ module Gamba
       end
     end
 
+    # In a tagged document, a box draws within the structure element of its role (Gamba::Tagging), once: its
+    # flow paints it, and a subclass calls its parent class.
+    module Tagged
+      def paint(prawn, ...)
+        return super unless prawn.tagged? && !@tagging
+
+        tagged(prawn) { super }
+      end
+
+      def flow(prawn, ...)
+        return super unless prawn.tagged? && !@tagging
+
+        tagged(prawn) { super }
+      end
+    end
+
     # A box. Its role says what it is to a reader, for tagged PDF: a heading of a level, a paragraph, a list and
-    # its items, a table, a figure with its alternative text, or an artifact, which only decorates the page.
+    # its items, a table, a figure with its alternative text, or an artifact, which only decorates the page. lang
+    # is the language of its text, when it differs from the document's.
     class Node
-      OPTIONS = %i[width grow keep_with_next role alt].freeze
+      OPTIONS = %i[width grow keep_with_next role alt lang].freeze
       ROLES = %i[artifact].freeze
       DEFAULT_ROLE = nil
       KIND = "a box"
+      # The standard structure type of each role (ISO 32000-1 §14.8.4).
+      STRUCTURE_TYPES = {
+        p: :P, h1: :H1, h2: :H2, h3: :H3, h4: :H4, h5: :H5, h6: :H6, list: :L, list_item: :LI, figure: :Figure, table: :Table
+      }.freeze
 
-      attr_reader :width, :grow, :keep_with_next, :role, :alt
+      attr_reader :width, :grow, :keep_with_next, :role, :alt, :lang
 
-      def initialize(width: nil, grow: nil, keep_with_next: false, role: self.class::DEFAULT_ROLE, alt: nil)
+      def self.inherited(subclass)
+        super
+        subclass.prepend(Tagged)
+      end
+      prepend Tagged
+
+      def initialize(width: nil, grow: nil, keep_with_next: false, role: self.class::DEFAULT_ROLE, alt: nil, lang: nil)
         raise ArgumentError, "width and grow exclude each other: a box is as wide as told, or shares what is left" if width && grow
         accepted = self.class::ROLES + (self.class::DEFAULT_ROLE ? [] : [nil])
         raise ArgumentError, "role is #{role.inspect}: #{self.class::KIND} takes #{self.class::ROLES.map(&:inspect).join(", ")}" unless accepted.include?(role)
@@ -147,6 +174,7 @@ module Gamba
         @keep_with_next = keep_with_next
         @role = role
         @alt = alt
+        @lang = lang
       end
 
       # A box is measured when it is placed and again by the boxes around it: once per width is enough.
@@ -175,6 +203,25 @@ module Gamba
 
       def relative(prawn, left, top)
         [left - prawn.bounds.absolute_left, top - prawn.bounds.absolute_bottom]
+      end
+
+      def tagged(prawn, &)
+        @tagging = true
+        tag(prawn, &)
+      ensure
+        @tagging = false
+      end
+
+      # A box that draws content marks it as its element's; a list item's goes in its body.
+      def tag(prawn, &)
+        return prawn.tag_artifact(&) if role == :artifact
+        return yield if role.nil?
+
+        prawn.tag_structure(STRUCTURE_TYPES.fetch(role), Alt: alt, Lang: lang) do
+          next prawn.tag_structure(:LBody) { prawn.tag_content(&) } if role == :list_item
+
+          prawn.tag_content(&)
+        end
       end
     end
 
@@ -587,17 +634,31 @@ module Gamba
       def decorate(prawn, left, top, width, height, graphic_state = nil)
         return unless decorated?
 
-        prawn.save_graphics_state(graphic_state) do
-          corner = relative(prawn, left, top)
-          if @background
-            prawn.fill_color(@background)
-            prawn.fill_rectangle(corner, width, height)
+        prawn.tag_artifact do
+          prawn.save_graphics_state(graphic_state) do
+            corner = relative(prawn, left, top)
+            if @background
+              prawn.fill_color(@background)
+              prawn.fill_rectangle(corner, width, height)
+            end
+            if @border_width
+              prawn.line_width(@border_width)
+              prawn.stroke_color(@border_color)
+              prawn.stroke_rectangle(corner, width, height)
+            end
           end
-          if @border_width
-            prawn.line_width(@border_width)
-            prawn.stroke_color(@border_color)
-            prawn.stroke_rectangle(corner, width, height)
-          end
+        end
+      end
+
+      # A container groups its children's elements: without a role, it makes none, unless it says their language.
+      def tag(prawn, &)
+        return prawn.tag_artifact(&) if role == :artifact
+        return (lang ? prawn.tag_structure(:Div, Lang: lang, &) : yield) if role.nil?
+
+        prawn.tag_structure(STRUCTURE_TYPES.fetch(role), Alt: alt, Lang: lang) do
+          next prawn.tag_structure(:LBody, &) if role == :list_item
+
+          yield
         end
       end
 
@@ -876,9 +937,9 @@ module Gamba
 
     # Named text attributes, and what they come to for Prawn once a call's own are added.
     class Styles
-      TEXT_ATTRIBUTES = %i[font size weight italic color align leading widows orphans keep_with_next role].freeze
+      TEXT_ATTRIBUTES = %i[font size weight italic color align leading widows orphans keep_with_next role lang].freeze
       # Attributes of the paragraph's place on the page, not of its glyphs: the layout reads them, Prawn does not.
-      LAYOUT_ATTRIBUTES = %i[widows orphans keep_with_next role].freeze
+      LAYOUT_ATTRIBUTES = %i[widows orphans keep_with_next role lang].freeze
       FONT_STYLES = %i[normal bold italic bold_italic].freeze
       DEFAULT_STYLE = :default
 

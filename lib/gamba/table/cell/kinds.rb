@@ -203,6 +203,11 @@ module Prawn
         def draw_bounded_content(_point)
         end
 
+        # The spanning cell is the table cell element; its stand-ins make none.
+        def tag_content
+          yield
+        end
+
         def padding_right=(value)
           @master_cell.padding_right = value if rightmost?
         end

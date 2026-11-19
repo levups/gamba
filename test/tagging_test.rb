@@ -1,0 +1,229 @@
+# frozen_string_literal: true
+
+require_relative "test_helper"
+require_relative "support/pdf_objects"
+require "base64"
+require "json"
+require "open3"
+require "tempfile"
+require "prawn"
+
+# Tagged PDF, PDF/UA-1 and PDF/A-3a: a structure tree read back with qpdf, checked by veraPDF when installed
+# (brew install verapdf), and pages identical to those of the same document untagged.
+class TaggingTest < Minitest::Test
+  DATA_DIRECTORY = File.join(Oracle::ROOT, "corpus/cache/prawn/data")
+  BENCH_DIRECTORY = File.join(Oracle::ROOT, "bench/native")
+  TAGGED = {pdf: :ua, pdf_a: :a, lang: "en", info: {Title: "Quarterly report"}}.freeze
+
+  def setup
+    skip CORPUS_MISSING_MESSAGE unless File.directory?(DATA_DIRECTORY)
+  end
+
+  def test_a_tagged_document_passes_pdf_ua_1_and_pdf_a_3a_alone_and_together
+    [{pdf: :ua}, {pdf_a: :a}, {pdf: :ua, pdf_a: :a}].each do |levels|
+      pdf = report(lang: "en", info: {Title: "Quarterly report"}, **levels)
+
+      assert_valid "ua1", pdf if levels[:pdf]
+      assert_valid "3a", pdf if levels[:pdf_a]
+    end
+  end
+
+  def test_the_bench_examples_pass_once_tagged
+    %w[invoice report catalog].each do |name|
+      body = File.read(File.join(BENCH_DIRECTORY, "#{name}.rb"))
+      pdf = Gamba.document(**TAGGED) { |document| eval(body, binding, name) }.to_s # rubocop:disable Security/Eval
+
+      assert_valid "ua1", pdf
+      assert_valid "3a", pdf
+    end
+  end
+
+  def test_the_structure_follows_the_boxes_and_reads_in_their_order
+    tree = structure(report(**TAGGED))
+
+    assert_equal "Document", tree[:type]
+    assert_equal %w[H1 H2 P L P Figure Table P], tree[:kids].map { _1[:type] }
+    list = tree[:kids][3]
+    assert_equal [%w[LI LBody], %w[LI LBody]], list[:kids].map { |item| [item[:type], *item[:kids].map { _1[:type] }] }
+    assert_equal "u:Two dice", tree[:kids][5][:attributes]["/Alt"]
+    assert_equal "u:fr", tree[:kids].last[:attributes]["/Lang"]
+  end
+
+  def test_a_paragraph_across_a_page_break_stays_one_paragraph
+    long = structure(report(**TAGGED))[:kids][2]
+
+    assert_equal [1, 2], long[:content].map(&:first).uniq
+  end
+
+  def test_a_table_across_pages_stays_one_table_with_its_header_once
+    tables = []
+    walk(structure(report(**TAGGED))) { tables << _1 if _1[:type] == "Table" }
+    assert_equal 1, tables.size
+    table = tables.first
+
+    assert_equal 81, table[:kids].size
+    assert_equal %w[TH TH], table[:kids].first[:kids].map { _1[:type] }
+    assert_equal({"/O" => "/Table", "/Scope" => "/Column"}, table[:kids].first[:kids].first[:attributes]["/A"])
+    assert(table[:kids].drop(1).all? { |row| row[:kids].map { _1[:type] } == %w[TD TD] })
+    assert_operator table[:kids].flat_map { |row| row[:kids].flat_map { _1[:content].map(&:first) } }.uniq.size, :>, 1
+  end
+
+  def test_marked_content_is_balanced_on_each_page_and_mapped_back_to_its_elements
+    reader = PdfObjects.new(report(**TAGGED))
+
+    assert_nil reader.marked_content_problem
+    assert_equal reader.pages.size, reader.parent_tree.size
+  end
+
+  def test_headers_footers_backgrounds_and_borders_are_artifacts
+    reader = PdfObjects.new(report(**TAGGED))
+    second = reader.content(reader.pages[1])
+
+    assert_includes second, "/Artifact <</Type /Pagination /Subtype /Header>> BDC"
+    assert_includes second, "/Artifact BMC"
+    # The repeated header of the table and the decorated stack's background are drawn inside artifacts only.
+    second.scan(%r{/Artifact BMC\n(.*?)EMC}m).flatten.each { |artifact| refute_match(/MCID/, artifact) }
+  end
+
+  # PDF/A's output intent changes how a viewer renders colours: each tagged document is compared with its untagged
+  # level of PDF/A, none or 3b.
+  def test_tagging_moves_no_pixel
+    untagged = {lang: "en", info: {Title: "Quarterly report"}}
+    [[{pdf: :ua}, {}], [{pdf: :ua, pdf_a: :a}, {pdf_a: true}]].each do |tagged, plain|
+      expected = pixels(report(**untagged, **plain))
+      actual = pixels(report(**untagged, **tagged))
+
+      assert_equal expected.size, actual.size, tagged.inspect
+      assert expected == actual, "#{tagged.inspect} moves pixels"
+    end
+  end
+
+  def test_an_untagged_document_is_written_as_before
+    plain = Gamba.document { |document| document.text "Hello" }.to_s
+    with_attributes = Gamba.document { |document| document.text "Hello", lang: "en" }.to_s
+
+    assert_equal plain, with_attributes
+    refute_includes plain, "StructTreeRoot"
+  end
+
+  def test_the_catalog_and_the_metadata_say_what_the_document_is
+    reader = PdfObjects.new(report(**TAGGED))
+    catalog = reader.catalog
+
+    assert_equal({"/Marked" => true}, catalog["/MarkInfo"])
+    assert_equal "u:en", catalog["/Lang"]
+    assert reader.value(catalog["/ViewerPreferences"])["/DisplayDocTitle"]
+    metadata = reader.stream(catalog["/Metadata"])
+    assert_includes metadata, "<pdfaid:conformance>A</pdfaid:conformance>"
+    assert_includes metadata, "<pdfuaid:part>1</pdfuaid:part>"
+    assert_includes metadata, "<pdfaSchema:prefix>pdfuaid</pdfaSchema:prefix>"
+  end
+
+  def test_what_breaks_the_rules_raises_where_it_is_written
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /lang: "en"/) { Gamba.document(pdf: :ua, info: {Title: "Report"}) }
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /Title/) { Gamba.document(pdf: :ua, lang: "en") }
+    assert_raises_with(ArgumentError, /:ua is the only/) { Prawn::Document.new(pdf: :ub) }
+    assert_raises_with(ArgumentError, /:a for PDF\/A-3a/) { Prawn::Document.new(pdf_a: :u) }
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /standard PDF font/) { Gamba.document(**TAGGED.except(:pdf_a)) { _1.text "Hello" } }
+
+    document = dejavu(Gamba.document(**TAGGED))
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /alternative text/) { document.image "#{DATA_DIRECTORY}/images/dice.png" }
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /outside any tagged box/) { document.prawn.text "Untagged" }
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /an h2 comes first/) { document.text "Details", role: :h2 }
+    document.text "Report", role: :h1
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /an h3 follows an h1/) { document.text "Details", role: :h3 }
+    assert_raises_with(Prawn::Errors::PdfAViolation, /PDF\/A-3a tags all content/) do
+      dejavu(Gamba.document(pdf_a: :a, lang: "en")).prawn.stroke_horizontal_rule
+    end
+  end
+
+  def test_a_decorative_image_needs_no_alternative_text
+    document = dejavu(Gamba.document(**TAGGED))
+    document.image "#{DATA_DIRECTORY}/images/dice.png", role: :artifact
+    document.text "Hello"
+
+    assert_valid "ua1", document.to_s
+  end
+
+  private
+
+  def report(**options)
+    document = dejavu(Gamba.document(**options))
+    document.header { |stack, page| stack.text "Quarterly report, page #{page.number} of #{page.total}" }
+    document.text "Quarterly report", role: :h1
+    document.text "Introduction", role: :h2
+    document.text "A quarterly report gathers sales figures from every region. " * 120
+    document.stack(role: :list) do |list|
+      list.text "Sales grew in every region.", role: :list_item
+      list.stack(role: :list_item) { |item| item.text "Costs fell, as planned." }
+    end
+    document.stack(background: "eeeeee", border_width: 1, padding: 8) { |stack| stack.text "A boxed summary. " * 200 }
+    document.image "#{DATA_DIRECTORY}/images/dice.png", width: 100, alt: "Two dice"
+    document.table(Array.new(80) { {name: "alice #{_1}", total: "$#{_1 * 3}.00"} }, stripes: %w[ffffff eeeeee])
+    document.text "Merci de votre lecture.", lang: "fr"
+    document.to_s
+  end
+
+  def dejavu(document)
+    document.register_font "DejaVu", normal: "#{DATA_DIRECTORY}/fonts/DejaVuSans.ttf", bold: "#{DATA_DIRECTORY}/fonts/DejaVuSans-Bold.ttf"
+    document.style :default, font: "DejaVu"
+    # What PDF/A and PDF/UA documents do on their own, for untagged ones to be drawn alike.
+    document.prawn.font("DejaVu")
+    document
+  end
+
+  def assert_valid(flavour, pdf)
+    require_verapdf
+
+    with_file(pdf) do |path|
+      report, = Open3.capture2e("verapdf", "--flavour", flavour, "--format", "text", path)
+      assert report.start_with?("PASS"), report
+    end
+  end
+
+  def assert_raises_with(error, message, &)
+    raised = assert_raises(error, &)
+    assert_match message, raised.message
+  end
+
+  def pixels(pdf)
+    with_file(pdf) do |path|
+      Dir.mktmpdir do |directory|
+        system("mutool", "draw", "-q", "-r", "36", "-o", File.join(directory, "%03d.png"), path, exception: true)
+        Dir[File.join(directory, "*.png")].sort.map { File.binread(_1) }
+      end
+    end
+  end
+
+  def with_file(pdf)
+    Tempfile.create(["tagged", ".pdf"]) do |file|
+      file.binmode
+      file.write(pdf)
+      file.flush
+      yield file.path
+    end
+  end
+
+  # The structure tree as nested hashes: each element's type, attributes, kids, and content as [page number, MCID].
+  def structure(pdf)
+    reader = PdfObjects.new(pdf)
+    root = reader.value(reader.catalog["/StructTreeRoot"])
+    element(reader, reader.value(root["/K"]).first)
+  end
+
+  def element(reader, reference)
+    dictionary = reader.value(reference)
+    kids = Array(dictionary["/K"]).map { reader.value(_1) }
+    {
+      type: dictionary["/S"].delete_prefix("/"),
+      attributes: dictionary.except("/K", "/P", "/S", "/Type"),
+      kids: Array(dictionary["/K"]).zip(kids).filter_map { |kid, value| element(reader, kid) if value["/Type"] == "/StructElem" },
+      content: kids.select { _1["/Type"] == "/MCR" }.map { [reader.pages.index(_1["/Pg"]) + 1, _1["/MCID"]] }
+    }
+  end
+
+  def walk(element, &block)
+    yield element
+    element[:kids].each { walk(_1, &block) }
+  end
+end

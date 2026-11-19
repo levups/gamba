@@ -56,6 +56,13 @@ module Gamba
 
       private
 
+      # The table element holds the elements its cells make as they are drawn (Prawn::Table::Cell#tag_content).
+      def tag(prawn, &)
+        return prawn.tag_artifact(&) if role == :artifact
+
+        prawn.tag_structure(:Table, Lang: lang, &)
+      end
+
       def measure(prawn, width)
         data.empty? ? 0 : table(prawn, width).height + PAGE_BREAK_SLACK_POINTS
       end

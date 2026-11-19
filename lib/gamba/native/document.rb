@@ -12,7 +12,7 @@ module Gamba
 
     OPTIONS = %i[
       page_size page_layout margin left_margin right_margin top_margin bottom_margin background info print_scaling
-      pdf_a lang background_pdf background_pdf_page
+      pdf_a pdf lang background_pdf background_pdf_page
     ].freeze
     TEXT_ATTRIBUTES = Layout::Styles::TEXT_ATTRIBUTES
     # No Prawn page to match here, so fonts that have ligatures and GPOS kerning use them.
@@ -37,9 +37,13 @@ module Gamba
       self
     end
 
-    # Text attributes under a name: text "…", style: name. The :default style applies to every text.
+    # Text attributes under a name: text "…", style: name. The :default style applies to every text; in PDF/A and
+    # PDF/UA its font is also the document's, which tables and Prawn's code start from: Helvetica, the default,
+    # cannot be embedded.
     def style(name, **attributes)
       @styles.define(name, attributes)
+      font = attributes[:font]
+      prawn.font(font) if font && name == Layout::Styles::DEFAULT_STYLE && (prawn.pdf_a? || prawn.pdf_ua?)
       self
     end
 

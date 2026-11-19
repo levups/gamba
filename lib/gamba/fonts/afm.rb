@@ -31,6 +31,9 @@ module Prawn
         if document.pdf_a?
           raise Errors::PdfAViolation, "PDF/A embeds every font, which #{name}, a standard PDF font, cannot be: use a TrueType or OpenType font"
         end
+        if document.pdf_ua?
+          raise Errors::PdfUaViolation, "PDF/UA embeds every font, which #{name}, a standard PDF font, cannot be: use a TrueType or OpenType font"
+        end
 
         super
         file_name = @name.end_with?(".afm") ? @name : "#{@name}.afm"

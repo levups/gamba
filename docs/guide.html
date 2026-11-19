@@ -43,7 +43,7 @@
         <li><a href="#fonts">Fonts</a></li>
         <li><a href="#images">Images</a></li>
         <li><a href="#barcodes">QR codes, DataMatrix and barcodes</a></li>
-        <li><a href="#pdf-a">PDF/A and Factur-X</a></li>
+        <li><a href="#pdf-a">PDF/A, PDF/UA and Factur-X</a></li>
         <li><a href="#output">Output</a></li>
         <li><a href="#rails">Rails</a></li>
         <li><a href="#servers">Servers that fork</a></li>
@@ -163,7 +163,7 @@
   <span class="n">footer</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Page </span><span class="si">#{</span><span class="n">page</span><span class="p">.</span><span class="nf">number</span><span class="si">}</span><span class="s2"> of </span><span class="si">#{</span><span class="n">page</span><span class="p">.</span><span class="nf">total</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="ss">align: :center</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">8</span>
 <span class="k">end</span></code></pre>
         <p>Their room is taken from the page: the body, native or drawn with Prawn’s own calls, starts below the header and its <code>gap</code> and breaks pages above the footer and its <code>gap</code>. The room kept is the height each has on the page it is declared on, and it applies from that page on, so a cover page declared before them has neither. A header that comes out higher on a later page raises <code>Prawn::Errors::CannotFit</code> when the document is rendered, naming the page, instead of running over the body.</p>
-        <p>Each box can say what it is to a reader with <code>role</code>: a text is a paragraph (<code>:p</code>, unless told), a heading from <code>:h1</code> to <code>:h6</code>, a <code>:list_item</code> or an <code>:artifact</code>; a container groups its children, or is a <code>:list</code>, a <code>:list_item</code> or a <code>:figure</code>; images and codes are figures, with their alternative text in <code>alt</code>; tables are tables. An <code>:artifact</code> only decorates the page. Roles draw nothing: tagged PDF will read them. Headings already make the PDF’s bookmarks, nested by level, each pointing at the top of its first line; those of a header or a footer make none.</p>
+        <p>Each box can say what it is to a reader with <code>role</code>: a text is a paragraph (<code>:p</code>, unless told), a heading from <code>:h1</code> to <code>:h6</code>, a <code>:list_item</code> or an <code>:artifact</code>; a container groups its children, or is a <code>:list</code>, a <code>:list_item</code> or a <code>:figure</code>; images and codes are figures, with their alternative text in <code>alt</code>; tables are tables. An <code>:artifact</code> only decorates the page, and <code>lang</code> gives the language of a box that differs from the document’s. Roles draw nothing: a <a href="#tagged-pdf">tagged PDF</a> reads them. Headings already make the PDF’s bookmarks, nested by level, each pointing at the top of its first line; those of a header or a footer make none.</p>
 <pre><code class="language-ruby"><span class="n">document</span><span class="p">.</span><span class="nf">style</span> <span class="ss">:chapter</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">18</span><span class="p">,</span> <span class="ss">weight: :bold</span><span class="p">,</span> <span class="ss">role: :h1</span><span class="p">,</span> <span class="ss">keep_with_next: </span><span class="kp">true</span>
 
 <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Payment terms"</span><span class="p">,</span> <span class="ss">style: :chapter</span>
@@ -259,7 +259,7 @@
     </section>
 
     <section id="pdf-a" aria-labelledby="pdf-a-title">
-      <h2 id="pdf-a-title">PDF/A and Factur-X</h2>
+      <h2 id="pdf-a-title">PDF/A, PDF/UA and Factur-X</h2>
       <div class="prose">
 <pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="ss">pdf_a: </span><span class="kp">true</span><span class="p">,</span> <span class="ss">info: </span><span class="p">{</span><span class="no">Title</span><span class="p">:</span> <span class="s2">"Invoice INV-2026-0001"</span><span class="p">})</span> <span class="k">do</span>
   <span class="n">font</span> <span class="s2">"Inter.ttf"</span>
@@ -278,7 +278,17 @@
         </tbody>
       </table>
       <div class="prose">
-        <p>The test suite checks PDF/A documents with veraPDF when it is installed (<code>brew install verapdf</code>).</p>
+        <p>The test suite checks PDF/A documents with veraPDF when it is installed (<code>brew install verapdf</code>); CI installs it.</p>
+        <h3 id="tagged-pdf">Tagged PDF and PDF/UA</h3>
+        <p>A screen reader reads an untagged PDF glyph by glyph, in drawing order. <code>pdf: :ua</code> writes a PDF/UA-1 document (ISO 14289-1), and <code>pdf_a: :a</code> a PDF/A-3a one; they combine. Both tag the boxes of Gamba’s own API from their <a href="#native">roles</a>: headings, paragraphs, lists, figures with their alternative text, and tables with their header cells, in the order the boxes are placed. A paragraph or a table across pages stays one; the copy of a table’s header atop each later page, headers and footers, backgrounds and borders are artifacts, which readers skip. Pages look the same as untagged.</p>
+<pre><code class="language-ruby"><span class="no">Gamba</span><span class="p">.</span><span class="nf">document</span><span class="p">(</span><span class="ss">pdf: :ua</span><span class="p">,</span> <span class="ss">pdf_a: :a</span><span class="p">,</span> <span class="ss">lang: </span><span class="s2">"en"</span><span class="p">,</span> <span class="ss">info: </span><span class="p">{</span><span class="no">Title</span><span class="p">:</span> <span class="s2">"Quarterly report"</span><span class="p">})</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">register_font</span> <span class="s2">"Inter"</span><span class="p">,</span> <span class="ss">normal: </span><span class="s2">"Inter.ttf"</span><span class="p">,</span> <span class="ss">bold: </span><span class="s2">"Inter-Bold.ttf"</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">style</span> <span class="ss">:default</span><span class="p">,</span> <span class="ss">font: </span><span class="s2">"Inter"</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Quarterly report"</span><span class="p">,</span> <span class="ss">role: :h1</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">image</span> <span class="s2">"chart.png"</span><span class="p">,</span> <span class="ss">alt: </span><span class="s2">"Sales by month, 2026"</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Merci"</span><span class="p">,</span> <span class="ss">lang: </span><span class="s2">"fr"</span>
+<span class="k">end</span></code></pre>
+        <p>What PDF/UA asks for raises <code>Prawn::Errors::PdfUaViolation</code> where it is missing: a document without <code>lang</code> or a title, a standard PDF font, a figure without <code>alt</code>, a heading that skips a level, and anything drawn through <code>document.prawn</code>, which no reader would see. Under <code>pdf_a: :a</code> alone, the same errors are <code>Prawn::Errors::PdfAViolation</code>. In both, the default style’s font is also the document’s. Drawing with Prawn’s own calls in a tagged document, and <code>ActualText</code> for ligatures, are still to come.</p>
       </div>
     </section>
 

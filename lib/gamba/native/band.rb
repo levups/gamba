@@ -47,7 +47,9 @@ module Gamba
         end
 
         top = (@name == :header) ? body.absolute_top + @gap + @height : body.absolute_bottom - @gap
-        @prawn.canvas { stack.paint(@prawn, body.absolute_left, top, body.width) }
+        @prawn.tag_artifact(:Pagination, @name.capitalize) do
+          @prawn.canvas { stack.paint(@prawn, body.absolute_left, top, body.width) }
+        end
       end
     end
   end
