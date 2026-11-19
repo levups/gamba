@@ -75,6 +75,18 @@ class NativeDocumentTest < Minitest::Test
     assert_equal glyphs(in_courier.to_s).drop(5), glyphs(in_helvetica.to_s).drop(5)
   end
 
+  def test_a_table_in_a_bold_document_is_sized_in_bold
+    words = %w[Gadget deluxe edition with spare parts toolkit and manual]
+    pdf = Prawn::Document.new do
+      font "Times-Roman", style: :bold
+      gamba { |document| document.stack(width: 200) { |stack| stack.table([{sku: "SKU1", description: words.join(" ")}], columns: {sku: {}, description: {}}, cell: {font: "Times-Roman"}) } }
+    end
+
+    drawn = glyphs(pdf.render)
+    assert_equal ["Times-Bold"], drawn.map { _1[1] }.uniq
+    assert_equal "SkuDescriptionSKU1#{words.join}", drawn.map(&:first).join.delete(" ")
+  end
+
   def test_a_table_lays_out_the_same_tagged_or_not
     skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
 
