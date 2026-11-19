@@ -12,16 +12,20 @@ module Prawn
     include Images
     include Barcodes
     include Gamba::PdfA
+    include Gamba::Tagging
     include Table::Interface
     include Stamp
     include SoftMask
 
     VALID_OPTIONS = %i[
       page_size page_layout margin left_margin right_margin top_margin bottom_margin skip_page_creation compress
-      background info text_formatter print_scaling pdf_a lang background_pdf background_pdf_page
+      background info text_formatter print_scaling pdf_a pdf lang background_pdf background_pdf_page
     ].freeze
 
     attr_accessor :margin_box, :page_number, :text_formatter
+    # The font used until one is set, Helvetica unless told: PDF/A and PDF/UA documents of Gamba's own API take
+    # their default style's.
+    attr_writer :default_font_family
     attr_reader :margins, :y
 
     # Modules every new document extends itself with: a subclass starts with its parent's.
@@ -44,7 +48,8 @@ module Prawn
       self.class.extensions.reverse_each { extend(_1) }
 
       initialize_internals(options)
-      @pdf_a = options.delete(:pdf_a) == true
+      @pdf_a_conformance = Gamba::PdfA.conformance(options.delete(:pdf_a))
+      initialize_tagging(options)
       @background = options[:background]
       @background_scale = options[:background_scale] || 1
       @background_pdf = options[:background_pdf]
@@ -66,6 +71,7 @@ module Prawn
     end
 
     def start_new_page(options = {})
+      close_marks_on_page
       last_page = page
       page_options = {size: options[:size] || last_page&.size, layout: options[:layout] || last_page&.layout, margins: last_page&.margins&.dup}
       if last_page
@@ -87,10 +93,10 @@ module Prawn
 
       insert_page(page, @page_number)
       @page_number += 1
-      canvas { image(@background, scale: @background_scale, at: bounds.top_left) } if @background
+      tag_artifact { canvas { image(@background, scale: @background_scale, at: bounds.top_left) } } if @background
       draw_background_pdf(options)
       @y = @bounding_box.absolute_top
-      float { @on_page_create&.call(self) }
+      float { tag_artifact { @on_page_create&.call(self) } }
       header_blend_mode = page.stack.last&.blend_mode
       reopen_ext_gstate_blocks
       # The blend mode in effect on the last page, which the new one resets to Normal (ISO 32000-1 §8.4.1), once the
@@ -115,6 +121,7 @@ module Prawn
     end
 
     def go_to_page(page_number)
+      close_marks_on_page
       @page_number = page_number
       @page = pages[page_number - 1]
       generate_margin_box
@@ -248,7 +255,7 @@ module Prawn
     # start_new_page names another (background_pdf:, background_pdf_page:) or none (background_pdf: false).
     def draw_background_pdf(options)
       source, number = options.key?(:background_pdf) ? [options[:background_pdf], options[:background_pdf_page] || 1] : [@background_pdf, @background_pdf_page]
-      canvas { pdf_page(source, page: number, at: bounds.top_left) } if source
+      tag_artifact { canvas { pdf_page(source, page: number, at: bounds.top_left) } } if source
     end
 
     # A gradient set as the fill or stroke stays it on the new page, in place of the colour Prawn writes.

@@ -56,6 +56,11 @@ module Gamba
 
       private
 
+      # The table element holds the elements its cells make as they are drawn (Prawn::Table::Cell#tag_content).
+      def tag_body(_prawn)
+        yield
+      end
+
       def measure(prawn, width)
         data.empty? ? 0 : table(prawn, width).height + PAGE_BREAK_SLACK_POINTS
       end

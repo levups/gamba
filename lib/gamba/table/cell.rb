@@ -31,6 +31,8 @@ module Prawn
       attr_reader :padding, :colspan, :rowspan, :dummy_cells, :border_widths, :border_colors, :border_lines
       attr_writer :height
       attr_accessor :borders, :content, :background_color
+      # In a tagged document, :header for a cell of the table header, :repeated for its copy atop a later page.
+      attr_writer :tag_role
 
       def self.make(pdf, content, options = {})
         at = options.delete(:at) || [0, pdf.cursor]
@@ -55,6 +57,8 @@ module Prawn
       end
 
       def self.draw_cells(cells)
+        return draw_tagged_cells(cells) if cells.first&.first&.tagged?
+
         cells.each do |cell, point|
           cell.set_width_constraints
           cell.draw_background(point)
@@ -63,6 +67,36 @@ module Prawn
           cell.draw_borders(point)
           cell.draw_bounded_content(point)
         end
+      end
+
+      # Backgrounds and borders only decorate; the content of each cell goes into its own table cell element.
+      def self.draw_tagged_cells(cells)
+        cells.each do |cell, point|
+          cell.set_width_constraints
+          cell.tag_decoration { cell.draw_background(point) }
+        end
+        cells.each do |cell, point|
+          cell.tag_decoration { cell.draw_borders(point) }
+          cell.tag_content { cell.draw_bounded_content(point) }
+        end
+      end
+      private_class_method :draw_tagged_cells
+
+      def tagged?
+        @pdf.tagged?
+      end
+
+      def tag_decoration(&)
+        @pdf.tag_decoration(&)
+      end
+
+      # A copy of the header atop a later page is an artifact: the table has its header once. A cell drawn outside
+      # a table has no row, and no table cell element.
+      def tag_content(&)
+        return @pdf.tag_artifact(&) if @tag_role == :repeated
+        return yield unless respond_to?(:row)
+
+        @pdf.tag_table_cell(row, header: @tag_role == :header, colspan:, rowspan:, &)
       end
 
       def initialize(pdf, point, options = {})
