@@ -31,7 +31,7 @@ const capitalized = (name) => name.charAt(0).toUpperCase() + name.slice(1);
 
 function columnChart({ title, better, rows, format = formatNumber, heading = "h3" }) {
   const maximum = Math.max(...rows.map((row) => row.value));
-  const columns = element("div", { class: "columns", style: { "--count": rows.length }, role: "img", "aria-label": `${title}: ${rows.map((row) => `${row.name} ${format(row.value)}`).join(", ")}` });
+  const columns = element("div", { class: "columns", style: { "--count": rows.length }, role: "img", "aria-label": `${title}: ${rows.map((row) => `${row.name} ${format(row.value)}`).join("; ")}` });
   for (const row of rows) {
     const ours = row.name.startsWith("Gamba") ? " ours" : "";
     columns.append(element("div", { class: `column${ours}`, title: `${row.label || row.name}: ${format(row.value)}` },
@@ -61,7 +61,7 @@ const strongest = (ratios) => ratios.reduce((strongest, entry) => entry.ratio > 
 
 function measuredOn(benchmarks) {
   const ruby = benchmarks.ruby.split(" (")[0].replace("ruby", "Ruby");
-  return `Measured on ${ruby} with YJIT, median of ${benchmarks.processes} fresh processes per engine, each timing ${benchmarks.iterations} renders.`;
+  return `Measured on ${ruby} with YJIT, median of ${benchmarks.processes} fresh processes per column, each timing ${benchmarks.iterations} renders.`;
 }
 
 function memoryTile(memory, tile) {

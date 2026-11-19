@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# Renders each document of bench/documents with Prawn and with Gamba, in PROCESSES fresh YJIT processes per engine,
-# and writes the median of each measure across them (time, allocations, peak memory, file weight) to
+# Renders each document of bench/documents with Prawn and with Gamba, and its bench/native version with Gamba's own
+# API untagged then tagged for PDF/UA, in PROCESSES fresh YJIT processes per column, and writes the median of each measure across them (time, allocations, peak memory, file weight) to
 # docs/benchmarks.json. Peak memory varies by 20% from one process to the next: one process proves nothing.
 
 require "bundler"
@@ -39,9 +39,9 @@ end
 def candidates(document)
   native = File.join(__dir__, "native", File.basename(document))
   columns = Oracle::ENGINES.keys.to_h { |engine| [engine, [engine, document]] }
-  columns["gamba_native"] = ["gamba", native] if File.exist?(native)
-  columns["gamba_tagged"] = ["gamba", native, "pdf_ua"] if File.exist?(native)
-  columns
+  return columns unless File.exist?(native)
+
+  columns.merge("gamba_native" => ["gamba", native], "gamba_tagged" => ["gamba", native, "pdf_ua"])
 end
 
 # The engines take turns, so a slower moment of the machine weighs on each.

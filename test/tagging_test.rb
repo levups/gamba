@@ -28,9 +28,12 @@ class TaggingTest < Minitest::Test
     %w[invoice report catalog].each do |name|
       body = File.read(File.join(BENCH_DIRECTORY, "#{name}.rb"))
       pdf = Gamba.document(**TAGGED) { |document| eval(body, binding, name) }.to_s # rubocop:disable Security/Eval
+      # As bench/run.rb renders them for the benchmarks page: PDF/UA alone.
+      ua_alone = Gamba.document(**TAGGED.except(:pdf_a)) { |document| eval(body, binding, name) }.to_s # rubocop:disable Security/Eval
 
       assert_valid "ua1", pdf
       assert_valid "3a", pdf
+      assert_valid "ua1", ua_alone
     end
   end
 

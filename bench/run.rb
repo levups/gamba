@@ -16,14 +16,21 @@ end
 
 DATA_DIRECTORY = File.expand_path("../corpus/cache/prawn/data", __dir__)
 
+# A document of Gamba's own API sees `document` and nothing else of this script.
+def write_native(document, body, path)
+  eval(body, binding, path) # rubocop:disable Security/Eval
+end
+
 document_path, iterations, standard = ARGV
 body = File.read(document_path)
+native = File.basename(File.dirname(document_path)) == "native"
+abort "Unknown standard #{standard.inspect}: pdf_ua, on a document of bench/native" if standard && !(standard == "pdf_ua" && native)
 # Tagged for PDF/UA: the structure tree and its marked content, the language, the title and the XMP metadata.
-options = (standard == "pdf_ua") ? {pdf: :ua, lang: "en", info: {Title: File.basename(document_path, ".rb").capitalize}} : {}
+options = standard ? {pdf: :ua, lang: "en", info: {Title: File.basename(document_path, ".rb").capitalize}} : {}
 render =
-  if File.basename(File.dirname(document_path)) == "native"
-    # A document of Gamba's own API, which compresses unasked, is written against `document`.
-    -> { Gamba.document(**options) { |document| eval(body, binding, document_path) }.to_s } # rubocop:disable Security/Eval
+  if native
+    # Gamba's own API compresses unasked.
+    -> { Gamba.document(**options) { |document| write_native(document, body, document_path) }.to_s }
   else
     # Prawn compresses only when asked: compared at its lightest.
     -> { Prawn::Document.new(compress: true).tap { _1.instance_eval(body, document_path) }.render }
