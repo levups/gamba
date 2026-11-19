@@ -12,6 +12,7 @@ module Gamba
     FONT_PROGRAMS = %i[FontFile FontFile2 FontFile3].freeze
     TYPE3 = PDF::Core::Name.new(value: "Type3")
     FORM = PDF::Core::Name.new(value: "Form")
+    MARKED_CONTENT_OPERATOR = %r{(?:\A|[\x00\t\n\f\r >])(?:BDC|BMC)(?:\z|[\x00\t\n\f\r ()<>\[\]{}/%])}
 
     attr_reader :width, :height, :form
 
@@ -91,10 +92,11 @@ module Gamba
     end
 
     # The page is drawn as one figure or artifact: marked content of its own would nest in it, which tagged PDF
-    # forbids, and its MCIDs would point at a structure tree left behind.
+    # forbids, and its MCIDs would point at a structure tree left behind. The operator follows whitespace or the >> of
+    # its properties, and comes before whitespace, a delimiter or the end: /P<</MCID 0>>BDC(a)Tj is written too.
     def check_no_marked_content(contents, document)
       streams = Array(@reader.resolve(contents)).map { @reader.resolve(_1) }.grep(PDF::Core::Reader::Stream)
-      return unless streams.any? { @reader.decoded(_1).match?(/(?:\A|[\s>\])])(?:BDC|BMC)(?:\s|\z)/) }
+      return unless streams.any? { @reader.decoded(_1).match?(MARKED_CONTENT_OPERATOR) }
 
       error, standard = document.pdf_ua? ? [Prawn::Errors::PdfUaViolation, "PDF/UA"] : [Prawn::Errors::PdfAViolation, "PDF/A-3a"]
       raise error, "#{standard} cannot import a page that has marked content of its own, a page of a tagged PDF: Gamba does not merge structure trees yet"

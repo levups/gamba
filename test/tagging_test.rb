@@ -118,7 +118,9 @@ class TaggingTest < Minitest::Test
   def test_what_breaks_the_rules_raises_where_it_is_written
     assert_raises_with(Prawn::Errors::PdfUaViolation, /lang: "en"/) { Gamba.document(pdf: :ua, info: {Title: "Report"}) }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /Title/) { Gamba.document(pdf: :ua, lang: "en") }
-    assert_raises_with(Prawn::Errors::PdfUaViolation, /Title/) { Gamba.document(pdf: :ua, lang: "en", info: {Title: " "}) }
+    [" ", "　", false, :Report].each do |title|
+      assert_raises_with(Prawn::Errors::PdfUaViolation, /Title/) { Gamba.document(pdf: :ua, lang: "en", info: {Title: title}) }
+    end
     assert_raises_with(ArgumentError, /:ua is the only/) { Prawn::Document.new(pdf: :ub) }
     assert_raises_with(ArgumentError, /:a for PDF\/A-3a/) { Prawn::Document.new(pdf_a: :u) }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /standard PDF font/) { Gamba.document(**TAGGED.except(:pdf_a)) { _1.text "Hello" } }
@@ -202,9 +204,11 @@ class TaggingTest < Minitest::Test
       dejavu(Gamba.document(**TAGGED)).pdf_page(tagged_page, alt: "A tagged page")
     end
     # LibreOffice writes the operator right after the dictionary.
-    compact = Gamba.document.tap { _1.prawn.add_content("/P<</MCID 0>>BDC\nEMC") }.to_s
-    assert_raises_with(Prawn::Errors::PdfUaViolation, /marked content of its own/) do
-      dejavu(Gamba.document(**TAGGED)).pdf_page(compact, alt: "A tagged page")
+    ["/P<</MCID 0>>BDC\nEMC", "/P<</MCID 0>>BDC[(a)]TJ EMC", "/Artifact BMC/GS1 gs EMC", "/Artifact BMC"].each do |marks|
+      compact = Gamba.document.tap { _1.prawn.add_content(marks) }.to_s
+      assert_raises_with(Prawn::Errors::PdfUaViolation, /marked content of its own/) do
+        dejavu(Gamba.document(**TAGGED)).pdf_page(compact, alt: "A tagged page")
+      end
     end
     assert_raises_with(Prawn::Errors::PdfUaViolation, /PDF\/UA metadata/) { Gamba.document(**TAGGED, info: {Title: "A\u0001B"}).to_s }
     refute Prawn::Document.new(pdf: false).tagged?
