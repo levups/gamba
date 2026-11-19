@@ -75,6 +75,12 @@ class NativeDocumentTest < Minitest::Test
     assert_equal glyphs(in_courier.to_s).drop(5), glyphs(in_helvetica.to_s).drop(5)
   end
 
+  def test_a_table_in_a_cell_is_drawn_in_the_font_it_was_sized_in
+    document = Gamba.document { |gamba| gamba.stack(width: 300) { |stack| stack.table([{sku: "SKU1", parts: [["WWWWMMMM WWMM"]]}], cell: {font: "Courier"}) } }
+
+    assert_equal "SkuPartsSKU1WWWWMMMMWWMM", glyphs(document.to_s).map(&:first).join.delete(" ")
+  end
+
   def test_a_cell_the_styling_block_sets_in_another_font_is_sized_in_it
     rows = [{sku: "SKU1", description: "Gadget, deluxe edition"}]
     document = Gamba.document { |gamba| gamba.stack(width: 220) { |stack| stack.table(rows, columns: {sku: {}, description: {}}) { |table| table.column(1).font = "Courier" } } }

@@ -37,7 +37,7 @@ module Gamba
 
         table = table(prawn, width)
         prawn.y = top
-        within(prawn, left, width) { table.draw }
+        in_font(prawn) { within(prawn, left, width) { table.draw } }
       end
 
       # Prawn draws a row higher than a page past its bottom: here it raises, as any box that cannot be split does.
@@ -122,9 +122,9 @@ module Gamba
       def table(prawn, width)
         return @table if @table_width == width
 
-        options = prawn_options(width, prawn.font.options[:style])
+        options = prawn_options(width)
         @table = within(prawn, prawn.bounds.absolute_left, width) do
-          in_font(prawn, options[:cell_style][:font]) do
+          in_font(prawn) do
             prawn.make_table(data, options) do |table|
               style_columns(table)
               style(table.row(0), @header) if @header
@@ -136,8 +136,11 @@ module Gamba
         @table
       end
 
-      # Built in the table's font, its cells measure in place; only those in another font set theirs.
-      def in_font(prawn, font)
+      # Prawn's table measures a cell's text in the document's font and draws it in the cell's, in the document's
+      # style unless the cell names one: built and drawn in the table's font, its cells fit what they draw whatever
+      # the document is in. A cell in another font is measured in it (Prawn::Table::Cell#sized_in_its_font=).
+      def in_font(prawn)
+        font = @cell.fetch(:font) { @styles.cell_defaults[:font] }
         return yield unless font
 
         prawn.save_font do
@@ -146,13 +149,9 @@ module Gamba
         end
       end
 
-      # Each cell is measured in the font it is drawn in, and in regular unless it says otherwise, as a text is: the
-      # style of the document around the table changes neither. Prawn draws a cell that names no style in the
-      # document's, so a document in bold or italic gives every cell its regular.
-      def prawn_options(width, document_style)
+      def prawn_options(width)
         widths = @columns.each_value.map { |options| options[:width] }
         cell_style = {sized_in_its_font: true, **prawn_cell_style({**@styles.cell_defaults, **@cell})}
-        cell_style[:font_style] = :normal unless document_style.nil? || document_style == :normal
         options = {header: !@header.nil?, cell_style:}
         options[:row_colors] = @stripes if @stripes
         options[:column_widths] = widths.each_with_index.to_h { |column_width, index| [index, column_width] }.compact
