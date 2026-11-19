@@ -166,15 +166,15 @@ module Gamba
 
     def escape_xml(text)
       text = text.encode(::Encoding::UTF_8)
-      raise metadata_violation, "#{pdf_a? ? "PDF/A" : "PDF/UA"} metadata cannot hold control characters: #{text.inspect}" if text.match?(XML_FORBIDDEN_CHARACTERS)
+      raise metadata_violation, "#{pdf_ua? ? "PDF/UA" : "PDF/A"} metadata cannot hold control characters: #{text.inspect}" if text.match?(XML_FORBIDDEN_CHARACTERS)
 
       text.encode(xml: :text)
     rescue EncodingError => error
-      raise metadata_violation, "#{pdf_a? ? "PDF/A" : "PDF/UA"} metadata must be text: #{error.message}"
+      raise metadata_violation, "#{pdf_ua? ? "PDF/UA" : "PDF/A"} metadata must be text: #{error.message}"
     end
 
     def metadata_violation
-      pdf_a? ? Prawn::Errors::PdfAViolation : Prawn::Errors::PdfUaViolation
+      pdf_ua? ? Prawn::Errors::PdfUaViolation : Prawn::Errors::PdfAViolation
     end
   end
 end

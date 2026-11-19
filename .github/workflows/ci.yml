@@ -92,7 +92,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      # Without veraPDF, the PDF/A, PDF/UA and tagged PDF tests skip.
+      # The PDF/A, PDF/UA and tagged PDF tests run veraPDF: locally they skip without it, here they fail.
       - name: Install veraPDF, the PDF/A and PDF/UA validator
         run: |
           mkdir -p ~/.cache/gamba-tools

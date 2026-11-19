@@ -43,6 +43,8 @@ module Gamba
     # marked-content sequence goes around them, never inside a text or a path object.
     BEGINS_GRAPHICS_OBJECT = /(?:\A|\s)(?:BT|BI|Do|m|re|sh)$/
     DOCUMENT_TYPE = :Document
+    # A BCP 47 language tag, as /Lang takes it: fr, en-GB, zh-Hant-TW.
+    LANGUAGE_TAG = /\A[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*\z/
     HEADING_LEVELS = {H1: 1, H2: 2, H3: 3, H4: 4, H5: 5, H6: 6}.freeze
 
     def tagged?
@@ -59,7 +61,7 @@ module Gamba
       return yield unless tagging_structure? && !@tagging.last.whole?
 
       attributes.compact!
-      raise tagging_violation, "#{tagging_standard} gives every figure an alternative text: alt: \"…\"" if type == :Figure && !attributes[:Alt]
+      check_text_attributes(type, attributes)
       check_list_nesting(type)
       check_heading_level(type) if pdf_ua?
 
@@ -110,7 +112,7 @@ module Gamba
 
     def initialize_tagging(options)
       pdf = options.delete(:pdf)
-      raise ArgumentError, "pdf is #{pdf.inspect}: :ua is the only conformance level, PDF/UA-1" unless pdf.nil? || pdf == :ua
+      raise ArgumentError, "pdf is #{pdf.inspect}: :ua is the only conformance level, PDF/UA-1" unless [nil, false, :ua].include?(pdf)
 
       @pdf_ua = pdf == :ua
       return unless @pdf_ua || @pdf_a_conformance == "A"
@@ -136,6 +138,17 @@ module Gamba
 
     def tagging_structure?
       tagged? && @marks.none? { _1.element.nil? }
+    end
+
+    def check_text_attributes(type, attributes)
+      alt = attributes[:Alt]
+      if type == :Figure && !(alt.is_a?(String) && alt.match?(/\S/))
+        raise tagging_violation, "#{tagging_standard} gives every figure an alternative text: alt: \"…\", not #{alt.inspect}"
+      end
+      lang = attributes[:Lang]
+      return if lang.nil? || (lang.is_a?(String) && lang.match?(LANGUAGE_TAG))
+
+      raise ArgumentError, "lang is #{lang.inspect}: give a language tag, \"fr\" or \"en-GB\""
     end
 
     # A list holds list items only, and a list item sits in a list. type is nil for content marked in the current
@@ -212,9 +225,10 @@ module Gamba
           "draw it with Gamba's boxes, or leave it out (#{string.strip.lines.last.strip.inspect})"
       end
 
-      artifact = @marks.find { _1.element.nil? }
+      artifact = @marks.index { _1.element.nil? }
       if artifact
-        write_mark(artifact) unless artifact.page
+        # Artifacts within one, a decoration moved beneath what it holds, are written too: they leave it.
+        @marks[artifact..].each { |mark| write_mark(mark) unless mark.element || mark.page }
       else
         @marks.each { |mark| write_mark(mark) unless mark.page }
       end

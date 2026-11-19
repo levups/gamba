@@ -7,6 +7,8 @@ require_relative "../../lib/gamba/pdf_check"
 
 # The objects of a PDF as qpdf's JSON gives them, streams decoded.
 class PdfObjects
+  # The operators that start painting: a text object, a path, an image, a shading.
+  PAINTING = /(?:\A|\s)(?:BT|BI|Do|m|re|sh)\z/
   def initialize(pdf)
     json = Gamba::PdfCheck.with_path(pdf) do |path|
       Open3.capture2("qpdf", "--json=2", "--json-stream-data=inline", "--decode-level=generalized", path).first
@@ -42,8 +44,8 @@ class PdfObjects
     value(value(catalog["/StructTreeRoot"])["/ParentTree"])["/Nums"].each_slice(2).to_h
   end
 
-  # What breaks the marked content of a tagged PDF, nil when nothing does: a sequence closed on no page or left
-  # open, an artifact inside tagged content, MCIDs not numbered from 0 on a page, or a page whose parent tree entry
+  # What breaks the marked content of a tagged PDF, nil when nothing does: something painted outside any
+  # sequence, a sequence closed on no page or left open, an artifact inside tagged content, MCIDs not numbered from 0 on a page, or a page whose parent tree entry
   # does not hold one element for each.
   def marked_content_problem
     tree = parent_tree
@@ -59,6 +61,8 @@ class PdfObjects
           mcids << Integer(line[/MCID (\d+)/, 1]) unless artifact
         elsif line == "EMC"
           return "page #{index + 1}: EMC closes no sequence" unless open.pop
+        elsif open.empty? && line.match?(PAINTING)
+          return "page #{index + 1}: #{line.inspect} painted outside any sequence"
         end
       end
       return "page #{index + 1}: #{open.size} sequences left open" unless open.empty?

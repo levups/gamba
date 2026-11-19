@@ -183,7 +183,7 @@ class TaggingTest < Minitest::Test
     assert kept.instance_variable_get(:@kept), "a style placed the box waiting for the next one"
   end
 
-  def test_lists_hold_list_items_and_imported_pages_embed_their_fonts
+  def test_lists_imported_pages_annotations_and_attribute_values_are_checked
     document = dejavu(Gamba.document(**TAGGED.except(:pdf_a)))
     assert_raises_with(Prawn::Errors::PdfUaViolation, /list item in a list/) { document.text "Alone", role: :list_item }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /only list items in a list/) do
@@ -192,6 +192,24 @@ class TaggingTest < Minitest::Test
     helvetica = Prawn::Document.new { text "Letterhead" }.render
     assert_raises_with(Prawn::Errors::PdfUaViolation, /PDF\/UA embeds every font/) { document.pdf_page(helvetica, alt: "Letterhead") }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /outside any tagged box/) { document.prawn.make_cell("x").draw }
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /annotations and links/) { document.prawn.link_annotation([0, 0, 10, 10], A: {S: :URI}) }
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /not " "/) { document.image "#{DATA_DIRECTORY}/images/dice.png", alt: " " }
+    assert_raises_with(ArgumentError, /language tag/) { document.text "Bonjour", lang: :fr }
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /PDF\/UA metadata/) { Gamba.document(**TAGGED, info: {Title: "A\u0001B"}).to_s }
+    refute Prawn::Document.new(pdf: false).tagged?
+  end
+
+  # A decoration within an artifact is moved beneath what the artifact holds on each page: it is an artifact too.
+  def test_a_decorated_stack_within_an_artifact_stays_an_artifact
+    document = dejavu(Gamba.document(**TAGGED))
+    document.stack(role: :artifact) do |artifact|
+      artifact.text "Draft"
+      artifact.stack(border_width: 1) { |stack| stack.text "word " * 900 }
+    end
+    pdf = document.to_s
+
+    assert_nil PdfObjects.new(pdf).marked_content_problem
+    assert_valid "ua1", pdf
   end
 
   private

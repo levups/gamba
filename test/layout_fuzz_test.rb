@@ -79,16 +79,19 @@ class LayoutFuzzTest < Minitest::Test
     sources = Array.new(CASES) { generator.document }.each_slice(TAGGED_SHARE).map(&:first)
     failures = sources.each_with_index.filter_map do |source, index|
       tagged_source = tagged(source)
-      pdf = eval(tagged_source, binding, "tree.rb").to_s # rubocop:disable Security/Eval
-      problem = PdfObjects.new(pdf).marked_content_problem
+      problem = begin
+        PdfObjects.new(eval(tagged_source, binding, "tree.rb").to_s).marked_content_problem # rubocop:disable Security/Eval
+      rescue Prawn::Errors::CannotFit
+        nil
+      rescue Prawn::Errors::PdfUaViolation => error
+        error.message
+      end
       next unless problem
 
       path = File.join(DIRECTORY, format("tagged_tree_%04d.rb", index))
       FileUtils.mkdir_p(DIRECTORY)
       File.write(path, tagged_source)
       "#{path}: #{problem}"
-    rescue Prawn::Errors::CannotFit
-      nil
     end
 
     assert_empty failures, "seed #{SEED}"
@@ -96,9 +99,11 @@ class LayoutFuzzTest < Minitest::Test
 
   private
 
-  # PDF/UA embeds its fonts: DejaVu Sans stands in for Helvetica. Its headings skip no level: all are h1.
+  # PDF/UA embeds its fonts: DejaVu Sans stands in for Helvetica. Its headings skip no level: all are h1. One
+  # stack in three is an artifact, decorations and all.
   def tagged(source)
-    source.gsub(/role: :h\d/, "role: :h1").sub("Gamba.document(", %{Gamba.document(pdf: :ua, lang: "en", info: {Title: "Tree"}, })
+    stacks = 0
+    source.gsub(/role: :h\d/, "role: :h1").gsub(".stack(") { ((stacks += 1) % 3).zero? ? ".stack(role: :artifact, " : _1 }.sub("Gamba.document(", %{Gamba.document(pdf: :ua, lang: "en", info: {Title: "Tree"}, })
       .sub("do |document|\n", %(do |document|\n  document.register_font "DejaVu", normal: "#{TAGGED_FONT_DIRECTORY}/DejaVuSans.ttf", bold: "#{TAGGED_FONT_DIRECTORY}/DejaVuSans-Bold.ttf"\n  document.style :default, font: "DejaVu"\n))
   end
 
