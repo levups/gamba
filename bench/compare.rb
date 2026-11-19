@@ -21,9 +21,9 @@ def peak_memory_megabytes(time_report)
   end
 end
 
-def measure(engine, document)
+def measure(engine, document, *options)
   settings = Oracle::ENGINES.fetch(engine)
-  command = [*TIME_COMMAND, "bundle", "exec", "ruby", "--yjit", *settings[:load_path], File.join(__dir__, "run.rb"), document, ITERATIONS.to_s]
+  command = [*TIME_COMMAND, "bundle", "exec", "ruby", "--yjit", *settings[:load_path], File.join(__dir__, "run.rb"), document, ITERATIONS.to_s, *options]
   output, report, status = Bundler.with_unbundled_env { Open3.capture3({"BUNDLE_GEMFILE" => settings[:gemfile]}, *command) }
   return {unavailable: report.lines.find { _1.match?(/cannot load|Error/) }&.strip} unless status.success?
 
@@ -35,11 +35,12 @@ def median(values)
 end
 
 # What each column of the results renders: the document with Prawn's API on each engine, and with Gamba's own API
-# where bench/native has it.
+# where bench/native has it, untagged then tagged for PDF/UA.
 def candidates(document)
   native = File.join(__dir__, "native", File.basename(document))
   columns = Oracle::ENGINES.keys.to_h { |engine| [engine, [engine, document]] }
   columns["gamba_native"] = ["gamba", native] if File.exist?(native)
+  columns["gamba_tagged"] = ["gamba", native, "pdf_ua"] if File.exist?(native)
   columns
 end
 
@@ -47,7 +48,7 @@ end
 def median_measures(document)
   columns = candidates(document)
   samples_by_engine = columns.keys.to_h { |column| [column, []] }
-  PROCESSES.times { columns.each { |column, (engine, path)| samples_by_engine[column] << measure(engine, path) } }
+  PROCESSES.times { columns.each { |column, (engine, path, *options)| samples_by_engine[column] << measure(engine, path, *options) } }
   samples_by_engine.transform_values do |samples|
     unavailable = samples.find { |sample| sample[:unavailable] }
     next unavailable if unavailable

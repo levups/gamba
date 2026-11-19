@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Runs inside one engine's process: `ruby bench/run.rb DOCUMENT ITERATIONS`, prints one JSON line.
+# Runs inside one engine's process: `ruby bench/run.rb DOCUMENT ITERATIONS [pdf_ua]`, prints one JSON line.
 
 require "json"
 begin
@@ -16,12 +16,14 @@ end
 
 DATA_DIRECTORY = File.expand_path("../corpus/cache/prawn/data", __dir__)
 
-document_path, iterations = ARGV
+document_path, iterations, standard = ARGV
 body = File.read(document_path)
+# Tagged for PDF/UA: the structure tree and its marked content, the language, the title and the XMP metadata.
+options = (standard == "pdf_ua") ? {pdf: :ua, lang: "en", info: {Title: File.basename(document_path, ".rb").capitalize}} : {}
 render =
   if File.basename(File.dirname(document_path)) == "native"
     # A document of Gamba's own API, which compresses unasked, is written against `document`.
-    -> { Gamba.document { |document| eval(body, binding, document_path) }.to_s } # rubocop:disable Security/Eval
+    -> { Gamba.document(**options) { |document| eval(body, binding, document_path) }.to_s } # rubocop:disable Security/Eval
   else
     # Prawn compresses only when asked: compared at its lightest.
     -> { Prawn::Document.new(compress: true).tap { _1.instance_eval(body, document_path) }.render }
