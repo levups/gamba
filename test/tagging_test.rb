@@ -118,9 +118,11 @@ class TaggingTest < Minitest::Test
   def test_what_breaks_the_rules_raises_where_it_is_written
     assert_raises_with(Prawn::Errors::PdfUaViolation, /lang: "en"/) { Gamba.document(pdf: :ua, info: {Title: "Report"}) }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /Title/) { Gamba.document(pdf: :ua, lang: "en") }
-    [" ", "　", false, :Report].each do |title|
+    [" ", "\u3000", "\u200B", "\uFEFF\u2060", false, :Report, "\xFF".b].each do |title|
       assert_raises_with(Prawn::Errors::PdfUaViolation, /Title/) { Gamba.document(pdf: :ua, lang: "en", info: {Title: title}) }
     end
+    assert Gamba.document(pdf: :ua, lang: "fr", info: {Title: "Résumé".encode(Encoding::ISO_8859_1)}).prawn.tagged?
+    assert_raises_with(ArgumentError, /alt is "\u200B"/) { Gamba.document.image "#{DATA_DIRECTORY}/images/dice.png", alt: "\u200B" }
     assert_raises_with(ArgumentError, /:ua is the only/) { Prawn::Document.new(pdf: :ub) }
     assert_raises_with(ArgumentError, /:a for PDF\/A-3a/) { Prawn::Document.new(pdf_a: :u) }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /standard PDF font/) { Gamba.document(**TAGGED.except(:pdf_a)) { _1.text "Hello" } }
@@ -203,8 +205,8 @@ class TaggingTest < Minitest::Test
     assert_raises_with(Prawn::Errors::PdfUaViolation, /marked content of its own/) do
       dejavu(Gamba.document(**TAGGED)).pdf_page(tagged_page, alt: "A tagged page")
     end
-    # LibreOffice writes the operator right after the dictionary.
-    ["/P<</MCID 0>>BDC\nEMC", "/P<</MCID 0>>BDC[(a)]TJ EMC", "/Artifact BMC/GS1 gs EMC", "/Artifact BMC"].each do |marks|
+    # Operators written against what surrounds them, as LibreOffice does after a dictionary.
+    ["/P<</MCID 0>>BDC\nEMC", "/P<</MCID 0>>BDC[(a)]TJ EMC", "/Artifact BMC/GS1 gs EMC"].each do |marks|
       compact = Gamba.document.tap { _1.prawn.add_content(marks) }.to_s
       assert_raises_with(Prawn::Errors::PdfUaViolation, /marked content of its own/) do
         dejavu(Gamba.document(**TAGGED)).pdf_page(compact, alt: "A tagged page")

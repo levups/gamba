@@ -46,6 +46,15 @@ module Gamba
     # A BCP 47 language tag, as /Lang takes it: fr, en-GB, zh-Hant-TW.
     LANGUAGE_TAG = /\A[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*\z/
     HEADING_LEVELS = {H1: 1, H2: 2, H3: 3, H4: 4, H5: 5, H6: 6}.freeze
+    # Something besides spaces and invisible format characters (zero-width space, byte order mark…).
+    VISIBLE = /[^[:space:]\p{Cf}]/
+
+    # Text a reader sees or hears: a title, an alt. A string in another encoding counts if it converts to UTF-8.
+    def self.visible_text?(value)
+      value.is_a?(String) && value.encode(Encoding::UTF_8).scrub.match?(VISIBLE)
+    rescue EncodingError
+      false
+    end
 
     def tagged?
       !@tagging.nil?
@@ -136,9 +145,9 @@ module Gamba
         raise Prawn::Errors::PdfUaViolation, 'PDF/UA documents say their language, for screen readers to speak it: lang: "en"'
       end
       title = options.dig(:info, :Title)
-      return if title.is_a?(String) && title.match?(/[^[:space:]​]/)
+      return if Tagging.visible_text?(title)
 
-      raise Prawn::Errors::PdfUaViolation, 'PDF/UA documents have a title, shown in the window bar: info: {Title: "…"}'
+      raise Prawn::Errors::PdfUaViolation, "PDF/UA documents have a title, shown in the window bar: info: {Title: \"…\"}, not #{title.inspect}"
     end
 
     def tagging_structure?
@@ -148,7 +157,7 @@ module Gamba
     # Boxes check their alt and lang when made (Gamba::Layout::Node): here a figure must have an alt.
     def check_text_attributes(type, attributes)
       alt = attributes[:Alt]
-      if type == :Figure && !(alt.is_a?(String) && alt.match?(/\S/))
+      if type == :Figure && !Tagging.visible_text?(alt)
         raise tagging_violation, "#{tagging_standard} gives every figure an alternative text: alt: \"…\", not #{alt.inspect}"
       end
     end
