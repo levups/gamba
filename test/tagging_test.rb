@@ -123,7 +123,10 @@ class TaggingTest < Minitest::Test
     end
     assert Gamba.document(pdf: :ua, lang: "fr", info: {Title: "Résumé".encode(Encoding::ISO_8859_1)}).prawn.tagged?
     assert_raises_with(ArgumentError, /alt is "\u200B"/) { Gamba.document.image "#{DATA_DIRECTORY}/images/dice.png", alt: "\u200B" }
-    assert Gamba.document.image("#{DATA_DIRECTORY}/images/dice.png", alt: "\xC3\xA9".b) # UTF-8 bytes, as File.binread reads them
+    # UTF-8 bytes, as File.binread reads them, are the alt's text; a title is given as text.
+    binary_alt = dejavu(Gamba.document(**TAGGED)).tap { _1.image("#{DATA_DIRECTORY}/images/dice.png", alt: "R\xC3\xA9sum\xC3\xA9".b) }
+    assert_equal "u:Résumé", structure(binary_alt.to_s)[:kids].first[:attributes]["/Alt"]
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /Title/) { Gamba.document(pdf: :ua, lang: "fr", info: {Title: "R\xC3\xA9sum\xC3\xA9".b}) }
     assert_raises_with(ArgumentError, /:ua is the only/) { Prawn::Document.new(pdf: :ub) }
     assert_raises_with(ArgumentError, /:a for PDF\/A-3a/) { Prawn::Document.new(pdf_a: :u) }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /standard PDF font/) { Gamba.document(**TAGGED.except(:pdf_a)) { _1.text "Hello" } }
