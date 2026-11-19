@@ -124,12 +124,24 @@ module Gamba
 
         @table_width = width
         @table = within(prawn, prawn.bounds.absolute_left, width) do
-          prawn.make_table(data, prawn_options(width)) do |table|
-            style_columns(table)
-            style(table.row(0), @header) if @header
-            @styling&.call(table)
+          in_font(prawn, @cell.fetch(:font) { @styles.cell_defaults[:font] }) do
+            prawn.make_table(data, prawn_options(width)) do |table|
+              style_columns(table)
+              style(table.row(0), @header) if @header
+              @styling&.call(table)
+            end
           end
         end
+      end
+
+      # Prawn's table measures a cell's text in the document's font and draws it in the cell's: sized in the
+      # table's font, the columns fit what they draw, whatever font the document is in.
+      def in_font(prawn, font)
+        return yield unless font
+
+        result = nil
+        prawn.font(font.to_s) { result = yield }
+        result
       end
 
       def prawn_options(width)

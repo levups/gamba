@@ -66,6 +66,29 @@ class NativeDocumentTest < Minitest::Test
     assert_equal [["A", "Courier", 10.0], ["B", "Courier", 18.0]], glyphs(document.to_s).map { _1.first(3) }
   end
 
+  # Prawn's table sizes its columns in the document's font: the native table sets its own around it.
+  def test_a_table_sizes_its_columns_in_its_font_whatever_the_documents
+    table = ->(document) { document.stack { |stack| stack.table([{sku: "SKU1", description: "Gadget, deluxe edition"}], columns: {sku: {}, description: {}}, cell: {font: "Courier"}) } }
+    in_helvetica = Gamba.document { |document| document.text "Intro" }.tap(&table)
+    in_courier = Gamba.document { |document| document.text "Intro" }.tap { |document| document.prawn.font("Courier") }.tap(&table)
+
+    assert_equal glyphs(in_courier.to_s).drop(5), glyphs(in_helvetica.to_s).drop(5)
+  end
+
+  def test_a_table_lays_out_the_same_tagged_or_not
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
+    table = lambda do |document|
+      document.register_font "DejaVuSans", normal: FONT, bold: BOLD_FONT
+      document.style :default, font: "DejaVuSans", size: 9
+      document.stack { |stack| stack.table([{sku: "SKU1", description: "Gadget, deluxe edition"}], columns: {sku: {title: "SKU"}, description: {}}) }
+    end
+    plain = Gamba.document(&table)
+    tagged = Gamba.document(pdf: :ua, lang: "en", info: {Title: "Table"}, &table)
+
+    assert_equal glyphs(tagged.to_s), glyphs(plain.to_s)
+  end
+
   def test_a_native_call_draws_what_the_prawn_call_draws
     native = Gamba.document(margin: 50) { |document| document.text "Hello", size: 18, color: "ff0000", align: :right, weight: :bold }
     prawn = Prawn::Document.new(margin: 50) { text "Hello", size: 18, color: "ff0000", align: :right, style: :bold }
