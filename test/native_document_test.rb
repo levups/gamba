@@ -113,19 +113,17 @@ class NativeDocumentTest < Minitest::Test
     skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
 
     words = %w[Gadget deluxe edition with spare parts toolkit and manual]
-    pdfs = %i[bold italic].map do |style|
-      Prawn::Document.new do
-        font "Times-Roman", style: style
-        gamba do |document|
-          document.register_font "DejaVuSans", normal: FONT, bold: BOLD_FONT
-          document.stack(width: 200) { |stack| stack.table([{sku: "SKU1", description: words.join(" ")}], columns: {sku: {}, description: {}}, cell: {font: "DejaVuSans"}) }
-        end
-      end.render
-    end
-    regular = Gamba.document do |document|
+    table = lambda do |document|
       document.register_font "DejaVuSans", normal: FONT, bold: BOLD_FONT
       document.stack(width: 200) { |stack| stack.table([{sku: "SKU1", description: words.join(" ")}], columns: {sku: {}, description: {}}, cell: {font: "DejaVuSans"}) }
     end
+    pdfs = %i[bold italic].map do |style|
+      Prawn::Document.new do
+        font "Times-Roman", style: style
+        gamba(&table)
+      end.render
+    end
+    regular = Gamba.document(&table)
 
     assert_equal "SkuDescriptionSKU1#{words.join}", glyphs(regular.to_s).map(&:first).join.delete(" ")
     pdfs.each { |pdf| assert_equal glyphs(regular.to_s), glyphs(pdf) }
@@ -138,6 +136,8 @@ class NativeDocumentTest < Minitest::Test
       document.register_font "DejaVuSans", normal: FONT, bold: BOLD_FONT
       document.style :default, font: "DejaVuSans", size: 9
       document.stack { |stack| stack.table([{sku: "SKU1", description: "Gadget, deluxe edition"}], columns: {sku: {title: "SKU"}, description: {}}) }
+      # Measured through Prawn's inline formatting, which takes no style from the options.
+      document.stack { |stack| stack.table([{sku: "SKU1", description: "Gadget"}], columns: {sku: {}, description: {}}) { |prawn_table| prawn_table.row(0).inline_format = true } }
     end
     plain = Gamba.document(&table)
     tagged = Gamba.document(pdf: :ua, lang: "en", info: {Title: "Table"}, &table)

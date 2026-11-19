@@ -148,7 +148,7 @@ module Gamba
           elsif cell.font_style == :normal
             cell.font_style = nil
           else
-            @styles.check_face(font, cell.font_style, ("; or header: {weight: :normal}" if @header && cell.row.zero?))
+            @styles.check_face(font, cell.font_style, ("; or header: {weight: :normal}" if @header && cell.row.zero? && cell.font_style == :bold))
           end
         end
       end

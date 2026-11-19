@@ -986,9 +986,11 @@ module Gamba
         {font:, font_options:, color:, text_options:, bookmarks: @bookmarks, **layout}
       end
 
-      # A font given by its file, or by the name of one face, rather than a family.
+      # A font given by its file, or by the name of one standard face (Courier-Bold), rather than a family.
       def single_face?(font)
-        !font.nil? && !@prawn.font_families.key?(font.to_s)
+        return false if font.nil? || @prawn.font_families.key?(font.to_s)
+
+        Prawn::Fonts::AFM::BUILT_INS.include?(font.to_s) || File.file?(font.to_s)
       end
 
       # A single face is that face alone: Prawn raises BadFontFamily, which names neither, when it is drawn in bold
@@ -997,7 +999,7 @@ module Gamba
         return if font_style.nil? || font_style == :normal || !single_face?(font)
 
         raise ArgumentError, "#{font.inspect} is a single face, without #{font_style}: register it with its faces, " \
-          "document.register_font \"Name\", normal: \"Name.ttf\", bold: \"Name-Bold.ttf\", then font: \"Name\"#{alternative}"
+          "document.register_font \"Name\", normal: \"Name.ttf\", #{font_style}: \"Name-#{font_style}.ttf\", then font: \"Name\"#{alternative}"
       end
 
       private
