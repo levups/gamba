@@ -122,7 +122,7 @@ module Gamba
       def table(prawn, width)
         return @table if @table_width == width
 
-        options = prawn_options(width)
+        options = prawn_options(width, prawn.font.options[:style])
         @table = within(prawn, prawn.bounds.absolute_left, width) do
           in_font(prawn, options[:cell_style][:font]) do
             prawn.make_table(data, options) do |table|
@@ -136,20 +136,24 @@ module Gamba
         @table
       end
 
-      # Prawn's table measures a cell's text in the document's font and draws it in the cell's, in the document's
-      # style: sized in the table's font, the columns fit what they draw whatever font the document is in. A cell
-      # the styling block gives another font is still measured in the table's, as in Prawn.
+      # Built in the table's font, its cells measure in place; only those in another font set theirs.
       def in_font(prawn, font)
         return yield unless font
 
-        returned = nil
-        prawn.font(font, prawn.font.options.slice(:style)) { returned = yield }
-        returned
+        prawn.save_font do
+          prawn.font(font)
+          yield
+        end
       end
 
-      def prawn_options(width)
+      # Each cell is measured in the font it is drawn in, and in regular unless it says otherwise, as a text is: the
+      # style of the document around the table changes neither. Prawn draws a cell that names no style in the
+      # document's, so a document in bold or italic gives every cell its regular.
+      def prawn_options(width, document_style)
         widths = @columns.each_value.map { |options| options[:width] }
-        options = {header: !@header.nil?, cell_style: prawn_cell_style({**@styles.cell_defaults, **@cell})}
+        cell_style = {sized_in_its_font: true, **prawn_cell_style({**@styles.cell_defaults, **@cell})}
+        cell_style[:font_style] = :normal unless document_style.nil? || document_style == :normal
+        options = {header: !@header.nil?, cell_style:}
         options[:row_colors] = @stripes if @stripes
         options[:column_widths] = widths.each_with_index.to_h { |column_width, index| [index, column_width] }.compact
         options[:width] = width unless widths.all?

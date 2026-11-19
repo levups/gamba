@@ -75,16 +75,35 @@ class NativeDocumentTest < Minitest::Test
     assert_equal glyphs(in_courier.to_s).drop(5), glyphs(in_helvetica.to_s).drop(5)
   end
 
-  def test_a_table_in_a_bold_document_is_sized_in_bold
+  def test_a_cell_the_styling_block_sets_in_another_font_is_sized_in_it
+    rows = [{sku: "SKU1", description: "Gadget, deluxe edition"}]
+    document = Gamba.document { |gamba| gamba.stack(width: 220) { |stack| stack.table(rows, columns: {sku: {}, description: {}}) { |table| table.column(1).font = "Courier" } } }
+
+    # Sized in Helvetica, the narrower, the description wrapped on two lines.
+    assert_equal 1, glyphs(document.to_s).select { _1[1] == "Courier" && _1.first != " " }.map(&:last).uniq.size
+  end
+
+  # As a text: the style of the Prawn code around the table changes neither what its cells draw nor their size.
+  def test_a_table_in_a_bold_or_italic_document_stays_regular
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
     words = %w[Gadget deluxe edition with spare parts toolkit and manual]
-    pdf = Prawn::Document.new do
-      font "Times-Roman", style: :bold
-      gamba { |document| document.stack(width: 200) { |stack| stack.table([{sku: "SKU1", description: words.join(" ")}], columns: {sku: {}, description: {}}, cell: {font: "Times-Roman"}) } }
+    pdfs = %i[bold italic].map do |style|
+      Prawn::Document.new do
+        font "Times-Roman", style: style
+        gamba do |document|
+          document.register_font "DejaVuSans", normal: FONT, bold: BOLD_FONT
+          document.stack(width: 200) { |stack| stack.table([{sku: "SKU1", description: words.join(" ")}], columns: {sku: {}, description: {}}, cell: {font: "DejaVuSans"}) }
+        end
+      end.render
+    end
+    regular = Gamba.document do |document|
+      document.register_font "DejaVuSans", normal: FONT, bold: BOLD_FONT
+      document.stack(width: 200) { |stack| stack.table([{sku: "SKU1", description: words.join(" ")}], columns: {sku: {}, description: {}}, cell: {font: "DejaVuSans"}) }
     end
 
-    drawn = glyphs(pdf.render)
-    assert_equal ["Times-Bold"], drawn.map { _1[1] }.uniq
-    assert_equal "SkuDescriptionSKU1#{words.join}", drawn.map(&:first).join.delete(" ")
+    assert_equal "SkuDescriptionSKU1#{words.join}", glyphs(regular.to_s).map(&:first).join.delete(" ")
+    pdfs.each { |pdf| assert_equal glyphs(regular.to_s), glyphs(pdf) }
   end
 
   def test_a_table_lays_out_the_same_tagged_or_not

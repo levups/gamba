@@ -38,7 +38,7 @@ module Gamba
     end
 
     # Text attributes under a name: text "…", style: name. The :default style applies to every text; in PDF/A and
-    # PDF/UA its font is also the document's default, which tables and Prawn's code start from: Helvetica, Prawn's,
+    # PDF/UA its font is also the document's default, which Prawn's code starts from: Helvetica, Prawn's,
     # cannot be embedded. It is looked up when first used, so it may be registered after.
     def style(name, **attributes)
       @styles.define(name, attributes)

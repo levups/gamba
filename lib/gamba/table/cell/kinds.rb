@@ -95,7 +95,10 @@ module Prawn
         end
 
         def styled_width_of(text)
-          @pdf.width_of(text, @text_options)
+          # width_of applies the cell's style itself: only another family needs the cell's font set around it.
+          return @pdf.width_of(text, @text_options) unless @sized_in_its_font && @font && @font.to_s != @pdf.font.family
+
+          with_font { @pdf.width_of(text, @text_options) }
         end
 
         private
