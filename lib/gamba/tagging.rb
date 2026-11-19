@@ -135,7 +135,7 @@ module Gamba
       unless lang
         raise Prawn::Errors::PdfUaViolation, 'PDF/UA documents say their language, for screen readers to speak it: lang: "en"'
       end
-      return if options.dig(:info, :Title)
+      return unless options.dig(:info, :Title).to_s.strip.empty?
 
       raise Prawn::Errors::PdfUaViolation, 'PDF/UA documents have a title, shown in the window bar: info: {Title: "…"}'
     end

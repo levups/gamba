@@ -94,7 +94,7 @@ module Gamba
     # forbids, and its MCIDs would point at a structure tree left behind.
     def check_no_marked_content(contents, document)
       streams = Array(@reader.resolve(contents)).map { @reader.resolve(_1) }.grep(PDF::Core::Reader::Stream)
-      return unless streams.any? { @reader.decoded(_1).match?(/(?:\A|\s)(?:BDC|BMC)\s/) }
+      return unless streams.any? { @reader.decoded(_1).match?(/(?:\A|[\s>\])])(?:BDC|BMC)(?:\s|\z)/) }
 
       error, standard = document.pdf_ua? ? [Prawn::Errors::PdfUaViolation, "PDF/UA"] : [Prawn::Errors::PdfAViolation, "PDF/A-3a"]
       raise error, "#{standard} cannot import a page that has marked content of its own, a page of a tagged PDF: Gamba does not merge structure trees yet"
