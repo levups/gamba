@@ -26,6 +26,15 @@ module Prawn
           @text_options[:style] = style
         end
 
+        # What the cell was given, before the document's font fills in: Gamba's own tables check the faces with them.
+        def font_style
+          @text_options[:style]
+        end
+
+        def font_name
+          @font
+        end
+
         def natural_content_width
           @natural_content_width ||= [styled_width_of(@content), @pdf.bounds.width].min
         end

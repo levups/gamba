@@ -81,6 +81,25 @@ class NativeDocumentTest < Minitest::Test
     assert_equal "SkuPartsSKU1WWWWMMMMWWMM", glyphs(document.to_s).map(&:first).join.delete(" ")
   end
 
+  def test_a_prawn_table_in_a_cell_is_drawn_in_the_font_it_was_sized_in
+    document = Gamba.document
+    document.style :default, font: "Courier"
+    inner = document.prawn.make_table([["filling little list"]])
+    document.stack(width: 300) { |stack| stack.table([{sku: "SKU1", parts: inner}]) }
+
+    assert_equal "SkuPartsSKU1fillinglittlelist", glyphs(document.to_s).map(&:first).join.delete(" ")
+  end
+
+  def test_a_colored_text_renders_under_prawn_debug
+    debug = Prawn.debug
+    Prawn.debug = true
+    document = Gamba.document { |gamba| gamba.text "Red", color: "ff0000" }
+
+    assert_equal "Red", glyphs(document.to_s).map(&:first).join
+  ensure
+    Prawn.debug = debug
+  end
+
   def test_a_cell_the_styling_block_sets_in_another_font_is_sized_in_it
     rows = [{sku: "SKU1", description: "Gadget, deluxe edition"}]
     document = Gamba.document { |gamba| gamba.stack(width: 220) { |stack| stack.table(rows, columns: {sku: {}, description: {}}) { |table| table.column(1).font = "Courier" } } }
