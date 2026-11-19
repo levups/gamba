@@ -73,10 +73,10 @@ module Prawn
       def self.draw_tagged_cells(cells)
         cells.each do |cell, point|
           cell.set_width_constraints
-          cell.tag_artifact { cell.draw_background(point) }
+          cell.tag_decoration { cell.draw_background(point) }
         end
         cells.each do |cell, point|
-          cell.tag_artifact { cell.draw_borders(point) }
+          cell.tag_decoration { cell.draw_borders(point) }
           cell.tag_content { cell.draw_bounded_content(point) }
         end
       end
@@ -86,13 +86,15 @@ module Prawn
         @pdf.tagged?
       end
 
-      def tag_artifact(&)
-        @pdf.tag_artifact(&)
+      def tag_decoration(&)
+        @pdf.tag_decoration(&)
       end
 
-      # A copy of the header atop a later page is an artifact: the table has its header once.
+      # A copy of the header atop a later page is an artifact: the table has its header once. A cell drawn outside
+      # a table has no row, and no table cell element.
       def tag_content(&)
         return @pdf.tag_artifact(&) if @tag_role == :repeated
+        return yield unless respond_to?(:row)
 
         @pdf.tag_table_cell(row, header: @tag_role == :header, colspan:, rowspan:, &)
       end

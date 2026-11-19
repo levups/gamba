@@ -85,7 +85,7 @@ module Prawn
         started_new_page_at_row = initial_row_on_initial_page
         offset = @pdf.y
         @header_row = header_rows if @header
-        mark_header_cells if @pdf.tagged?
+        mark_header_cells if @header && @pdf.tagged?
         cells_this_page = []
         @cells.each do |cell|
           if start_new_page?(cell, offset, reference_bounds)
@@ -152,8 +152,6 @@ module Prawn
 
     # Tagged, the header is made of header cells, and its copies atop later pages are artifacts.
     def mark_header_cells
-      return unless @header
-
       row(0..(number_of_header_rows - 1)).each { _1.tag_role = :header }
       @header_row.each { _1.tag_role = :repeated }
     end

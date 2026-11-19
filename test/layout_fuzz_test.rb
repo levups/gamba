@@ -78,13 +78,14 @@ class LayoutFuzzTest < Minitest::Test
     generator = LayoutTrees.new(SEED)
     sources = Array.new(CASES) { generator.document }.each_slice(TAGGED_SHARE).map(&:first)
     failures = sources.each_with_index.filter_map do |source, index|
-      pdf = eval(tagged(source), binding, "tree.rb").to_s # rubocop:disable Security/Eval
+      tagged_source = tagged(source)
+      pdf = eval(tagged_source, binding, "tree.rb").to_s # rubocop:disable Security/Eval
       problem = PdfObjects.new(pdf).marked_content_problem
       next unless problem
 
       path = File.join(DIRECTORY, format("tagged_tree_%04d.rb", index))
       FileUtils.mkdir_p(DIRECTORY)
-      File.write(path, tagged(source))
+      File.write(path, tagged_source)
       "#{path}: #{problem}"
     rescue Prawn::Errors::CannotFit
       nil

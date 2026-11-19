@@ -3,16 +3,13 @@
 require "base64"
 require "json"
 require "open3"
-require "tempfile"
+require_relative "../../lib/gamba/pdf_check"
 
 # The objects of a PDF as qpdf's JSON gives them, streams decoded.
 class PdfObjects
   def initialize(pdf)
-    json = Tempfile.create(["tagged", ".pdf"]) do |file|
-      file.binmode
-      file.write(pdf)
-      file.flush
-      Open3.capture2("qpdf", "--json=2", "--json-stream-data=inline", "--decode-level=generalized", file.path).first
+    json = Gamba::PdfCheck.with_path(pdf) do |path|
+      Open3.capture2("qpdf", "--json=2", "--json-stream-data=inline", "--decode-level=generalized", path).first
     end
     @objects = JSON.parse(json).fetch("qpdf").last
   end

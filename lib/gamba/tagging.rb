@@ -60,16 +60,18 @@ module Gamba
 
       attributes.compact!
       raise tagging_violation, "#{tagging_standard} gives every figure an alternative text: alt: \"…\"" if type == :Figure && !attributes[:Alt]
+      check_list_nesting(type)
       check_heading_level(type) if pdf_ua?
 
       within_element(Tagging::Element.new(type, @tagging.last, attributes), &)
     end
 
     # A cell of the table element being drawn, in the row element of its row index: a header cell for a column,
-    # or a data cell. Outside a table element, nothing is made.
+    # or a data cell. In a figure, the cell is part of it; outside a table element, nothing is made.
     def tag_table_cell(row, header:, colspan:, rowspan:, &)
-      table = @tagging&.last
-      return yield unless tagging_structure? && table.type == :Table
+      return yield unless tagging_structure?
+      return tag_content(&) if @tagging.last.whole?
+      return yield unless (table = @tagging.last).type == :Table
 
       attributes = {}
       attributes[:Scope] = :Column if header
@@ -83,6 +85,7 @@ module Gamba
     def tag_content(&)
       return yield unless tagging_structure?
 
+      check_list_nesting(nil)
       within_mark(Tagging::Mark.new(@tagging.last), &)
     end
 
@@ -93,6 +96,14 @@ module Gamba
 
       properties = type && "<</Type /#{type}#{" /Subtype /#{subtype}" if subtype}>>"
       within_mark(Tagging::Mark.new(nil, properties), &)
+    end
+
+    # What only decorates a part of the content, a table cell's background or border: an artifact, unless it is
+    # drawn within tagged content, a table nested in a cell, where an artifact cannot be (ISO 14289-1 §7.1).
+    def tag_decoration(&)
+      return yield if tagged? && @marks.any?(&:element)
+
+      tag_artifact(&)
     end
 
     private
@@ -127,6 +138,16 @@ module Gamba
       tagged? && @marks.none? { _1.element.nil? }
     end
 
+    # A list holds list items only, and a list item sits in a list. type is nil for content marked in the current
+    # element.
+    def check_list_nesting(type)
+      parent = @tagging.last.type
+      return unless (type == :LI) ? parent != :L : (parent == :L && type != :LI)
+
+      raise tagging_violation, (type == :LI) ? "#{tagging_standard} puts a list item in a list: role: :list on its container" :
+        "#{tagging_standard} puts only list items in a list: role: :list_item on each of its boxes"
+    end
+
     # PDF/UA reads headings as an outline: the first is an h1, and each goes at most one level below the last.
     def check_heading_level(type)
       level = HEADING_LEVELS[type]
@@ -155,19 +176,16 @@ module Gamba
       @tagging.pop
     end
 
+    # The sequence is written when something is drawn in it: a box that moves to the next page before drawing
+    # leaves no empty sequence behind, and its decoration sees nothing drawn on the page it leaves.
     def within_mark(mark)
-      open_mark(mark)
+      @marks << mark
       begin
         yield
       ensure
         @marks.pop
         add_content("EMC") if mark.page
       end
-    end
-
-    def open_mark(mark)
-      @marks << mark
-      write_mark(mark)
     end
 
     def write_mark(mark)
@@ -182,25 +200,29 @@ module Gamba
       end
     end
 
-    # Called before the content goes to the page: what paints opens again the sequences a page break closed, or
-    # raises when it is in none.
+    # Called before the content goes to the page: what paints opens the sequences not written on this page yet, or
+    # raises when it is in none. Within an artifact, only the outermost one is: what it holds is part of it, and
+    # the elements around it wait for content of their own.
     def check_tagged_content(string)
-      return unless string.match?(Tagging::BEGINS_GRAPHICS_OBJECT)
+      innermost = @marks.last
+      return if innermost&.page || !string.match?(Tagging::BEGINS_GRAPHICS_OBJECT)
 
-      if @marks.empty?
+      unless innermost
         raise tagging_violation, "#{tagging_standard} tags all content, and this is drawn outside any tagged box or artifact: " \
           "draw it with Gamba's boxes, or leave it out (#{string.strip.lines.last.strip.inspect})"
       end
-      return if @marks.last.page
 
-      @marks.each { |mark| write_mark(mark) unless mark.page }
+      artifact = @marks.find { _1.element.nil? }
+      if artifact
+        write_mark(artifact) unless artifact.page
+      else
+        @marks.each { |mark| write_mark(mark) unless mark.page }
+      end
     end
 
     # Before leaving a page, the sequences open on it are closed there.
     def close_marks_on_page
-      return unless @marks&.any?(&:page)
-
-      @marks.reverse_each do |mark|
+      @marks&.reverse_each do |mark|
         next unless mark.page
 
         add_content("EMC")

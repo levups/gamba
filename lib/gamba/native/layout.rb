@@ -130,13 +130,14 @@ module Gamba
     # flow paints it, and a subclass calls its parent class.
     module Tagged
       def paint(prawn, ...)
-        return super unless prawn.tagged? && !@tagging
+        return super unless prawn.tagged? && !@in_tag
 
         tagged(prawn) { super }
       end
 
-      def flow(prawn, ...)
-        return super unless prawn.tagged? && !@tagging
+      # Parameters spelled out, unlike paint's: forwarding with ... allocates an Array on each call, tagged or not.
+      def flow(prawn, cursor, left, width)
+        return super unless prawn.tagged? && !@in_tag
 
         tagged(prawn) { super }
       end
@@ -206,22 +207,27 @@ module Gamba
       end
 
       def tagged(prawn, &)
-        @tagging = true
+        @in_tag = true
         tag(prawn, &)
       ensure
-        @tagging = false
+        @in_tag = false
       end
 
-      # A box that draws content marks it as its element's; a list item's goes in its body.
+      # Without a role, a box makes no element unless it says its language; a list item's content goes in its body.
       def tag(prawn, &)
         return prawn.tag_artifact(&) if role == :artifact
-        return yield if role.nil?
+        return (lang ? prawn.tag_structure(:Div, Lang: lang, &) : yield) if role.nil?
 
         prawn.tag_structure(STRUCTURE_TYPES.fetch(role), Alt: alt, Lang: lang) do
-          next prawn.tag_structure(:LBody) { prawn.tag_content(&) } if role == :list_item
+          next prawn.tag_structure(:LBody) { tag_body(prawn, &) } if role == :list_item
 
-          prawn.tag_content(&)
+          tag_body(prawn, &)
         end
+      end
+
+      # A box that draws content marks it as its element's.
+      def tag_body(prawn, &)
+        prawn.tag_content(&)
       end
     end
 
@@ -650,16 +656,9 @@ module Gamba
         end
       end
 
-      # A container groups its children's elements: without a role, it makes none, unless it says their language.
-      def tag(prawn, &)
-        return prawn.tag_artifact(&) if role == :artifact
-        return (lang ? prawn.tag_structure(:Div, Lang: lang, &) : yield) if role.nil?
-
-        prawn.tag_structure(STRUCTURE_TYPES.fetch(role), Alt: alt, Lang: lang) do
-          next prawn.tag_structure(:LBody, &) if role == :list_item
-
-          yield
-        end
+      # A container's element groups its children's.
+      def tag_body(_prawn)
+        yield
       end
 
       def inner_width(width)

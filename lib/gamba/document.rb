@@ -23,6 +23,9 @@ module Prawn
     ].freeze
 
     attr_accessor :margin_box, :page_number, :text_formatter
+    # The font used until one is set, Helvetica unless told: PDF/A and PDF/UA documents of Gamba's own API take
+    # their default style's.
+    attr_writer :default_font_family
     attr_reader :margins, :y
 
     # Modules every new document extends itself with: a subclass starts with its parent's.
@@ -93,7 +96,7 @@ module Prawn
       tag_artifact { canvas { image(@background, scale: @background_scale, at: bounds.top_left) } } if @background
       draw_background_pdf(options)
       @y = @bounding_box.absolute_top
-      float { @on_page_create&.call(self) }
+      float { tag_artifact { @on_page_create&.call(self) } }
       header_blend_mode = page.stack.last&.blend_mode
       reopen_ext_gstate_blocks
       # The blend mode in effect on the last page, which the new one resets to Normal (ISO 32000-1 §8.4.1), once the

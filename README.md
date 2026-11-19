@@ -104,7 +104,8 @@ end
 ```
 
 Tagged PDF for screen readers: `pdf: :ua` (PDF/UA-1) and `pdf_a: :a` (PDF/A-3a) tag the boxes of Gamba's own API
-from their roles, and raise where a rule is broken (no `lang`, a figure without `alt`, a skipped heading level).
+from their roles, and raise where a rule is broken (a figure without `alt`, a list item outside a list; under `pdf: :ua`
+also no `lang`, no title, a skipped heading level).
 
 ```ruby
 Gamba.document(pdf: :ua, lang: "en", info: {Title: "Quarterly report"}) do |document|

@@ -28,11 +28,9 @@ module Prawn
       def initialize(document, name, options = {})
         name ||= options[:family]
         raise Errors::UnknownFont, "#{name} (#{options[:style] || "normal"}) is not a known font." unless BUILT_INS.include?(name)
-        if document.pdf_a?
-          raise Errors::PdfAViolation, "PDF/A embeds every font, which #{name}, a standard PDF font, cannot be: use a TrueType or OpenType font"
-        end
-        if document.pdf_ua?
-          raise Errors::PdfUaViolation, "PDF/UA embeds every font, which #{name}, a standard PDF font, cannot be: use a TrueType or OpenType font"
+        if document.pdf_a? || document.pdf_ua?
+          error, standard = document.pdf_ua? ? [Errors::PdfUaViolation, "PDF/UA"] : [Errors::PdfAViolation, "PDF/A"]
+          raise error, "#{standard} embeds every font, which #{name}, a standard PDF font, cannot be: use a TrueType or OpenType font"
         end
 
         super

@@ -47,7 +47,11 @@ module Gamba
       end
 
       page = source.pages[number - 1].last
-      check_fonts_embedded(page[:Resources], {}) if document.pdf_a?
+      if document.pdf_a? || document.pdf_ua?
+        # PDF/A and PDF/UA both embed every font; PDF/UA names the error when both apply, as everywhere else.
+        @embedding_violation = document.pdf_ua? ? [Prawn::Errors::PdfUaViolation, "PDF/UA"] : [Prawn::Errors::PdfAViolation, "PDF/A"]
+        check_fonts_embedded(page[:Resources], {})
+      end
       @form = document.ref!(form_dictionary(page, source.copier))
       @form.stream, filters = content(page[:Contents], source.copier)
       @form.data.merge!(filters)
@@ -113,7 +117,8 @@ module Gamba
       return if descriptor.is_a?(Hash) && FONT_PROGRAMS.any? { descriptor[_1] }
 
       name = @reader.resolve(font[:BaseFont])
-      raise Prawn::Errors::PdfAViolation, "PDF/A embeds every font: the page uses #{name.respond_to?(:value) ? name.value : "a font"} without its font file"
+      error, standard = @embedding_violation
+      raise error, "#{standard} embeds every font: the page uses #{name.respond_to?(:value) ? name.value : "a font"} without its font file"
     end
   end
 end

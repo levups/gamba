@@ -2,10 +2,6 @@
 
 require_relative "test_helper"
 require_relative "support/pdf_objects"
-require "base64"
-require "json"
-require "open3"
-require "tempfile"
 require "prawn"
 
 # Tagged PDF, PDF/UA-1 and PDF/A-3a: a structure tree read back with qpdf, checked by veraPDF when installed
@@ -21,7 +17,7 @@ class TaggingTest < Minitest::Test
 
   def test_a_tagged_document_passes_pdf_ua_1_and_pdf_a_3a_alone_and_together
     [{pdf: :ua}, {pdf_a: :a}, {pdf: :ua, pdf_a: :a}].each do |levels|
-      pdf = report(lang: "en", info: {Title: "Quarterly report"}, **levels)
+      pdf = report(**TAGGED.slice(:lang, :info), **levels)
 
       assert_valid "ua1", pdf if levels[:pdf]
       assert_valid "3a", pdf if levels[:pdf_a]
@@ -88,7 +84,7 @@ class TaggingTest < Minitest::Test
   # PDF/A's output intent changes how a viewer renders colours: each tagged document is compared with its untagged
   # level of PDF/A, none or 3b.
   def test_tagging_moves_no_pixel
-    untagged = {lang: "en", info: {Title: "Quarterly report"}}
+    untagged = TAGGED.slice(:lang, :info)
     [[{pdf: :ua}, {}], [{pdf: :ua, pdf_a: :a}, {pdf_a: true}]].each do |tagged, plain|
       expected = pixels(report(**untagged, **plain))
       actual = pixels(report(**untagged, **tagged))
@@ -145,6 +141,59 @@ class TaggingTest < Minitest::Test
     assert_valid "ua1", document.to_s
   end
 
+  # A box that moves to the next page before drawing leaves nothing on the page it leaves: no empty sequence, and
+  # no decoration around nothing.
+  def test_a_decorated_stack_moving_to_the_next_page_leaves_its_page_as_untagged
+    pdfs = [{pdf: :ua}, {}].map do |levels|
+      document = dejavu(Gamba.document(lang: "en", info: {Title: "Report"}, **levels))
+      # Two of the paragraph's three lines fit: leaving one widow, it moves whole.
+      document.prawn.move_down(document.prawn.cursor - 36)
+      document.stack(background: "dddddd", border_width: 1, padding: 2) { |stack| stack.text "word " * 36 }
+      document.to_s
+    end
+    reader = PdfObjects.new(pdfs.first)
+
+    assert_equal 2, reader.pages.size
+    assert_nil reader.marked_content_problem
+    refute_match(/\bre\b|BDC|BMC/, reader.content(reader.pages.first))
+    assert_equal pixels(pdfs.last), pixels(pdfs.first)
+  end
+
+  def test_tables_in_a_figure_and_in_a_cell_are_tagged_validly
+    document = dejavu(Gamba.document(**TAGGED))
+    document.stack(role: :figure, alt: "Totals by customer") { |figure| figure.table([{name: "alice", total: "$1.00"}]) }
+    document.table([{name: "alice", detail: [%w[a b], %w[c d]]}])
+    pdf = document.to_s
+
+    assert_nil PdfObjects.new(pdf).marked_content_problem
+    assert_valid "ua1", pdf
+    assert_valid "3a", pdf
+  end
+
+  def test_the_default_style_font_is_found_when_first_used_and_keeps_waiting_boxes_waiting
+    document = Gamba.document(pdf_a: true)
+    document.style :default, font: "DejaVu"
+    document.register_font "DejaVu", normal: "#{DATA_DIRECTORY}/fonts/DejaVuSans.ttf", bold: "#{DATA_DIRECTORY}/fonts/DejaVuSans-Bold.ttf"
+    document.table([{name: "alice"}])
+
+    # Helvetica, Prawn's default, would raise PdfAViolation: the table is measured and drawn in DejaVu Sans.
+    assert document.to_s.start_with?("%PDF")
+    kept = Gamba.document { |plain| plain.text "Heading", keep_with_next: true }
+    kept.style :default, size: 9
+    assert kept.instance_variable_get(:@kept), "a style placed the box waiting for the next one"
+  end
+
+  def test_lists_hold_list_items_and_imported_pages_embed_their_fonts
+    document = dejavu(Gamba.document(**TAGGED.except(:pdf_a)))
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /list item in a list/) { document.text "Alone", role: :list_item }
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /only list items in a list/) do
+      document.stack(role: :list) { |list| list.text "Not an item" }
+    end
+    helvetica = Prawn::Document.new { text "Letterhead" }.render
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /PDF\/UA embeds every font/) { document.pdf_page(helvetica, alt: "Letterhead") }
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /outside any tagged box/) { document.prawn.make_cell("x").draw }
+  end
+
   private
 
   def report(**options)
@@ -175,10 +224,7 @@ class TaggingTest < Minitest::Test
   def assert_valid(flavour, pdf)
     require_verapdf
 
-    with_file(pdf) do |path|
-      report, = Open3.capture2e("verapdf", "--flavour", flavour, "--format", "text", path)
-      assert report.start_with?("PASS"), report
-    end
+    assert_nil Gamba::PdfCheck.pdf_a_failure(pdf, flavour:)
   end
 
   def assert_raises_with(error, message, &)
@@ -187,20 +233,11 @@ class TaggingTest < Minitest::Test
   end
 
   def pixels(pdf)
-    with_file(pdf) do |path|
+    Gamba::PdfCheck.with_path(pdf) do |path|
       Dir.mktmpdir do |directory|
         system("mutool", "draw", "-q", "-r", "36", "-o", File.join(directory, "%03d.png"), path, exception: true)
         Dir[File.join(directory, "*.png")].sort.map { File.binread(_1) }
       end
-    end
-  end
-
-  def with_file(pdf)
-    Tempfile.create(["tagged", ".pdf"]) do |file|
-      file.binmode
-      file.write(pdf)
-      file.flush
-      yield file.path
     end
   end
 
