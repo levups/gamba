@@ -83,8 +83,8 @@ class LayoutFuzzTest < Minitest::Test
         PdfObjects.new(eval(tagged_source, binding, "tree.rb").to_s).marked_content_problem # rubocop:disable Security/Eval
       rescue Prawn::Errors::CannotFit
         nil
-      rescue Prawn::Errors::PdfUaViolation => error
-        error.message
+      rescue Prawn::Errors::PdfUaViolation => exception
+        exception.message
       end
       next unless problem
 

@@ -169,6 +169,8 @@ module Gamba
         accepted = self.class::ROLES + (self.class::DEFAULT_ROLE ? [] : [nil])
         raise ArgumentError, "role is #{role.inspect}: #{self.class::KIND} takes #{self.class::ROLES.map(&:inspect).join(", ")}" unless accepted.include?(role)
         raise ArgumentError, "alt is the alternative text of a figure: give it with role: :figure, not #{role.inspect}" if alt && role != :figure
+        raise ArgumentError, "alt is #{alt.inspect}: give the text a reader hears in place of the figure" if alt && !(alt.is_a?(String) && alt.match?(/\S/))
+        raise ArgumentError, "lang is #{lang.inspect}: give a language tag, \"fr\" or \"en-GB\"" if lang && !(lang.is_a?(String) && lang.match?(Gamba::Tagging::LANGUAGE_TAG))
 
         @width = width
         @grow = grow

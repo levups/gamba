@@ -126,9 +126,13 @@ module Gamba
     end
 
     def check_tagging_options(options)
+      lang = options[:lang]
+      if lang && !(lang.is_a?(String) && lang.match?(Tagging::LANGUAGE_TAG))
+        raise ArgumentError, "lang is #{lang.inspect}: give a language tag, \"fr\" or \"en-GB\""
+      end
       return unless @pdf_ua
 
-      unless options[:lang]
+      unless lang
         raise Prawn::Errors::PdfUaViolation, 'PDF/UA documents say their language, for screen readers to speak it: lang: "en"'
       end
       return if options.dig(:info, :Title)
@@ -140,15 +144,12 @@ module Gamba
       tagged? && @marks.none? { _1.element.nil? }
     end
 
+    # Boxes check their alt and lang when made (Gamba::Layout::Node): here a figure must have an alt.
     def check_text_attributes(type, attributes)
       alt = attributes[:Alt]
       if type == :Figure && !(alt.is_a?(String) && alt.match?(/\S/))
         raise tagging_violation, "#{tagging_standard} gives every figure an alternative text: alt: \"…\", not #{alt.inspect}"
       end
-      lang = attributes[:Lang]
-      return if lang.nil? || (lang.is_a?(String) && lang.match?(LANGUAGE_TAG))
-
-      raise ArgumentError, "lang is #{lang.inspect}: give a language tag, \"fr\" or \"en-GB\""
     end
 
     # A list holds list items only, and a list item sits in a list. type is nil for content marked in the current

@@ -52,6 +52,7 @@ module Gamba
         @embedding_violation = document.pdf_ua? ? [Prawn::Errors::PdfUaViolation, "PDF/UA"] : [Prawn::Errors::PdfAViolation, "PDF/A"]
         check_fonts_embedded(page[:Resources], {})
       end
+      check_no_marked_content(page[:Contents], document) if document.tagged?
       @form = document.ref!(form_dictionary(page, source.copier))
       @form.stream, filters = content(page[:Contents], source.copier)
       @form.data.merge!(filters)
@@ -87,6 +88,16 @@ module Gamba
       return [+streams.first.data, copier.copy(streams.first.dictionary.slice(:Filter, :DecodeParms))] if streams.one?
 
       [streams.map { @reader.decoded(_1) }.join("\n"), {}]
+    end
+
+    # The page is drawn as one figure or artifact: marked content of its own would nest in it, which tagged PDF
+    # forbids, and its MCIDs would point at a structure tree left behind.
+    def check_no_marked_content(contents, document)
+      streams = Array(@reader.resolve(contents)).map { @reader.resolve(_1) }.grep(PDF::Core::Reader::Stream)
+      return unless streams.any? { @reader.decoded(_1).match?(/(?:\A|\s)(?:BDC|BMC)\s/) }
+
+      error, standard = document.pdf_ua? ? [Prawn::Errors::PdfUaViolation, "PDF/UA"] : [Prawn::Errors::PdfAViolation, "PDF/A-3a"]
+      raise error, "#{standard} cannot import a page that has marked content of its own, a page of a tagged PDF: Gamba does not merge structure trees yet"
     end
 
     # PDF/A wants every font's program in the file: a page that leaves one to the viewer raises.

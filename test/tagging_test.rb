@@ -193,8 +193,13 @@ class TaggingTest < Minitest::Test
     assert_raises_with(Prawn::Errors::PdfUaViolation, /PDF\/UA embeds every font/) { document.pdf_page(helvetica, alt: "Letterhead") }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /outside any tagged box/) { document.prawn.make_cell("x").draw }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /annotations and links/) { document.prawn.link_annotation([0, 0, 10, 10], A: {S: :URI}) }
-    assert_raises_with(Prawn::Errors::PdfUaViolation, /not " "/) { document.image "#{DATA_DIRECTORY}/images/dice.png", alt: " " }
-    assert_raises_with(ArgumentError, /language tag/) { document.text "Bonjour", lang: :fr }
+    assert_raises_with(ArgumentError, /alt is " "/) { document.image "#{DATA_DIRECTORY}/images/dice.png", alt: " " }
+    assert_raises_with(ArgumentError, /language tag/) { Gamba.document.text "Bonjour", lang: :fr }
+    assert_raises_with(ArgumentError, /language tag/) { Gamba.document(**TAGGED, lang: "en_US") }
+    tagged_page = document.to_s
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /marked content of its own/) do
+      dejavu(Gamba.document(**TAGGED)).pdf_page(tagged_page, alt: "A tagged page")
+    end
     assert_raises_with(Prawn::Errors::PdfUaViolation, /PDF\/UA metadata/) { Gamba.document(**TAGGED, info: {Title: "A\u0001B"}).to_s }
     refute Prawn::Document.new(pdf: false).tagged?
   end
