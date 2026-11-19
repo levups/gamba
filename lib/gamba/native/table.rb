@@ -122,6 +122,10 @@ module Gamba
       def table(prawn, width)
         return @table if @table_width == width
 
+        @styles.check_face(font, Styles.font_style(@header[:weight], @header[:italic]), "; or header: {weight: :normal}") if @header
+        @columns.each_value { |options| @styles.check_face(font, Styles.font_style(options[:weight], options[:italic])) }
+        # Its one face is its regular: Prawn finds no family to look :normal up in.
+        @single_face = font && !prawn.font_families.key?(font.to_s)
         options = prawn_options(width)
         @table = within(prawn, prawn.bounds.absolute_left, width) do
           in_font(prawn) do
@@ -140,13 +144,16 @@ module Gamba
       # style unless the cell names one: built and drawn in the table's font, its cells fit what they draw whatever
       # the document is in. A cell in another font is measured in it (Prawn::Table::Cell#sized_in_its_font=).
       def in_font(prawn)
-        font = @cell.fetch(:font) { @styles.cell_defaults[:font] }
         return yield unless font
 
         prawn.save_font do
           prawn.font(font)
           yield
         end
+      end
+
+      def font
+        @cell.fetch(:font) { @styles.cell_defaults[:font] }
       end
 
       def prawn_options(width)
@@ -165,7 +172,8 @@ module Gamba
 
       def style(cells, options)
         style = prawn_cell_style(options.except(:weight, :italic))
-        style[:font_style] = Styles.font_style(options[:weight], options[:italic]) if options[:weight] || options[:italic]
+        font_style = Styles.font_style(options[:weight], options[:italic]) if options[:weight] || options[:italic]
+        style[:font_style] = font_style if font_style && !(font_style == :normal && @single_face)
         cells.style(style)
       end
 

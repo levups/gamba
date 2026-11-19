@@ -225,6 +225,18 @@ class NativeDocumentTest < Minitest::Test
     assert_operator glyphs(native.to_s).last[3], :<, glyphs(prawn.render).last[3]
   end
 
+  # Prawn raised BadFontFamily, which names neither the font nor the face.
+  def test_a_font_given_by_its_file_has_no_bold_and_says_so
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
+    text = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: FONT, weight: :bold } }
+    assert_includes text.message, "is a single face, without bold: register it with its faces"
+    table = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}) } } }
+    assert_includes table.message, "or header: {weight: :normal}"
+    regular = Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}, header: {weight: :normal}) } }
+    assert_equal "SkuSKU1", glyphs(regular.to_s).map(&:first).join
+  end
+
   def test_a_registered_font_can_turn_its_features_off
     skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
     native = Gamba.document do |document|
