@@ -118,11 +118,12 @@ class TaggingTest < Minitest::Test
   def test_what_breaks_the_rules_raises_where_it_is_written
     assert_raises_with(Prawn::Errors::PdfUaViolation, /lang: "en"/) { Gamba.document(pdf: :ua, info: {Title: "Report"}) }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /Title/) { Gamba.document(pdf: :ua, lang: "en") }
-    [" ", "\u3000", "\u200B", "\uFEFF\u2060", false, :Report, "\xFF".b].each do |title|
+    [" ", "\u3000", "\u200B", "\uFEFF\u2060", false, :Report, "\xFF".b, (+"Report \xFF").force_encoding(Encoding::UTF_8)].each do |title|
       assert_raises_with(Prawn::Errors::PdfUaViolation, /Title/) { Gamba.document(pdf: :ua, lang: "en", info: {Title: title}) }
     end
     assert Gamba.document(pdf: :ua, lang: "fr", info: {Title: "Résumé".encode(Encoding::ISO_8859_1)}).prawn.tagged?
     assert_raises_with(ArgumentError, /alt is "\u200B"/) { Gamba.document.image "#{DATA_DIRECTORY}/images/dice.png", alt: "\u200B" }
+    assert Gamba.document.image("#{DATA_DIRECTORY}/images/dice.png", alt: "\xC3\xA9".b) # UTF-8 bytes, as File.binread reads them
     assert_raises_with(ArgumentError, /:ua is the only/) { Prawn::Document.new(pdf: :ub) }
     assert_raises_with(ArgumentError, /:a for PDF\/A-3a/) { Prawn::Document.new(pdf_a: :u) }
     assert_raises_with(Prawn::Errors::PdfUaViolation, /standard PDF font/) { Gamba.document(**TAGGED.except(:pdf_a)) { _1.text "Hello" } }

@@ -49,9 +49,13 @@ module Gamba
     # Something besides spaces and invisible format characters (zero-width space, byte order mark…).
     VISIBLE = /[^[:space:]\p{Cf}]/
 
-    # Text a reader sees or hears: a title, an alt. A string in another encoding counts if it converts to UTF-8.
+    # Text a reader sees or hears: a title, an alt. A string in another encoding counts if it converts to UTF-8,
+    # and binary bytes if they are UTF-8, as File.binread returns them.
     def self.visible_text?(value)
-      value.is_a?(String) && value.encode(Encoding::UTF_8).scrub.match?(VISIBLE)
+      return false unless value.is_a?(String)
+
+      value = value.dup.force_encoding(Encoding::UTF_8) if value.encoding == Encoding::BINARY
+      value.valid_encoding? && value.encode(Encoding::UTF_8).match?(VISIBLE)
     rescue EncodingError
       false
     end
