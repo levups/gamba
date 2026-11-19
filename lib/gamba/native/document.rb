@@ -115,7 +115,7 @@ module Gamba
     def place(box)
       bounds = @prawn.bounds
       cursor = Layout::Cursor.new(@prawn)
-      box.flow(@prawn, cursor, bounds.absolute_left, [box.width || bounds.width, bounds.width].min)
+      box.flow_tagged(@prawn, cursor, bounds.absolute_left, [box.width || bounds.width, bounds.width].min)
       @prawn.y = cursor.y
     end
   end

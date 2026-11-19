@@ -126,23 +126,6 @@ module Gamba
       end
     end
 
-    # In a tagged document, a box draws within the structure element of its role (Gamba::Tagging), once: its
-    # flow paints it, and a subclass calls its parent class.
-    module Tagged
-      def paint(prawn, ...)
-        return super unless prawn.tagged? && !@in_tag
-
-        tagged(prawn) { super }
-      end
-
-      # Parameters spelled out, unlike paint's: forwarding with ... allocates an Array on each call, tagged or not.
-      def flow(prawn, cursor, left, width)
-        return super unless prawn.tagged? && !@in_tag
-
-        tagged(prawn) { super }
-      end
-    end
-
     # A box. Its role says what it is to a reader, for tagged PDF: a heading of a level, a paragraph, a list and
     # its items, a table, a figure with its alternative text, or an artifact, which only decorates the page. lang
     # is the language of its text, when it differs from the document's.
@@ -157,12 +140,6 @@ module Gamba
       }.freeze
 
       attr_reader :width, :grow, :keep_with_next, :role, :alt, :lang
-
-      def self.inherited(subclass)
-        super
-        subclass.prepend(Tagged)
-      end
-      prepend Tagged
 
       def initialize(width: nil, grow: nil, keep_with_next: false, role: self.class::DEFAULT_ROLE, alt: nil, lang: nil)
         raise ArgumentError, "width and grow exclude each other: a box is as wide as told, or shares what is left" if width && grow
@@ -190,6 +167,20 @@ module Gamba
         height(prawn, width)
       end
 
+      # What a container or the document calls: in a tagged document, the box flows or is painted within its
+      # structure element (Gamba::Tagging), or as an artifact.
+      def flow_tagged(prawn, cursor, left, width)
+        return flow(prawn, cursor, left, width) unless prawn.tagged?
+
+        tag(prawn) { flow(prawn, cursor, left, width) }
+      end
+
+      def paint_tagged(prawn, left, top, width, stretched_height = nil)
+        return paint_stretched(prawn, left, top, width, stretched_height) unless prawn.tagged?
+
+        tag(prawn) { paint_stretched(prawn, left, top, width, stretched_height) }
+      end
+
       # A box that cannot be split goes to the next page when the rest of this one is too short for it.
       def flow(prawn, cursor, left, width)
         height = height(prawn, width)
@@ -204,15 +195,13 @@ module Gamba
 
       private
 
-      def relative(prawn, left, top)
-        [left - prawn.bounds.absolute_left, top - prawn.bounds.absolute_bottom]
+      # Only a container in a line of a grid is stretched to the line's height.
+      def paint_stretched(prawn, left, top, width, stretched_height)
+        stretched_height ? paint(prawn, left, top, width, stretched_height) : paint(prawn, left, top, width)
       end
 
-      def tagged(prawn, &)
-        @in_tag = true
-        tag(prawn, &)
-      ensure
-        @in_tag = false
+      def relative(prawn, left, top)
+        [left - prawn.bounds.absolute_left, top - prawn.bounds.absolute_bottom]
       end
 
       # Without a role, a box makes no element unless it says its language; a list item's content goes in its body.
@@ -693,7 +682,7 @@ module Gamba
         child_top = top - @padding_top
         @children.each do |child|
           child_width = child_width(child, width)
-          child.paint(prawn, left + @padding_left, child_top, child_width)
+          child.paint_tagged(prawn, left + @padding_left, child_top, child_width)
           child_top -= child.height(prawn, child_width) + @gap
         end
       end
@@ -726,7 +715,7 @@ module Gamba
         @children.each_with_index do |child, index|
           cursor.y -= @gap unless index.zero? || cursor.at_page_top?
           keep_with_what_follows(prawn, cursor, width, index)
-          child.flow(prawn, cursor, left + @padding_left, child_width(child, width))
+          child.flow_tagged(prawn, cursor, left + @padding_left, child_width(child, width))
         end
         # The bottom padding of a plain stack ends with the page, so that a decorated stack holding it is not drawn
         # past the page. A decorated stack's own is kept clear on every page, and the gap below its last line ends
@@ -792,7 +781,7 @@ module Gamba
 
       def paint_children(prawn, child_left, top, width)
         @children.zip(child_widths(width)) do |child, child_width|
-          child.paint(prawn, child_left, top - @padding_top, child_width)
+          child.paint_tagged(prawn, child_left, top - @padding_top, child_width)
           child_left += child_width + @gap
         end
       end
@@ -888,9 +877,9 @@ module Gamba
           line_height = height(prawn, width)
           @children.zip(child_widths(width)) do |child, child_width|
             if child.is_a?(Container)
-              child.paint(prawn, child_left, top, child_width, line_height)
+              child.paint_tagged(prawn, child_left, top, child_width, line_height)
             else
-              child.paint(prawn, child_left, top, child_width)
+              child.paint_tagged(prawn, child_left, top, child_width)
             end
             child_left += child_width + @gap
           end
