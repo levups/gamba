@@ -245,12 +245,14 @@ Ruby 4.0.9:
 
 | Document | Prawn | Gamba | Allocations, Prawn → Gamba | Weight, Prawn → Gamba |
 |---|---:|---:|---:|---:|
-| Invoice, one page | 22.1 ms | 4.5 ms | 163,881 → 31,366 | 38,766 → 28,992 bytes |
-| Report, 101 pages | 559.4 ms | 216.0 ms | 3,350,853 → 2,089,008 | 207,815 → 164,924 bytes |
-| Catalog, 1,000 table rows | 544.9 ms | 265.6 ms | 3,979,977 → 2,078,343 | 147,731 → 134,082 bytes |
+| Invoice, one page | 22.5 ms | 5.2 ms | 163,879 → 26,718 | 38,766 → 28,990 bytes |
+| Report, 101 pages | 529.0 ms | 152.8 ms | 3,350,867 → 766,398 | 207,815 → 164,923 bytes |
+| Catalog, 1,000 table rows | 545.7 ms | 242.2 ms | 3,979,956 → 1,717,915 | 147,731 → 134,085 bytes |
 
 Files are lighter because Gamba compresses streams and packs objects together, which PDF 1.5 allows and Prawn
-doesn't do. Charts and peak memory are on the [benchmarks page](https://levups.github.io/gamba/benchmarks.html).
+doesn't do. The same documents written with Gamba's own API are measured untagged and tagged for PDF/UA: tagging
+costs up to a fifth in time and 8 to 65% in weight, the catalog's structure tree holding each of its cells. Charts and
+peak memory are on the [benchmarks page](https://levups.github.io/gamba/benchmarks.html).
 
 ## How we know the pages are the same
 

@@ -16,7 +16,7 @@ end
 
 DATA_DIRECTORY = File.expand_path("../corpus/cache/prawn/data", __dir__)
 
-# A document of Gamba's own API sees `document` and nothing else of this script.
+# A document of Gamba's own API sees `document` and this method's arguments, not the script's locals.
 def write_native(document, body, path)
   eval(body, binding, path) # rubocop:disable Security/Eval
 end
@@ -24,7 +24,8 @@ end
 document_path, iterations, standard = ARGV
 body = File.read(document_path)
 native = File.basename(File.dirname(document_path)) == "native"
-abort "Unknown standard #{standard.inspect}: pdf_ua, on a document of bench/native" if standard && !(standard == "pdf_ua" && native)
+abort "Error: unknown standard #{standard.inspect}, the only one is pdf_ua" if standard && standard != "pdf_ua"
+abort "Error: pdf_ua tags Gamba's own API, a document of bench/native, not #{document_path}" if standard && !native
 # Tagged for PDF/UA: the structure tree and its marked content, the language, the title and the XMP metadata.
 options = standard ? {pdf: :ua, lang: "en", info: {Title: File.basename(document_path, ".rb").capitalize}} : {}
 render =

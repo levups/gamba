@@ -25,14 +25,16 @@ class TaggingTest < Minitest::Test
   end
 
   def test_the_bench_examples_pass_once_tagged
-    %w[invoice report catalog].each do |name|
-      body = File.read(File.join(BENCH_DIRECTORY, "#{name}.rb"))
-      pdf = Gamba.document(**TAGGED) { |document| eval(body, binding, name) }.to_s # rubocop:disable Security/Eval
-      # As bench/run.rb renders them for the benchmarks page: PDF/UA alone.
-      ua_alone = Gamba.document(**TAGGED.except(:pdf_a)) { |document| eval(body, binding, name) }.to_s # rubocop:disable Security/Eval
+    require_verapdf
 
-      assert_valid "ua1", pdf
-      assert_valid "3a", pdf
+    %w[invoice report catalog].each do |name|
+      path = File.join(BENCH_DIRECTORY, "#{name}.rb")
+      both = render_bench(path, **TAGGED)
+      # As bench/run.rb renders them for the benchmarks page: PDF/UA alone, titled after the document.
+      ua_alone = render_bench(path, pdf: :ua, lang: "en", info: {Title: name.capitalize})
+
+      assert_valid "ua1", both
+      assert_valid "3a", both
       assert_valid "ua1", ua_alone
     end
   end
@@ -261,6 +263,15 @@ class TaggingTest < Minitest::Test
     # What PDF/A and PDF/UA documents do on their own, for untagged ones to be drawn alike.
     document.prawn.font("DejaVu")
     document
+  end
+
+  # A bench document sees `document` and nothing of the test, as in bench/run.rb.
+  def render_bench(path, **options)
+    Gamba.document(**options) { |document| eval_bench(document, File.read(path), path) }.to_s
+  end
+
+  def eval_bench(document, body, path)
+    eval(body, binding, path) # rubocop:disable Security/Eval
   end
 
   def assert_valid(flavour, pdf)

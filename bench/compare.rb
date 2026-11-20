@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 # Renders each document of bench/documents with Prawn and with Gamba, and its bench/native version with Gamba's own
-# API untagged then tagged for PDF/UA, in PROCESSES fresh YJIT processes per column, and writes the median of each measure across them (time, allocations, peak memory, file weight) to
-# docs/benchmarks.json. Peak memory varies by 20% from one process to the next: one process proves nothing.
+# API untagged then tagged for PDF/UA, in PROCESSES fresh YJIT processes per column, and writes the median of each
+# measure across them (time, allocations, peak memory, file weight) to docs/benchmarks.json. Peak memory varies by 20% from one process to the next: one process proves nothing.
 
 require "bundler"
 require "json"
@@ -21,9 +21,9 @@ def peak_memory_megabytes(time_report)
   end
 end
 
-def measure(engine, document, *options)
+def measure(engine, document, standard = nil)
   settings = Oracle::ENGINES.fetch(engine)
-  command = [*TIME_COMMAND, "bundle", "exec", "ruby", "--yjit", *settings[:load_path], File.join(__dir__, "run.rb"), document, ITERATIONS.to_s, *options]
+  command = [*TIME_COMMAND, "bundle", "exec", "ruby", "--yjit", *settings[:load_path], File.join(__dir__, "run.rb"), document, ITERATIONS.to_s, *standard]
   output, report, status = Bundler.with_unbundled_env { Open3.capture3({"BUNDLE_GEMFILE" => settings[:gemfile]}, *command) }
   return {unavailable: report.lines.find { _1.match?(/cannot load|Error/) }&.strip} unless status.success?
 
@@ -47,9 +47,9 @@ end
 # The engines take turns, so a slower moment of the machine weighs on each.
 def median_measures(document)
   columns = candidates(document)
-  samples_by_engine = columns.keys.to_h { |column| [column, []] }
-  PROCESSES.times { columns.each { |column, (engine, path, *options)| samples_by_engine[column] << measure(engine, path, *options) } }
-  samples_by_engine.transform_values do |samples|
+  samples_by_column = columns.keys.to_h { |column| [column, []] }
+  PROCESSES.times { columns.each { |column, (engine, path, standard)| samples_by_column[column] << measure(engine, path, standard) } }
+  samples_by_column.transform_values do |samples|
     unavailable = samples.find { |sample| sample[:unavailable] }
     next unavailable if unavailable
 
@@ -61,10 +61,10 @@ results = Dir[File.join(__dir__, "documents/*.rb")].sort.to_h do |document|
   [File.basename(document, ".rb"), median_measures(document)]
 end
 
-results.each do |document, measures_by_engine|
-  measures_by_engine.each do |engine, measures|
+results.each do |document, measures_by_column|
+  measures_by_column.each do |column, measures|
     summary = measures[:unavailable] ? "unavailable (#{measures[:unavailable]})" : measures.map { |name, value| "#{name} #{value}" }.join(", ")
-    puts format("%-10s %-12s %s", document, engine, summary)
+    puts format("%-10s %-12s %s", document, column, summary)
   end
 end
 File.write(File.expand_path("../docs/benchmarks.json", __dir__), JSON.pretty_generate(ruby: RUBY_DESCRIPTION, iterations: ITERATIONS, processes: PROCESSES, results:) + "\n")

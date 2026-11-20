@@ -5,80 +5,80 @@
   "results": {
     "catalog": {
       "prawn": {
-        "median_milliseconds": 569.9,
-        "allocations": 3979967,
+        "median_milliseconds": 545.7,
+        "allocations": 3979956,
         "bytes": 147731,
-        "peak_memory_megabytes": 129.8
+        "peak_memory_megabytes": 122.1
       },
       "gamba": {
-        "median_milliseconds": 235.3,
+        "median_milliseconds": 242.2,
         "allocations": 1717915,
         "bytes": 134085,
-        "peak_memory_megabytes": 177.5
+        "peak_memory_megabytes": 172.5
       },
       "gamba_native": {
-        "median_milliseconds": 262.8,
-        "allocations": 1773874,
-        "bytes": 139242,
-        "peak_memory_megabytes": 171.3
+        "median_milliseconds": 278.8,
+        "allocations": 1831934,
+        "bytes": 138087,
+        "peak_memory_megabytes": 170.6
       },
       "gamba_tagged": {
-        "median_milliseconds": 303.3,
-        "allocations": 2139190,
+        "median_milliseconds": 324.1,
+        "allocations": 2211262,
         "bytes": 228031,
-        "peak_memory_megabytes": 174.5
+        "peak_memory_megabytes": 147.3
       }
     },
     "invoice": {
       "prawn": {
-        "median_milliseconds": 21.3,
+        "median_milliseconds": 22.5,
         "allocations": 163879,
         "bytes": 38766,
-        "peak_memory_megabytes": 66.0
+        "peak_memory_megabytes": 66.5
       },
       "gamba": {
-        "median_milliseconds": 4.5,
+        "median_milliseconds": 5.2,
         "allocations": 26718,
         "bytes": 28990,
-        "peak_memory_megabytes": 50.4
+        "peak_memory_megabytes": 49.8
       },
       "gamba_native": {
-        "median_milliseconds": 5.9,
-        "allocations": 30179,
-        "bytes": 29080,
-        "peak_memory_megabytes": 56.4
+        "median_milliseconds": 5.7,
+        "allocations": 30054,
+        "bytes": 28993,
+        "peak_memory_megabytes": 56.6
       },
       "gamba_tagged": {
-        "median_milliseconds": 5.9,
-        "allocations": 35151,
+        "median_milliseconds": 6.8,
+        "allocations": 36141,
         "bytes": 31182,
-        "peak_memory_megabytes": 53.8
+        "peak_memory_megabytes": 52.8
       }
     },
     "report": {
       "prawn": {
-        "median_milliseconds": 518.8,
-        "allocations": 3350869,
+        "median_milliseconds": 529.0,
+        "allocations": 3350867,
         "bytes": 207815,
-        "peak_memory_megabytes": 80.8
+        "peak_memory_megabytes": 80.3
       },
       "gamba": {
-        "median_milliseconds": 147.8,
+        "median_milliseconds": 152.8,
         "allocations": 766398,
         "bytes": 164923,
-        "peak_memory_megabytes": 79.9
+        "peak_memory_megabytes": 74.7
       },
       "gamba_native": {
-        "median_milliseconds": 210.6,
+        "median_milliseconds": 218.8,
         "allocations": 839132,
         "bytes": 167927,
-        "peak_memory_megabytes": 69.0
+        "peak_memory_megabytes": 80.0
       },
       "gamba_tagged": {
-        "median_milliseconds": 218.9,
-        "allocations": 904471,
+        "median_milliseconds": 220.2,
+        "allocations": 904470,
         "bytes": 187764,
-        "peak_memory_megabytes": 68.5
+        "peak_memory_megabytes": 67.5
       }
     }
   }
