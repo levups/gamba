@@ -1007,7 +1007,7 @@ module Gamba
         if faces
           lacking = "#{name} is registered without #{font_style}"
         elsif %w[Symbol ZapfDingbats].include?(font.to_s)
-          raise ArgumentError, "#{name} is a standard font of one face, without #{font_style}"
+          raise ArgumentError, "#{name} is a standard font of one face, without #{font_style}#{alternative}"
         elsif Prawn::Fonts::AFM::BUILT_INS.include?(font.to_s)
           raise ArgumentError, "#{name} is one face of a standard font, without #{font_style}: name its family, " \
             "font: \"Courier\", \"Helvetica\" or \"Times-Roman\", and the weight or italic#{alternative}"

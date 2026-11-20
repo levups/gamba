@@ -80,6 +80,8 @@ class NativeDocumentTest < Minitest::Test
   end
 
   def test_a_standard_name_registered_without_bold_takes_the_standard_face_as_in_prawn
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
     document = Gamba.document { |gamba| gamba.register_font "Helvetica", normal: FONT }
     document.text "x", font: "Helvetica", weight: :bold
     document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Helvetica"}) }
@@ -299,7 +301,7 @@ class NativeDocumentTest < Minitest::Test
       end
     end
     assert_includes header.message, "registered without bold_italic"
-    refute_includes header.message, "weight: :normal"
+    assert_includes header.message, "; or header: {weight: :normal, italic: false}"
   end
 
   # Its own regular, as in Prawn: a family without one takes the style of the document around.
