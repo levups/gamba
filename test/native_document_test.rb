@@ -66,7 +66,14 @@ class NativeDocumentTest < Minitest::Test
     assert_equal [["A", "Courier", 10.0], ["B", "Courier", 18.0]], glyphs(document.to_s).map { _1.first(3) }
   end
 
-  # Prawn's table sizes its columns in the document's font: the native table sets its own around it.
+  # Prawn's table sizes its columns in the document's font: a native cell is measured in its own.
+  # Prawn's inline formatting measures without the cell's style: the bold header was sized in regular.
+  def test_an_inline_formatted_header_is_sized_in_bold_with_or_without_a_font
+    table = ->(cell) { Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1", description: "Gadget"}], cell:) { |prawn_table| prawn_table.row(0).inline_format = true } } } }
+
+    assert_equal glyphs(table.call({font: "Helvetica"}).to_s), glyphs(table.call({}).to_s)
+  end
+
   def test_a_table_sizes_its_columns_in_its_font_whatever_the_documents
     table = ->(document) { document.stack { |stack| stack.table([{sku: "SKU1", description: "Gadget, deluxe edition"}], columns: {sku: {}, description: {}}, cell: {font: "Courier"}) } }
     in_helvetica = Gamba.document { |document| document.text "Intro" }.tap(&table)
@@ -249,11 +256,38 @@ class NativeDocumentTest < Minitest::Test
     skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
 
     text = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: FONT, weight: :bold } }
-    assert_includes text.message, "is a single face, without bold: register it with its faces"
+    assert_includes text.message, "is a single face, without bold: register its faces"
     table = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}) } } }
     assert_includes table.message, "or header: {weight: :normal}"
     regular = Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}, header: {weight: :normal}) } }
     assert_equal "SkuSKU1", glyphs(regular.to_s).map(&:first).join
+  end
+
+  def test_a_face_a_font_lacks_says_what_to_name_instead
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
+    registered = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.register_font "Body", normal: FONT
+        document.text "Italic", font: "Body", italic: true
+      end
+    end
+    assert_includes registered.message, %("Body" is registered without italic: register its faces)
+    standard = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Courier-Bold", weight: :bold } }
+    assert_includes standard.message, "is one face of a standard font, without bold: name its family"
+  end
+
+  # Its own regular, as in Prawn: a family without one takes the style of the document around.
+  def test_a_family_without_a_regular_takes_the_documents_style
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
+    pdf = Prawn::Document.new do
+      font_families["BoldOnly"] = {bold: BOLD_FONT}
+      font "Times-Roman", style: :bold
+      gamba { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: "BoldOnly"}) } }
+    end
+
+    assert_equal ["DejaVuSans-Bold"], glyphs(pdf.render).map { _1[1] }.uniq
   end
 
   def test_a_registered_font_can_turn_its_features_off

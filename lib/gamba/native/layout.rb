@@ -990,16 +990,26 @@ module Gamba
       def single_face?(font)
         return false if font.nil? || @prawn.font_families.key?(font.to_s)
 
-        Prawn::Fonts::AFM::BUILT_INS.include?(font.to_s) || File.file?(font.to_s)
+        (@single_faces ||= {}).fetch(font.to_s) do |name|
+          @single_faces[name] = Prawn::Fonts::AFM::BUILT_INS.include?(name) || File.file?(name)
+        end
       end
 
-      # A single face is that face alone: Prawn raises BadFontFamily, which names neither, when it is drawn in bold
-      # or italic.
+      # A face the font lacks: Prawn raises BadFontFamily or UnknownFont, which say neither what is missing nor how to
+      # add it.
       def check_face(font, font_style, alternative = nil)
-        return if font_style.nil? || font_style == :normal || !single_face?(font)
+        return if font.nil? || font_style.nil? || font_style == :normal
 
-        raise ArgumentError, "#{font.inspect} is a single face, without #{font_style}: register it with its faces, " \
-          "document.register_font \"Name\", normal: \"Name.ttf\", #{font_style}: \"Name-#{font_style}.ttf\", then font: \"Name\"#{alternative}"
+        faces = @prawn.font_families[font.to_s]
+        return if faces&.key?(font_style) || (faces.nil? && !single_face?(font))
+
+        if Prawn::Fonts::AFM::BUILT_INS.include?(font.to_s)
+          raise ArgumentError, "#{font.inspect} is one face of a standard font, without #{font_style}: name its family, " \
+            "font: \"Courier\", \"Helvetica\" or \"Times-Roman\", and the weight or italic#{alternative}"
+        end
+        lacking = faces ? "#{font.inspect} is registered without #{font_style}" : "#{font.inspect} is a single face, without #{font_style}"
+        raise ArgumentError, "#{lacking}: register its faces, document.register_font \"Name\", normal: \"Name.ttf\", " \
+          "#{font_style}: \"Name-#{font_style}.ttf\", then font: \"Name\"#{alternative}"
       end
 
       private

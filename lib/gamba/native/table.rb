@@ -128,27 +128,24 @@ module Gamba
             style_columns(table)
             style(table.row(0), @header) if @header
             @styling&.call(table)
-            settle_faces(table, prawn.font.options[:style])
+            check_faces(table)
           end
         end
         @table_width = width
         @table
       end
 
-      # Once the styling block has had its say. A cell in a font of its own is in its regular unless it names a style,
-      # as a text is, whatever the style of the document around. A font given by its file is its own regular, which
-      # Prawn would look up in a family it does not have; asked for bold or italic, it says so.
-      def settle_faces(table, document_style)
-        regular_by_default = document_style && document_style != :normal
+      # Once the styling block has had its say: a face a cell asks for and its font lacks says so. A font given by its
+      # file is its own regular, which Prawn would look up in a family it does not have.
+      def check_faces(table)
+        bold_header = @header && @header[:weight] == :bold
         table.cells.each do |cell|
-          next unless cell.is_a?(Prawn::Table::Cell::Text) && (font = cell.font_name)
+          next unless cell.is_a?(Prawn::Table::Cell::Text) && (font = cell.font_name) && (font_style = cell.font_style)
 
-          if !@styles.single_face?(font)
-            cell.font_style ||= :normal if regular_by_default
-          elsif cell.font_style == :normal
+          if font_style == :normal && @styles.single_face?(font)
             cell.font_style = nil
           else
-            @styles.check_face(font, cell.font_style, ("; or header: {weight: :normal}" if @header && cell.row.zero? && cell.font_style == :bold))
+            @styles.check_face(font, font_style, ("; or header: {weight: :normal}" if bold_header && cell.row.zero?))
           end
         end
       end
