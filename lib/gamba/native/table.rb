@@ -141,7 +141,7 @@ module Gamba
         table.cells.each do |cell|
           next unless cell.is_a?(Prawn::Table::Cell::Text) && (font = cell.font_name) && (font_style = cell.font_style)
 
-          @styles.check_face(font, font_style, (hint.last if hint && cell.row.zero? && font_style == hint.first))
+          @styles.check_face(font, font_style, (hint.last if hint && cell.row.zero? && font_style == hint.first), in_table: true)
         end
       end
 

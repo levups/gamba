@@ -280,6 +280,11 @@ class NativeDocumentTest < Minitest::Test
     measured = Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}, header: {weight: :normal}) { |table| widths = table.cells.map(&:natural_content_width) } } }
     assert_equal "SkuSKU1", glyphs(measured.to_s).map(&:first).join
     assert widths.all?(&:positive?)
+    inherited = Prawn::Document.new do |prawn|
+      prawn.font FONT
+      prawn.gamba { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], header: {weight: :normal}) } }
+    end
+    assert_equal "SkuSKU1", glyphs(inherited.render).map(&:first).join
   end
 
   def test_a_face_a_font_lacks_says_what_to_name_instead
@@ -296,6 +301,15 @@ class NativeDocumentTest < Minitest::Test
     assert_includes standard.message, %("Courier-Bold" is one face of Courier: name the family, font: "Courier")
     oblique = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Italic", font: "Helvetica-Oblique", italic: true } }
     assert_includes oblique.message, %("Helvetica-Oblique" is one face of Helvetica)
+    in_table = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Courier-Bold"}) } } }
+    assert_includes in_table.message, %(font: "Courier", with weight or italic in its columns or header)
+    unregistered = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.prawn.font_families.delete("Courier")
+        document.text "Bold", font: "Courier", weight: :bold
+      end
+    end
+    refute_includes unregistered.message, "one face of Courier"
     symbol = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Symbol", weight: :bold } }
     assert_equal %("Symbol" is a standard font of one face, without bold), symbol.message
     path = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: Pathname(FONT), weight: :bold } }

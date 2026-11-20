@@ -111,11 +111,15 @@ module Prawn
 
         private
 
-        # A font of one face, given by its file or by a standard face's name, is its own regular: asked by name, Prawn
-        # would look it up in a family it does not have.
+        # A font of one face, given by its file or by a standard face's name, its own or the document's, is its own
+        # regular: asked by name, Prawn would look it up in a family it does not have.
         def drawn_style
           style = @text_options[:style]
-          (style == :normal && @sized_in_its_font && @font && !@pdf.font_families.key?(@font.to_s)) ? nil : style
+          (style == :normal && @sized_in_its_font && one_face?) ? nil : style
+        end
+
+        def one_face?
+          @font ? !@pdf.font_families.key?(@font.to_s) : @pdf.font.family.nil?
         end
 
         def drawn_text_options

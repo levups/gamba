@@ -997,7 +997,7 @@ module Gamba
 
       # A face the font lacks: Prawn raises BadFontFamily or UnknownFont, which say neither what is missing nor how to
       # add it.
-      def check_face(font, font_style, alternative = nil)
+      def check_face(font, font_style, alternative = nil, in_table: false)
         return if font.nil? || font_style.nil? || font_style == :normal
 
         name = font.to_s
@@ -1010,8 +1010,9 @@ module Gamba
         elsif !single_face?(font)
           return
         elsif (family = standard_family(name))
+          styled = in_table ? "with weight or italic in its columns or header" : "and the weight or italic"
           raise ArgumentError, "#{name.inspect} is one face of #{family}: name the family, font: #{family.inspect}, " \
-            "and the weight or italic#{alternative}"
+            "#{styled}#{alternative}"
         elsif Prawn::Fonts::AFM::BUILT_INS.include?(name)
           raise ArgumentError, "#{name.inspect} is a standard font of one face, without #{font_style}#{alternative}"
         else
@@ -1021,12 +1022,12 @@ module Gamba
           "#{font_style}: \"Name-#{font_style}.ttf\", then font: \"Name\"#{alternative}"
       end
 
-      # The standard family a face of Prawn's standard fonts belongs to (Courier for Courier-Bold).
-      def standard_family(name)
-        Prawn::Document::BUILT_IN_FONT_FAMILIES.find { |_family, faces| faces.value?(name) }&.first
-      end
-
       private
+
+      # Courier for Courier-Bold, while the document still has Courier.
+      def standard_family(name)
+        @prawn.font_families.find { |family, faces| family != name && faces.value?(name) }&.first
+      end
 
       def named(name)
         return {} unless name
