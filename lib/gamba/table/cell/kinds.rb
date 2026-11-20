@@ -73,7 +73,7 @@ module Prawn
         def with_font
           @pdf.save_font do
             options = {}
-            options[:style] = @text_options[:style] if @text_options[:style]
+            options[:style] = drawn_style if drawn_style
             options[:style] ||= @pdf.font.options[:style] if @pdf.font.options[:style] && !in_its_regular?
             @pdf.font(@font || @pdf.font.family, options)
             yield
@@ -95,21 +95,36 @@ module Prawn
         def text_box(extra_options = {})
           inline_format = @text_options[:inline_format]
           if inline_format
-            options = @text_options.except(:inline_format).merge(extra_options).merge(document: @pdf)
+            options = drawn_text_options.except(:inline_format).merge(extra_options).merge(document: @pdf)
             array = @pdf.text_formatter.format(@content, *(inline_format.is_a?(Array) ? inline_format : []))
             Prawn::Text::Formatted::Box.new(array, options)
           else
-            Prawn::Text::Box.new(@content, @text_options.merge(extra_options).merge(document: @pdf))
+            Prawn::Text::Box.new(@content, drawn_text_options.merge(extra_options).merge(document: @pdf))
           end
         end
 
         def styled_width_of(text)
           return @pdf.width_of(text, @text_options) unless @sized_in_its_font
 
-          with_font { @pdf.width_of(text, @text_options) }
+          with_font { @pdf.width_of(text, drawn_text_options) }
         end
 
         private
+
+        # A font of one face, given by its file or by a standard face's name, its own or the document's, is its own
+        # regular: asked by name, Prawn would look it up in a family it does not have.
+        def drawn_style
+          style = @text_options[:style]
+          (style == :normal && @sized_in_its_font && one_face?) ? nil : style
+        end
+
+        def one_face?
+          @font ? !@pdf.font_families.key?(@font.to_s) : @pdf.font.family.nil?
+        end
+
+        def drawn_text_options
+          (drawn_style == @text_options[:style]) ? @text_options : @text_options.except(:style)
+        end
 
         # A cell of Gamba's own tables in a font of its own is in its regular unless it names a style, as a text is:
         # the style of the document around is not its own. A family without a regular takes it still, as in Prawn.

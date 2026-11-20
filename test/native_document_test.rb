@@ -276,6 +276,15 @@ class NativeDocumentTest < Minitest::Test
     assert_includes table.message, "or header: {weight: :normal}"
     regular = Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}, header: {weight: :normal}) } }
     assert_equal "SkuSKU1", glyphs(regular.to_s).map(&:first).join
+    widths = nil
+    measured = Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}, header: {weight: :normal}) { |table| widths = table.cells.map(&:natural_content_width) } } }
+    assert_equal "SkuSKU1", glyphs(measured.to_s).map(&:first).join
+    assert widths.all?(&:positive?)
+    inherited = Prawn::Document.new do |prawn|
+      prawn.font FONT
+      prawn.gamba { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], header: {weight: :normal}) } }
+    end
+    assert_equal "SkuSKU1", glyphs(inherited.render).map(&:first).join
   end
 
   def test_a_face_a_font_lacks_says_what_to_name_instead
@@ -289,7 +298,41 @@ class NativeDocumentTest < Minitest::Test
     end
     assert_includes registered.message, %("Body" is registered without italic: register its faces)
     standard = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Courier-Bold", weight: :bold } }
-    assert_includes standard.message, "is one face of a standard font, without bold: name its family"
+    assert_includes standard.message, %("Courier-Bold" is one face of Courier: name the family, font: "Courier")
+    oblique = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Italic", font: "Helvetica-Oblique", italic: true } }
+    assert_includes oblique.message, %("Helvetica-Oblique" is one face of Helvetica)
+    in_table = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Courier-Bold"}) } } }
+    assert_includes in_table.message, %(font: "Courier", with weight: :bold in its columns or header)
+    unregistered = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.prawn.font_families.delete("Courier")
+        document.text "Bold", font: "Courier", weight: :bold
+      end
+    end
+    refute_includes unregistered.message, "one face of Courier"
+    regular = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.prawn.font_families.delete("Courier")
+        document.text "Bold", font: "Courier-Bold", weight: :bold
+      end
+    end
+    assert_includes regular.message, %("Courier-Bold" is one face of a standard font, without bold: register its faces)
+    overridden = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.register_font "Helvetica", normal: FONT, bold: FONT
+        document.text "Bold", font: "Helvetica-Bold", weight: :bold
+      end
+    end
+    assert_includes overridden.message, %("Helvetica-Bold" is one face of a standard font, without bold: register its faces)
+    bold_oblique = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Both", font: "Courier-Bold", italic: true } }
+    assert_includes bold_oblique.message, %(font: "Courier", with weight: :bold, italic: true)
+    single = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.prawn.font_families.update("Body" => {normal: FONT})
+        document.text "Bold", font: FONT, weight: :bold
+      end
+    end
+    assert_includes single.message, "is a single face, without bold: register its faces"
     symbol = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Symbol", weight: :bold } }
     assert_equal %("Symbol" is a standard font of one face, without bold), symbol.message
     path = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: Pathname(FONT), weight: :bold } }

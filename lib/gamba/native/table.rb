@@ -135,18 +135,13 @@ module Gamba
         @table
       end
 
-      # Once the styling block has had its say: a face a cell asks for and its font lacks says so. A font given by its
-      # file is its own regular, which Prawn would look up in a family it does not have.
+      # Once the styling block has had its say: a face a cell asks for and its font lacks says so.
       def check_faces(table)
         hint = header_hint
         table.cells.each do |cell|
           next unless cell.is_a?(Prawn::Table::Cell::Text) && (font = cell.font_name) && (font_style = cell.font_style)
 
-          if font_style == :normal && @styles.single_face?(font)
-            cell.font_style = nil
-          else
-            @styles.check_face(font, font_style, (hint.last if hint && cell.row.zero? && font_style == hint.first))
-          end
+          @styles.check_face(font, font_style, (hint.last if hint && cell.row.zero? && font_style == hint.first), in_table: true)
         end
       end
 
