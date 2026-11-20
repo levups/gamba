@@ -9,7 +9,6 @@ require_relative "../bench/native_bench"
 # (brew install verapdf), and pages identical to those of the same document untagged.
 class TaggingTest < Minitest::Test
   DATA_DIRECTORY = NativeBench::DATA_DIRECTORY
-  BENCH_DIRECTORY = File.join(Oracle::ROOT, "bench/native")
   TAGGED = {pdf: :ua, pdf_a: :a, lang: "en", info: {Title: "Quarterly report"}}.freeze
 
   def setup
@@ -26,21 +25,23 @@ class TaggingTest < Minitest::Test
   end
 
   def test_the_bench_examples_pass_once_tagged
-    require_verapdf
-
-    paths = Dir[File.join(BENCH_DIRECTORY, "*.rb")]
+    paths = Dir[File.join(NativeBench::DIRECTORY, "*.rb")]
     refute_empty paths
+    require_verapdf
 
     paths.each do |path|
       body = File.read(path)
       both = Gamba.document(**TAGGED) { |document| NativeBench.write(document, body, path) }.to_s
-      # As bench/run.rb renders them for the benchmarks page.
-      ua_alone = NativeBench.render(body, path, "pdf_ua")
 
       assert_valid "ua1", both
       assert_valid "3a", both
-      assert_valid "ua1", ua_alone
+      # As bench/run.rb renders them for the benchmarks page.
+      NativeBench::OPTIONS_BY_STANDARD.each_key { |standard| assert_valid "ua1", NativeBench.render(body, path, standard) }
     end
+  end
+
+  def test_a_bench_standard_is_one_the_bench_knows
+    assert_raises(KeyError) { NativeBench.render("", "invoice.rb", "pdf_x") }
   end
 
   def test_the_structure_follows_the_boxes_and_reads_in_their_order

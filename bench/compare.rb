@@ -9,6 +9,7 @@ require "bundler"
 require "json"
 require "open3"
 require_relative "../test/support/oracle"
+require_relative "native_bench"
 
 ITERATIONS = Integer(ENV.fetch("BENCH_ITERATIONS", "20"))
 PROCESSES = Integer(ENV.fetch("BENCH_PROCESSES", "7"))
@@ -29,8 +30,8 @@ def measure(engine, document, standard = nil)
   # The page draws every column of every document and divides by Prawn's: a failed one is a bug to fix, not a gap
   # to publish, and the first failure says so without waiting for the other runs.
   unless status.success?
-    reason = report.lines.grep(/cannot load|Error/).last&.strip || status.to_s
-    abort "#{engine} failed on #{document}#{" with #{standard}" if standard}: #{reason}. docs/benchmarks.json left as it was."
+    abort "#{engine} failed on #{document}#{" with #{standard}" if standard} (#{status}), docs/benchmarks.json left as it was. " \
+      "BUNDLE_GEMFILE=#{settings[:gemfile]} #{command.drop(TIME_COMMAND.size).join(" ")}:\n#{report.scrub}"
   end
 
   JSON.parse(output.lines.last, symbolize_names: true).merge(peak_memory_megabytes: peak_memory_megabytes(report))
@@ -43,20 +44,27 @@ end
 # What each column of the results renders: the document with Prawn's API on each engine, and with Gamba's own API
 # where bench/native has it, untagged then tagged for PDF/UA.
 def candidates(document)
-  native = File.join(__dir__, "native", File.basename(document))
+  native = File.join(NativeBench::DIRECTORY, File.basename(document))
   columns = Oracle::ENGINES.keys.to_h { |engine| [engine, [engine, document]] }
   return columns unless File.exist?(native)
 
   columns.merge("gamba_native" => ["gamba", native], "gamba_tagged" => ["gamba", native, "pdf_ua"])
 end
 
-# The columns take turns, in an order drawn again each round (seeded, so a run can be repeated): a slower moment of
-# the machine, or following a heavier column, falls on none in particular.
+# A Williams design: over as many rounds as columns, each column takes each place once and follows each other column
+# once (an even count of columns, as here), so neither a slower moment of the machine nor a heavier neighbour falls
+# on one column more than another. PROCESSES a multiple of the columns balances every round.
+def order(count, round)
+  first = [0] + (1...count).map { |step| step.odd? ? (step + 1) / 2 : count - (step / 2) }
+  first.map { |index| (index + round) % count }
+end
+
+# The columns take turns, in the order of their round.
 def median_measures(document)
   columns = candidates(document)
   samples_by_column = columns.keys.to_h { |column| [column, []] }
   PROCESSES.times do |round|
-    columns.to_a.shuffle(random: Random.new(round)).each { |column, (engine, path, standard)| samples_by_column[column] << measure(engine, path, standard) }
+    columns.to_a.values_at(*order(columns.size, round)).each { |column, (engine, path, standard)| samples_by_column[column] << measure(engine, path, standard) }
   end
   samples_by_column.transform_values do |samples|
     samples.first.keys.to_h { |name| [name, median(samples.map { |sample| sample[name] })] }
