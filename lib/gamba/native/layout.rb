@@ -1009,12 +1009,14 @@ module Gamba
           lacking = "#{name.inspect} is registered without #{font_style}"
         elsif !single_face?(font)
           return
-        elsif (family = standard_family(name))
-          styled = in_table ? "with weight or italic in its columns or header" : "and the weight or italic"
+        elsif (family = standard_family(name, font_style))
+          styled = in_table ? "with #{font_style} in its columns or header" : "with #{font_style}"
           raise ArgumentError, "#{name.inspect} is one face of #{family}: name the family, font: #{family.inspect}, " \
             "#{styled}#{alternative}"
-        elsif Prawn::Fonts::AFM::BUILT_INS.include?(name)
+        elsif %w[Symbol ZapfDingbats].include?(name)
           raise ArgumentError, "#{name.inspect} is a standard font of one face, without #{font_style}#{alternative}"
+        elsif Prawn::Fonts::AFM::BUILT_INS.include?(name)
+          lacking = "#{name.inspect} is one face of a standard font, without #{font_style}"
         else
           lacking = "#{name.inspect} is a single face, without #{font_style}"
         end
@@ -1024,9 +1026,10 @@ module Gamba
 
       private
 
-      # Courier for Courier-Bold, while the document still has Courier.
-      def standard_family(name)
-        @prawn.font_families.find { |family, faces| family != name && faces.value?(name) }&.first
+      # Courier for Courier-Bold, while the document has a Courier with the style asked.
+      def standard_family(name, font_style)
+        family, = Prawn::Document::BUILT_IN_FONT_FAMILIES.find { |_family, faces| faces.value?(name) }
+        family if @prawn.font_families[family]&.key?(font_style)
       end
 
       def named(name)

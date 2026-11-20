@@ -302,7 +302,7 @@ class NativeDocumentTest < Minitest::Test
     oblique = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Italic", font: "Helvetica-Oblique", italic: true } }
     assert_includes oblique.message, %("Helvetica-Oblique" is one face of Helvetica)
     in_table = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Courier-Bold"}) } } }
-    assert_includes in_table.message, %(font: "Courier", with weight or italic in its columns or header)
+    assert_includes in_table.message, %(font: "Courier", with bold in its columns or header)
     unregistered = assert_raises(ArgumentError) do
       Gamba.document do |document|
         document.prawn.font_families.delete("Courier")
@@ -310,6 +310,27 @@ class NativeDocumentTest < Minitest::Test
       end
     end
     refute_includes unregistered.message, "one face of Courier"
+    regular = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.prawn.font_families.delete("Courier")
+        document.text "Bold", font: "Courier-Bold", weight: :bold
+      end
+    end
+    assert_includes regular.message, %("Courier-Bold" is one face of a standard font, without bold: register its faces)
+    overridden = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.register_font "Helvetica", normal: FONT, bold: FONT
+        document.text "Bold", font: "Helvetica-Bold", weight: :bold
+      end
+    end
+    assert_includes overridden.message, %(is one face of Helvetica: name the family, font: "Helvetica", with bold)
+    single = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.prawn.font_families.update("Body" => {normal: FONT})
+        document.text "Bold", font: FONT, weight: :bold
+      end
+    end
+    assert_includes single.message, "is a single face, without bold: register its faces"
     symbol = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Symbol", weight: :bold } }
     assert_equal %("Symbol" is a standard font of one face, without bold), symbol.message
     path = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: Pathname(FONT), weight: :bold } }
