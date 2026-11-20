@@ -1009,8 +1009,7 @@ module Gamba
           lacking = "#{name.inspect} is registered without #{font_style}"
         elsif !single_face?(font)
           return
-        elsif (family, styled = standard_family(name, font_style))
-          styled = "#{styled} in its columns or header" if in_table
+        elsif (family, styled = standard_family(name, font_style, in_table))
           raise ArgumentError, "#{name.inspect} is one face of #{family}: name the family, font: #{family.inspect}, " \
             "#{styled}#{alternative}"
         elsif %w[Symbol ZapfDingbats].include?(name)
@@ -1026,17 +1025,20 @@ module Gamba
 
       private
 
-      # Courier for Courier-Bold, and the options that reach the face it would take, its own style and the one asked
-      # together, while the document still has that standard face.
-      def standard_family(name, font_style)
+      # Courier for Courier-Bold, and the options that reach the face it would take, while the document still has that
+      # standard face. Out of a table, that face joins its own style to the one asked; in a table, the header or the
+      # styling block asked the rest, so the columns take its own style alone.
+      def standard_family(name, font_style, in_table)
         family, faces = Prawn::Document::BUILT_IN_FONT_FAMILIES.find { |_family, standard| standard.value?(name) }
         return unless family
 
-        bold, italic = %w[bold italic].map { |part| [faces.key(name), font_style].any? { |style| style.to_s.include?(part) } }
+        styles = in_table ? [faces.key(name)] : [faces.key(name), font_style]
+        bold, italic = %w[bold italic].map { |part| styles.any? { |style| style.to_s.include?(part) } }
         face = Styles.font_style(bold ? :bold : nil, italic)
-        return unless @prawn.font_families.dig(family, face) == faces[face]
+        return unless @prawn.font_families.dig(family, face) == faces[face] && @prawn.font_families.dig(family, font_style)
 
-        [family, "with #{[("weight: :bold" if bold), ("italic: true" if italic)].compact.join(", ")}"]
+        options = [("weight: :bold" if bold), ("italic: true" if italic)].compact.join(", ")
+        [family, in_table ? "with #{options} in its columns" : "with #{options}"]
       end
 
       def named(name)

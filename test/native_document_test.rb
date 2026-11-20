@@ -302,7 +302,11 @@ class NativeDocumentTest < Minitest::Test
     oblique = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Italic", font: "Helvetica-Oblique", italic: true } }
     assert_includes oblique.message, %("Helvetica-Oblique" is one face of Helvetica)
     in_table = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Courier-Bold"}) } } }
-    assert_includes in_table.message, %(font: "Courier", with weight: :bold in its columns or header)
+    assert_includes in_table.message, %(font: "Courier", with weight: :bold in its columns)
+    oblique_header = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Courier-Oblique"}) } } }
+    assert_includes oblique_header.message, %(font: "Courier", with italic: true in its columns; or header: {weight: :normal})
+    followed = Gamba.document { |document| document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Courier"}, columns: {a: {italic: true}}) } }
+    assert_equal "Ab", glyphs(followed.to_s).map(&:first).join
     unregistered = assert_raises(ArgumentError) do
       Gamba.document do |document|
         document.prawn.font_families.delete("Courier")
