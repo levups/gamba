@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-# Runs inside one engine's process: `ruby bench/run.rb DOCUMENT ITERATIONS [pdf_ua]`, prints one JSON line.
+# Runs inside one engine's process, as bench/compare.rb starts it (`bundle exec ruby -Ilib bench/run.rb DOCUMENT
+# ITERATIONS [pdf_ua]` for Gamba), and prints one JSON line.
 
 require "json"
 begin
@@ -14,24 +15,18 @@ rescue LoadError
   # Documents with tables then fail on their own, reported as unavailable for this engine.
 end
 
-DATA_DIRECTORY = File.expand_path("../corpus/cache/prawn/data", __dir__)
+require_relative "native_bench"
 
-# A document of Gamba's own API sees `document` and this method's arguments, not the script's locals.
-def write_native(document, body, path)
-  eval(body, binding, path) # rubocop:disable Security/Eval
-end
+DATA_DIRECTORY = NativeBench::DATA_DIRECTORY
 
 document_path, iterations, standard = ARGV
 body = File.read(document_path)
 native = File.basename(File.dirname(document_path)) == "native"
-abort "Error: unknown standard #{standard.inspect}, the only one is pdf_ua" if standard && standard != "pdf_ua"
+abort "Error: unknown standard #{standard.inspect}, the only one is pdf_ua" if standard && !NativeBench::STANDARDS.include?(standard)
 abort "Error: pdf_ua tags Gamba's own API, a document of bench/native, not #{document_path}" if standard && !native
-# Tagged for PDF/UA: the structure tree and its marked content, the language, the title and the XMP metadata.
-options = standard ? {pdf: :ua, lang: "en", info: {Title: File.basename(document_path, ".rb").capitalize}} : {}
 render =
   if native
-    # Gamba's own API compresses unasked.
-    -> { Gamba.document(**options) { |document| write_native(document, body, document_path) }.to_s }
+    -> { NativeBench.render(body, document_path, standard) }
   else
     # Prawn compresses only when asked: compared at its lightest.
     -> { Prawn::Document.new(compress: true).tap { _1.instance_eval(body, document_path) }.render }

@@ -5,7 +5,7 @@ images and shapes. It is a faster rewrite of [Prawn](https://github.com/prawnpdf
 library for Ruby, together with its two companion gems, prawn-table and prawn-svg.
 
 Code written for Prawn 2.5 runs on Gamba unchanged and draws the same pages, down to the pixel. The difference is
-speed and size: a one-page invoice renders about five times faster and the file is a quarter lighter (see
+speed and size: a one-page invoice renders about four times faster and the file is a quarter lighter (see
 [Performance](#performance)).
 
 Website and guide: https://levups.github.io/gamba/
@@ -251,8 +251,8 @@ Ruby 4.0.9:
 
 Files are lighter because Gamba compresses streams and packs objects together, which PDF 1.5 allows and Prawn
 doesn't do. The same documents written with Gamba's own API are measured untagged and tagged for PDF/UA: tagging
-costs up to a fifth in time and 8 to 65% in weight, the catalog's structure tree holding each of its cells. Charts and
-peak memory are on the [benchmarks page](https://levups.github.io/gamba/benchmarks.html).
+costs 8 to 21% more allocations and 8 to 65% in weight, the catalog's structure tree holding each of its cells.
+Charts and peak memory are on the [benchmarks page](https://levups.github.io/gamba/benchmarks.html).
 
 ## How we know the pages are the same
 
