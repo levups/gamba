@@ -1000,22 +1000,30 @@ module Gamba
       def check_face(font, font_style, alternative = nil)
         return if font.nil? || font_style.nil? || font_style == :normal
 
-        faces = @prawn.font_families[font.to_s]
-        return if faces&.key?(font_style) || (faces.nil? ? !single_face?(font) : Prawn::Fonts::AFM::BUILT_INS.include?(font.to_s))
-
-        name = font.to_s.inspect
+        name = font.to_s
+        faces = @prawn.font_families[name]
         if faces
-          lacking = "#{name} is registered without #{font_style}"
-        elsif %w[Symbol ZapfDingbats].include?(font.to_s)
-          raise ArgumentError, "#{name} is a standard font of one face, without #{font_style}#{alternative}"
-        elsif Prawn::Fonts::AFM::BUILT_INS.include?(font.to_s)
-          raise ArgumentError, "#{name} is one face of a standard font, without #{font_style}: name its family, " \
-            "font: \"Courier\", \"Helvetica\" or \"Times-Roman\", and the weight or italic#{alternative}"
+          # A family named after a standard font falls back on it, as in Prawn.
+          return if faces.key?(font_style) || Prawn::Fonts::AFM::BUILT_INS.include?(name)
+
+          lacking = "#{name.inspect} is registered without #{font_style}"
+        elsif !single_face?(font)
+          return
+        elsif (family = standard_family(name))
+          raise ArgumentError, "#{name.inspect} is one face of #{family}: name the family, font: #{family.inspect}, " \
+            "and the weight or italic#{alternative}"
+        elsif Prawn::Fonts::AFM::BUILT_INS.include?(name)
+          raise ArgumentError, "#{name.inspect} is a standard font of one face, without #{font_style}#{alternative}"
         else
-          lacking = "#{name} is a single face, without #{font_style}"
+          lacking = "#{name.inspect} is a single face, without #{font_style}"
         end
         raise ArgumentError, "#{lacking}: register its faces, document.register_font \"Name\", normal: \"Name.ttf\", " \
           "#{font_style}: \"Name-#{font_style}.ttf\", then font: \"Name\"#{alternative}"
+      end
+
+      # The standard family a face of Prawn's standard fonts belongs to (Courier for Courier-Bold).
+      def standard_family(name)
+        Prawn::Document::BUILT_IN_FONT_FAMILIES.find { |_family, faces| faces.value?(name) }&.first
       end
 
       private

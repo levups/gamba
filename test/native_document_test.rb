@@ -276,6 +276,10 @@ class NativeDocumentTest < Minitest::Test
     assert_includes table.message, "or header: {weight: :normal}"
     regular = Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}, header: {weight: :normal}) } }
     assert_equal "SkuSKU1", glyphs(regular.to_s).map(&:first).join
+    widths = nil
+    measured = Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}, header: {weight: :normal}) { |table| widths = table.cells.map(&:natural_content_width) } } }
+    assert_equal "SkuSKU1", glyphs(measured.to_s).map(&:first).join
+    assert widths.all?(&:positive?)
   end
 
   def test_a_face_a_font_lacks_says_what_to_name_instead
@@ -289,7 +293,9 @@ class NativeDocumentTest < Minitest::Test
     end
     assert_includes registered.message, %("Body" is registered without italic: register its faces)
     standard = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Courier-Bold", weight: :bold } }
-    assert_includes standard.message, "is one face of a standard font, without bold: name its family"
+    assert_includes standard.message, %("Courier-Bold" is one face of Courier: name the family, font: "Courier")
+    oblique = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Italic", font: "Helvetica-Oblique", italic: true } }
+    assert_includes oblique.message, %("Helvetica-Oblique" is one face of Helvetica)
     symbol = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Symbol", weight: :bold } }
     assert_equal %("Symbol" is a standard font of one face, without bold), symbol.message
     path = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: Pathname(FONT), weight: :bold } }
