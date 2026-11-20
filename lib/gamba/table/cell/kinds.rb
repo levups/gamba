@@ -26,6 +26,15 @@ module Prawn
           @text_options[:style] = style
         end
 
+        # What the cell was given, before the document's font fills in: Gamba's own tables check the faces with them.
+        def font_style
+          @text_options[:style]
+        end
+
+        def font_name
+          @font
+        end
+
         def natural_content_width
           @natural_content_width ||= [styled_width_of(@content), @pdf.bounds.width].min
         end
@@ -65,7 +74,7 @@ module Prawn
           @pdf.save_font do
             options = {}
             options[:style] = @text_options[:style] if @text_options[:style]
-            options[:style] ||= @pdf.font.options[:style] if @pdf.font.options[:style]
+            options[:style] ||= @pdf.font.options[:style] if @pdf.font.options[:style] && !in_its_regular?
             @pdf.font(@font || @pdf.font.family, options)
             yield
           end
@@ -95,10 +104,21 @@ module Prawn
         end
 
         def styled_width_of(text)
-          @pdf.width_of(text, @text_options)
+          return @pdf.width_of(text, @text_options) unless @sized_in_its_font
+
+          with_font { @pdf.width_of(text, @text_options) }
         end
 
         private
+
+        # A cell of Gamba's own tables in a font of its own is in its regular unless it names a style, as a text is:
+        # the style of the document around is not its own. A family without a regular takes it still, as in Prawn.
+        def in_its_regular?
+          return false unless @sized_in_its_font && @font
+
+          faces = @pdf.font_families[@font.to_s]
+          faces.nil? || faces.key?(:normal)
+        end
 
         # A cell is laid out while the table is sized, then drawn: the layout is drawn again unless
         # before_rendering_page, the document or a truncating height changed what the cell would wrap.

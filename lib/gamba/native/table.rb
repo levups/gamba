@@ -122,19 +122,48 @@ module Gamba
       def table(prawn, width)
         return @table if @table_width == width
 
-        @table_width = width
+        options = prawn_options(width)
         @table = within(prawn, prawn.bounds.absolute_left, width) do
-          prawn.make_table(data, prawn_options(width)) do |table|
+          prawn.make_table(data, options) do |table|
             style_columns(table)
             style(table.row(0), @header) if @header
             @styling&.call(table)
+            check_faces(table)
+          end
+        end
+        @table_width = width
+        @table
+      end
+
+      # Once the styling block has had its say: a face a cell asks for and its font lacks says so. A font given by its
+      # file is its own regular, which Prawn would look up in a family it does not have.
+      def check_faces(table)
+        hint = header_hint
+        table.cells.each do |cell|
+          next unless cell.is_a?(Prawn::Table::Cell::Text) && (font = cell.font_name) && (font_style = cell.font_style)
+
+          if font_style == :normal && @styles.single_face?(font)
+            cell.font_style = nil
+          else
+            @styles.check_face(font, font_style, (hint.last if hint && cell.row.zero? && font_style == hint.first))
           end
         end
       end
 
+      # The header's own face, and how to drop it: a cell of the first row in that face may take a regular header.
+      def header_hint
+        return unless @header && (style = Styles.font_style(@header[:weight], @header[:italic])) != :normal
+
+        drops = [("weight: :normal" if @header[:weight] == :bold), ("italic: false" if @header[:italic])].compact
+        [style, "; or header: {#{drops.join(", ")}}"]
+      end
+
+      # Prawn's table measures a cell's text in the document's font and draws it in the cell's: each native cell is
+      # measured in its own (Prawn::Table::Cell#sized_in_its_font=), so it fits what it draws.
       def prawn_options(width)
         widths = @columns.each_value.map { |options| options[:width] }
-        options = {header: !@header.nil?, cell_style: prawn_cell_style({**@styles.cell_defaults, **@cell})}
+        cell_style = {sized_in_its_font: true, **prawn_cell_style({**@styles.cell_defaults, **@cell})}
+        options = {header: !@header.nil?, cell_style:}
         options[:row_colors] = @stripes if @stripes
         options[:column_widths] = widths.each_with_index.to_h { |column_width, index| [index, column_width] }.compact
         options[:width] = width unless widths.all?
