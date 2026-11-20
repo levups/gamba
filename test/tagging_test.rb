@@ -3,6 +3,7 @@
 require_relative "test_helper"
 require_relative "support/pdf_objects"
 require "prawn"
+require_relative "../bench/native_bench"
 
 # Tagged PDF, PDF/UA-1 and PDF/A-3a: a structure tree read back with qpdf, checked by veraPDF when installed
 # (brew install verapdf), and pages identical to those of the same document untagged.
@@ -25,12 +26,17 @@ class TaggingTest < Minitest::Test
   end
 
   def test_the_bench_examples_pass_once_tagged
-    %w[invoice report catalog].each do |name|
-      body = File.read(File.join(BENCH_DIRECTORY, "#{name}.rb"))
-      pdf = Gamba.document(**TAGGED) { |document| eval(body, binding, name) }.to_s # rubocop:disable Security/Eval
+    require_verapdf
 
-      assert_valid "ua1", pdf
-      assert_valid "3a", pdf
+    Dir[File.join(BENCH_DIRECTORY, "*.rb")].each do |path|
+      body = File.read(path)
+      both = Gamba.document(**TAGGED) { |document| NativeBench.write(document, body, path) }.to_s
+      # As bench/run.rb renders them for the benchmarks page.
+      ua_alone = NativeBench.render(body, path, "pdf_ua")
+
+      assert_valid "ua1", both
+      assert_valid "3a", both
+      assert_valid "ua1", ua_alone
     end
   end
 

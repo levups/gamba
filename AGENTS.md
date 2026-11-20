@@ -16,7 +16,7 @@ FUZZ_SEED=42 FUZZ_CASES=500 bundle exec ruby -Itest test/fuzz_test.rb
 INPUT_FUZZ_SEED=42 INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb
 LAYOUT_FUZZ_SEED=42 LAYOUT_FUZZ_CASES=1000 bundle exec ruby -Itest test/layout_fuzz_test.rb
 bundle exec rubocop
-bundle exec rake bench                                          # Prawn against Gamba, writes docs/benchmarks.json
+bundle exec rake bench                                          # Prawn against Gamba, and Gamba tagged, writes docs/benchmarks.json
 ```
 
 CI also runs `ruby-head` and `truffleruby-head`, and the oracle and the three fuzzers on a fresh seed.
