@@ -21,9 +21,9 @@ DATA_DIRECTORY = NativeBench::DATA_DIRECTORY
 
 document_path, iterations, standard = ARGV
 body = File.read(document_path)
-native = File.basename(File.dirname(document_path)) == "native"
-abort "Error: unknown standard #{standard.inspect}: #{NativeBench::OPTIONS_BY_STANDARD.keys.join(", ")}" if standard && !NativeBench::OPTIONS_BY_STANDARD.key?(standard)
-abort "Error: #{standard} tags Gamba's own API, a document of bench/native, not #{document_path}" if standard && !native
+native = File.expand_path(File.dirname(document_path)) == NativeBench::DIRECTORY
+abort "Unknown standard #{standard.inspect}: #{NativeBench::OPTIONS_BY_STANDARD.keys.join(", ")}" if standard && !NativeBench::OPTIONS_BY_STANDARD.key?(standard)
+abort "#{standard} tags Gamba's own API, a document of bench/native, not #{document_path}" if standard && !native
 render =
   if native
     -> { NativeBench.render(body, document_path, standard) }

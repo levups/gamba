@@ -5,7 +5,7 @@ module NativeBench
   DIRECTORY = File.expand_path("native", __dir__)
   # Tagged for PDF/UA: the structure tree and its marked content, the language and the XMP metadata; options adds
   # the title.
-  OPTIONS_BY_STANDARD = {"pdf_ua" => {pdf: :ua, lang: "en"}}.freeze
+  OPTIONS_BY_STANDARD = {"pdf_ua" => {pdf: :ua, lang: "en"}.freeze}.freeze
   # Prawn's fonts and images, which the documents draw.
   DATA_DIRECTORY = File.expand_path("../corpus/cache/prawn/data", __dir__)
 

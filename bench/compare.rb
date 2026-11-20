@@ -8,6 +8,7 @@
 require "bundler"
 require "json"
 require "open3"
+require "shellwords"
 require_relative "../test/support/oracle"
 require_relative "native_bench"
 
@@ -31,14 +32,17 @@ def measure(engine, document, standard = nil)
   # to publish, and the first failure says so without waiting for the other runs.
   unless status.success?
     abort "#{engine} failed on #{document}#{" with #{standard}" if standard} (#{status}), docs/benchmarks.json left as it was. " \
-      "BUNDLE_GEMFILE=#{settings[:gemfile]} #{command.drop(TIME_COMMAND.size).join(" ")}:\n#{report.scrub}"
+      "BUNDLE_GEMFILE=#{Shellwords.escape(settings[:gemfile])} #{Shellwords.join(command.drop(TIME_COMMAND.size))}:\n#{report.scrub}"
   end
 
   JSON.parse(output.lines.last, symbolize_names: true).merge(peak_memory_megabytes: peak_memory_megabytes(report))
 end
 
+# Of an even count, the mean of the two middle values, so that no column leans to its slower half.
 def median(values)
-  values.sort[values.size / 2]
+  sorted = values.sort
+  middle = sorted.size / 2
+  sorted.size.odd? ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2.0
 end
 
 # What each column of the results renders: the document with Prawn's API on each engine, and with Gamba's own API
@@ -53,13 +57,13 @@ end
 
 # A Williams design: over as many rounds as columns, each column takes each place once and follows each other column
 # once (an even count of columns, as here), so neither a slower moment of the machine nor a heavier neighbour falls
-# on one column more than another. PROCESSES a multiple of the columns balances every round.
+# on one column more than another. Only a multiple of the columns balances all the rounds: 7, the default the site's
+# numbers were measured with, repeats the first three orders.
 def order(count, round)
   first = [0] + (1...count).map { |step| step.odd? ? (step + 1) / 2 : count - (step / 2) }
   first.map { |index| (index + round) % count }
 end
 
-# The columns take turns, in the order of their round.
 def median_measures(document)
   columns = candidates(document)
   samples_by_column = columns.keys.to_h { |column| [column, []] }
