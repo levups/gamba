@@ -26,7 +26,12 @@ def measure(engine, document, standard = nil)
   settings = Oracle::ENGINES.fetch(engine)
   command = [*TIME_COMMAND, "bundle", "exec", "ruby", "--yjit", *settings[:load_path], File.join(__dir__, "run.rb"), document, ITERATIONS.to_s, *standard]
   output, report, status = Bundler.with_unbundled_env { Open3.capture3({"BUNDLE_GEMFILE" => settings[:gemfile]}, *command) }
-  return {unavailable: (report.lines.find { _1.match?(/cannot load|Error/) } || "exit #{status.exitstatus}").strip} unless status.success?
+  # The page draws every column of every document and divides by Prawn's: a failed one is a bug to fix, not a gap
+  # to publish, and the first failure says so without waiting for the other runs.
+  unless status.success?
+    reason = report.lines.grep(/cannot load|Error/).last&.strip || status.to_s
+    abort "#{engine} failed on #{document}#{" with #{standard}" if standard}: #{reason}. docs/benchmarks.json left as it was."
+  end
 
   JSON.parse(output.lines.last, symbolize_names: true).merge(peak_memory_megabytes: peak_memory_megabytes(report))
 end
@@ -45,18 +50,15 @@ def candidates(document)
   columns.merge("gamba_native" => ["gamba", native], "gamba_tagged" => ["gamba", native, "pdf_ua"])
 end
 
-# The columns take turns, each round starting one further, so a slower moment of the machine, or following
-# another column, weighs on each alike.
+# The columns take turns, in an order drawn again each round (seeded, so a run can be repeated): a slower moment of
+# the machine, or following a heavier column, falls on none in particular.
 def median_measures(document)
   columns = candidates(document)
   samples_by_column = columns.keys.to_h { |column| [column, []] }
   PROCESSES.times do |round|
-    columns.to_a.rotate(round).each { |column, (engine, path, standard)| samples_by_column[column] << measure(engine, path, standard) }
+    columns.to_a.shuffle(random: Random.new(round)).each { |column, (engine, path, standard)| samples_by_column[column] << measure(engine, path, standard) }
   end
   samples_by_column.transform_values do |samples|
-    unavailable = samples.find { |sample| sample[:unavailable] }
-    next unavailable if unavailable
-
     samples.first.keys.to_h { |name| [name, median(samples.map { |sample| sample[name] })] }
   end
 end
@@ -67,11 +69,7 @@ end
 
 results.each do |document, measures_by_column|
   measures_by_column.each do |column, measures|
-    summary = measures[:unavailable] ? "unavailable (#{measures[:unavailable]})" : measures.map { |name, value| "#{name} #{value}" }.join(", ")
-    puts format("%-10s %-12s %s", document, column, summary)
+    puts format("%-10s %-12s %s", document, column, measures.map { |name, value| "#{name} #{value}" }.join(", "))
   end
 end
-# The page draws Gamba's columns for every document: one that failed is a bug to fix, not a gap to publish.
-failed = results.flat_map { |document, measures| measures.select { |column, measure| column.start_with?("gamba") && measure[:unavailable] }.keys.map { "#{document} #{_1}" } }
-abort "Gamba failed on #{failed.join(", ")}: docs/benchmarks.json left as it was" if failed.any?
 File.write(File.expand_path("../docs/benchmarks.json", __dir__), JSON.pretty_generate(ruby: RUBY_DESCRIPTION, iterations: ITERATIONS, processes: PROCESSES, results:) + "\n")

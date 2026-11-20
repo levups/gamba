@@ -12,7 +12,7 @@ end
 begin
   require "prawn/table"
 rescue LoadError
-  # Documents with tables then fail on their own, reported as unavailable for this engine.
+  # Documents with tables then fail on their own, and bench/compare.rb stops there.
 end
 
 require_relative "native_bench"
@@ -22,7 +22,7 @@ DATA_DIRECTORY = NativeBench::DATA_DIRECTORY
 document_path, iterations, standard = ARGV
 body = File.read(document_path)
 native = File.basename(File.dirname(document_path)) == "native"
-abort "Error: unknown standard #{standard.inspect}, the only one is pdf_ua" if standard && !NativeBench::STANDARDS.include?(standard)
+abort "Error: unknown standard #{standard.inspect}, the only one is pdf_ua" if standard && !NativeBench::STANDARDS.key?(standard)
 abort "Error: pdf_ua tags Gamba's own API, a document of bench/native, not #{document_path}" if standard && !native
 render =
   if native

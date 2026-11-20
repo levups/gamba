@@ -8,7 +8,7 @@ require_relative "../bench/native_bench"
 # Tagged PDF, PDF/UA-1 and PDF/A-3a: a structure tree read back with qpdf, checked by veraPDF when installed
 # (brew install verapdf), and pages identical to those of the same document untagged.
 class TaggingTest < Minitest::Test
-  DATA_DIRECTORY = File.join(Oracle::ROOT, "corpus/cache/prawn/data")
+  DATA_DIRECTORY = NativeBench::DATA_DIRECTORY
   BENCH_DIRECTORY = File.join(Oracle::ROOT, "bench/native")
   TAGGED = {pdf: :ua, pdf_a: :a, lang: "en", info: {Title: "Quarterly report"}}.freeze
 
@@ -28,7 +28,10 @@ class TaggingTest < Minitest::Test
   def test_the_bench_examples_pass_once_tagged
     require_verapdf
 
-    Dir[File.join(BENCH_DIRECTORY, "*.rb")].each do |path|
+    paths = Dir[File.join(BENCH_DIRECTORY, "*.rb")]
+    refute_empty paths
+
+    paths.each do |path|
       body = File.read(path)
       both = Gamba.document(**TAGGED) { |document| NativeBench.write(document, body, path) }.to_s
       # As bench/run.rb renders them for the benchmarks page.

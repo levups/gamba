@@ -2,13 +2,13 @@
 
 # How bench/run.rb renders a document of bench/native, shared with the test that checks the tagged ones pass PDF/UA.
 module NativeBench
-  STANDARDS = %w[pdf_ua].freeze
+  # Tagged for PDF/UA: the structure tree and its marked content, the language, the title and the XMP metadata.
+  STANDARDS = {"pdf_ua" => {pdf: :ua, lang: "en"}}.freeze
   # Prawn's fonts and images, which the documents draw.
   DATA_DIRECTORY = File.expand_path("../corpus/cache/prawn/data", __dir__)
 
-  # Tagged for PDF/UA: the structure tree and its marked content, the language, the title and the XMP metadata.
   def self.options(path, standard)
-    standard ? {pdf: :ua, lang: "en", info: {Title: File.basename(path, ".rb").capitalize}} : {}
+    standard ? {**STANDARDS.fetch(standard), info: {Title: File.basename(path, ".rb").capitalize}} : {}
   end
 
   # Gamba's own API compresses unasked.
@@ -16,7 +16,7 @@ module NativeBench
     Gamba.document(**options(path, standard)) { |document| write(document, body, path) }.to_s
   end
 
-  # The document sees `document` and this module, not the script or the test rendering it.
+  # The document sees `document`, `body`, `path` and this module, not the script or the test rendering it.
   def self.write(document, body, path)
     eval(body, binding, path) # rubocop:disable Security/Eval
   end
