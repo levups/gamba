@@ -302,7 +302,7 @@ class NativeDocumentTest < Minitest::Test
     oblique = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Italic", font: "Helvetica-Oblique", italic: true } }
     assert_includes oblique.message, %("Helvetica-Oblique" is one face of Helvetica)
     in_table = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Courier-Bold"}) } } }
-    assert_includes in_table.message, %(font: "Courier", with bold in its columns or header)
+    assert_includes in_table.message, %(font: "Courier", with weight: :bold in its columns or header)
     unregistered = assert_raises(ArgumentError) do
       Gamba.document do |document|
         document.prawn.font_families.delete("Courier")
@@ -323,7 +323,9 @@ class NativeDocumentTest < Minitest::Test
         document.text "Bold", font: "Helvetica-Bold", weight: :bold
       end
     end
-    assert_includes overridden.message, %(is one face of Helvetica: name the family, font: "Helvetica", with bold)
+    assert_includes overridden.message, %("Helvetica-Bold" is one face of a standard font, without bold: register its faces)
+    bold_oblique = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Both", font: "Courier-Bold", italic: true } }
+    assert_includes bold_oblique.message, %(font: "Courier", with weight: :bold, italic: true)
     single = assert_raises(ArgumentError) do
       Gamba.document do |document|
         document.prawn.font_families.update("Body" => {normal: FONT})
