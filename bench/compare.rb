@@ -42,7 +42,10 @@ end
 def median(values)
   sorted = values.sort
   middle = sorted.size / 2
-  sorted.size.odd? ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2.0
+  return sorted[middle] if sorted.size.odd?
+
+  mean = (sorted[middle - 1] + sorted[middle]) / 2.0
+  sorted.all?(Integer) ? mean.round : mean.round(1)
 end
 
 # What each column of the results renders: the document with Prawn's API on each engine, and with Gamba's own API

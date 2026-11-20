@@ -10,7 +10,7 @@ require_relative "../bench/native_bench"
 class TaggingTest < Minitest::Test
   DATA_DIRECTORY = NativeBench::DATA_DIRECTORY
   # veraPDF's profile for each standard of the benchmarks page.
-  PROFILES = {"pdf_ua" => "ua1"}.freeze
+  PROFILE_BY_STANDARD = {"pdf_ua" => "ua1"}.freeze
   TAGGED = {pdf: :ua, pdf_a: :a, lang: "en", info: {Title: "Quarterly report"}}.freeze
 
   def setup
@@ -38,7 +38,7 @@ class TaggingTest < Minitest::Test
       assert_valid "ua1", both
       assert_valid "3a", both
       # As bench/run.rb renders them for the benchmarks page.
-      NativeBench::OPTIONS_BY_STANDARD.each_key { |standard| assert_valid PROFILES.fetch(standard), NativeBench.render(body, path, standard) }
+      NativeBench::OPTIONS_BY_STANDARD.each_key { |standard| assert_valid PROFILE_BY_STANDARD.fetch(standard), NativeBench.render(body, path, standard) }
     end
   end
 
