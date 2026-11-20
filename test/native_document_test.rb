@@ -68,10 +68,23 @@ class NativeDocumentTest < Minitest::Test
 
   # Prawn's table sizes its columns in the document's font: a native cell is measured in its own.
   # Prawn's inline formatting measures without the cell's style: the bold header was sized in regular.
-  def test_an_inline_formatted_header_is_sized_in_bold_with_or_without_a_font
-    table = ->(cell) { Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1", description: "Gadget"}], cell:) { |prawn_table| prawn_table.row(0).inline_format = true } } } }
+  def test_an_inline_formatted_header_in_a_font_of_its_own_is_sized_in_it
+    table = ->(cell, ambient) {
+      Gamba.document { |document|
+        document.prawn.font(ambient) if ambient
+        document.stack { |stack| stack.table([{sku: "S", description: "G"}], columns: {sku: {title: "Reference number"}, description: {title: "Item"}}, cell:) { |prawn_table| prawn_table.row(0).inline_format = true } }
+      }
+    }
 
-    assert_equal glyphs(table.call({font: "Helvetica"}).to_s), glyphs(table.call({}).to_s)
+    assert_equal glyphs(table.call({font: "Helvetica"}, nil).to_s), glyphs(table.call({font: "Helvetica"}, "Courier").to_s)
+  end
+
+  def test_a_standard_name_registered_without_bold_takes_the_standard_face_as_in_prawn
+    document = Gamba.document { |gamba| gamba.register_font "Helvetica", normal: FONT }
+    document.text "x", font: "Helvetica", weight: :bold
+    document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Helvetica"}) }
+
+    assert_match(/%%EOF/, document.to_s)
   end
 
   def test_a_table_sizes_its_columns_in_its_font_whatever_the_documents
@@ -275,6 +288,18 @@ class NativeDocumentTest < Minitest::Test
     assert_includes registered.message, %("Body" is registered without italic: register its faces)
     standard = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Courier-Bold", weight: :bold } }
     assert_includes standard.message, "is one face of a standard font, without bold: name its family"
+    symbol = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Symbol", weight: :bold } }
+    assert_equal %("Symbol" is a standard font of one face, without bold), symbol.message
+    path = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: Pathname(FONT), weight: :bold } }
+    assert_includes path.message, %(#{FONT.inspect} is a single face)
+    header = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.register_font "Body", normal: FONT, bold: FONT
+        document.stack { |stack| stack.table([{a: "b"}], header: {italic: true}, cell: {font: "Body"}) }
+      end
+    end
+    assert_includes header.message, "registered without bold_italic"
+    refute_includes header.message, "weight: :normal"
   end
 
   # Its own regular, as in Prawn: a family without one takes the style of the document around.

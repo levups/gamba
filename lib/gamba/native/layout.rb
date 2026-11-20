@@ -1001,13 +1001,19 @@ module Gamba
         return if font.nil? || font_style.nil? || font_style == :normal
 
         faces = @prawn.font_families[font.to_s]
-        return if faces&.key?(font_style) || (faces.nil? && !single_face?(font))
+        return if faces&.key?(font_style) || (faces.nil? ? !single_face?(font) : Prawn::Fonts::AFM::BUILT_INS.include?(font.to_s))
 
-        if Prawn::Fonts::AFM::BUILT_INS.include?(font.to_s)
-          raise ArgumentError, "#{font.inspect} is one face of a standard font, without #{font_style}: name its family, " \
+        name = font.to_s.inspect
+        if faces
+          lacking = "#{name} is registered without #{font_style}"
+        elsif %w[Symbol ZapfDingbats].include?(font.to_s)
+          raise ArgumentError, "#{name} is a standard font of one face, without #{font_style}"
+        elsif Prawn::Fonts::AFM::BUILT_INS.include?(font.to_s)
+          raise ArgumentError, "#{name} is one face of a standard font, without #{font_style}: name its family, " \
             "font: \"Courier\", \"Helvetica\" or \"Times-Roman\", and the weight or italic#{alternative}"
+        else
+          lacking = "#{name} is a single face, without #{font_style}"
         end
-        lacking = faces ? "#{font.inspect} is registered without #{font_style}" : "#{font.inspect} is a single face, without #{font_style}"
         raise ArgumentError, "#{lacking}: register its faces, document.register_font \"Name\", normal: \"Name.ttf\", " \
           "#{font_style}: \"Name-#{font_style}.ttf\", then font: \"Name\"#{alternative}"
       end
