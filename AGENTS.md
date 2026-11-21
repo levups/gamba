@@ -70,8 +70,7 @@ promise to its users; everything behind it is yours to reshape when that serves 
 
 ## Releases
 
-The user is needed twice: a working git signing key (the tag is signed) and one click approving the `release`
-environment on GitHub.
+The user is needed once: one click approving the `release` environment on GitHub. No key, no Mac.
 
 1. Another session may have just released: `git fetch --tags origin`, and `gh pr list --search "head:release/"`
    must be empty. Unreleased changes: `git log --first-parent --oneline $(git describe --tags --abbrev=0 origin/main)..origin/main`,
@@ -81,14 +80,13 @@ environment on GitHub.
    them; CI, refactoring, docs and tests get none. No version, date or link: `bin/release` adds them.
 3. Show it to the user, wait for their go. From `main` level with `origin/main`, `CHANGELOG.md` its only change:
    `bin/release minor --dry-run`, then `bin/release minor --yes` (or `patch`, `major`). It opens `release/vX.Y.Z`,
-   waits for it to merge itself, pushes the signed tag. Signing fails: the user fixes it, never an unsigned tag.
-   Interrupted after the merge: `bin/release --tag X.Y.Z`.
-4. The tag runs `release.yml`, which waits for the user to approve the `release` environment, then publishes to
-   RubyGems and GitHub. Open that run in their browser, where they click Review deployments, `release`, Approve:
-   `gh run view --web $(gh run list --workflow release.yml --branch vX.Y.Z --json databaseId -q '.[0].databaseId')`,
-   once the run exists: it starts a few seconds after the tag, and without `--branch` the previous release's run
-   opens.
-   Then check RubyGems.
+   waits for it to merge itself, then opens the release run. Interrupted: `bin/release --wait X.Y.Z`. Where `gh pr`
+   can't run, `bin/release minor --write` writes the changes: commit them, open the pull request with auto-merge.
+4. The merge runs `release.yml`, which waits for the user to approve the `release` environment, then tags the merge
+   commit `vX.Y.Z` and publishes to RubyGems and GitHub. Send them the run's link, where they click Review
+   deployments, `release`, Approve (from their phone too). Then check RubyGems. A failed run runs again from its page,
+   or with `gh workflow run release.yml`: each step skips what is done.
 
-RubyGems trusts only that workflow: never `gem push`, except a new gem name's first version. `bin/release` and
-`release.yml` are identical in all five gems.
+Only a merged pull request publishes: a version with notes in `CHANGELOG.md` and no tag yet. RubyGems trusts only
+that workflow: never `gem push`, except a new gem name's first version, pushed by hand while its run waits for
+approval. `bin/release` and `release.yml` are identical in all five gems.
