@@ -1,12 +1,13 @@
 # Gamba
 
 Gamba is a Ruby library that writes PDF files: invoices, reports, labels, anything you can lay out as text, tables,
-images and shapes. It is a faster rewrite of [Prawn](https://github.com/prawnpdf/prawn), the most widely used PDF
-library for Ruby, together with its two companion gems, prawn-table and prawn-svg.
+images and shapes. You describe the layout, stacks, rows, tables, headers and footers, and Gamba measures it, places
+it, breaks pages where a reader expects them, and tags the result for screen readers.
 
-Code written for Prawn 2.5 runs on Gamba unchanged and draws the same pages, down to the pixel. The difference is
-speed and size: a one-page invoice renders about four times faster and the file is a quarter lighter (see
-[Performance](#performance)).
+It also runs code written for [Prawn](https://github.com/prawnpdf/prawn) 2.5, the most widely used PDF library for
+Ruby, and for its companions prawn-table and prawn-svg, unchanged and down to the pixel: a one-page invoice renders
+about four times faster and the file is a quarter lighter (see [Performance](#performance)). An application moves
+from one API to the other one block at a time ([the migration guide](https://levups.github.io/gamba/migration.html)).
 
 Website and guide: https://levups.github.io/gamba/
 
@@ -25,6 +26,19 @@ without them.
 ## A first document
 
 ```ruby
+require "gamba"
+
+Gamba.document do |document|
+  document.footer { |footer, page| footer.text "Page #{page.number} of #{page.total}" }
+  document.text "Hello, World!", role: :h1
+  document.table([{sku: "A-1", quantity: 2}], columns: {sku: {title: "SKU"}, quantity: {title: "Qty"}})
+end.write("hello.pdf")
+```
+
+This writes `hello.pdf` with a heading, which also makes the PDF's first bookmark, a two-row table and a footer
+numbering the pages. The same document with Prawn's API, which Gamba runs as it is:
+
+```ruby
 require "prawn"
 
 Prawn::Document.generate("hello.pdf") do
@@ -33,9 +47,9 @@ Prawn::Document.generate("hello.pdf") do
 end
 ```
 
-This writes `hello.pdf` with a line of text and a two-row table. Everything else Prawn documents works the same
-way: fonts, colors, images, columns, page numbers, links, encryption. Prawn's manual applies as it is, and
-[the guide](https://levups.github.io/gamba/guide.html) covers what Gamba adds.
+Everything else Prawn documents works the same way: fonts, colors, images, columns, page numbers, links,
+encryption. Prawn's manual applies as it is, and [the guide](https://levups.github.io/gamba/guide.html) covers what
+Gamba adds.
 
 The constant is still `Prawn`, so you don't have to rename anything. `Prawn::VERSION` reports `2.5.0`, the
 version of the API Gamba reproduces, for code that checks it. Gamba's own version is `Gamba::VERSION`.
@@ -83,8 +97,9 @@ document.table(lines, columns: {sku: {title: "SKU", width: 60}, description: {},
 Pages break where a reader expects them: a paragraph leaves no single line at the bottom or the top of a page
 (`widows` and `orphans`, 2 unless told), and a heading with `keep_with_next: true` moves with what follows it.
 
-Text, styles, components, stacks, rows, grids, tables, images, headers, footers and these page breaks are there today;
-boxes with a background split across pages come next ([the plan](https://github.com/levups/gamba/issues/69)).
+Text, styles, components, stacks, rows, grids, tables, images, codes, headers, footers, these page breaks and
+semantic roles are there today; forms, signatures and complex scripts come next
+([the plan](https://github.com/levups/gamba/issues/69)).
 
 Ligatures and kerning from OpenType fonts, per font:
 

@@ -22,7 +22,7 @@ namespace :corpus do
   end
 end
 
-desc "Compare Gamba with Prawn on bench/documents, and Gamba's own API untagged and tagged on bench/native, into docs/benchmarks.json"
+desc "Compare Gamba with Prawn on bench/documents, one native block on bench/mixed, and Gamba's own API untagged and tagged on bench/native, into docs/benchmarks.json"
 task :bench do
   ruby "bench/compare.rb"
 end

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gamba Migration</title>
+<meta name="description" content="Move Prawn code to Gamba’s own API in three stages, each worth doing alone: switch the gem, adopt native blocks inside existing documents, write new documents natively.">
+<link rel="canonical" href="https://levups.github.io/gamba/migration.html">
+<meta property="og:title" content="Gamba Migration">
+<meta property="og:description" content="Move Prawn code to Gamba’s own API in three stages, each worth doing alone: switch the gem, adopt native blocks inside existing documents, write new documents natively.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://levups.github.io/gamba/migration.html">
+<meta property="og:site_name" content="Level UP Solutions">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#c2361b">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800&family=Inter+Tight:wght@400;600&family=Fira+Code&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="page">
+  <nav class="site-nav" aria-label="Site">
+    <a class="brand" href="./">Gamba</a>
+    <a href="guide.html">Guide</a>
+    <a href="migration.html" aria-current="page">Migration</a>
+    <a href="compatibility.html">Compatibility</a>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="https://github.com/levups/gamba">GitHub</a>
+  </nav>
+
+  <main id="main">
+    <header>
+      <h1 class="page-title">Migration</h1>
+      <p class="lede">From Prawn to Gamba’s own API in three stages. Each one is worth doing alone, and you can stop after any of them: an application with fifty Prawn documents moves one block, then one document, at a time.</p>
+      <ul class="toc">
+        <li><a href="#switch">1. Switch the gem</a></li>
+        <li><a href="#adopt">2. Native blocks in existing documents</a></li>
+        <li><a href="#native">3. New documents in the native API</a></li>
+        <li><a href="#numbers">The invoice at each stage</a></li>
+        <li><a href="#idioms">Prawn idioms, side by side</a></li>
+        <li><a href="#prawn">What still goes through Prawn</a></li>
+      </ul>
+    </header>
+
+    <section id="switch" aria-labelledby="switch-title">
+      <h2 id="switch-title">1. Switch the gem</h2>
+      <div class="prose">
+        <p>Replace <code>prawn</code>, <code>prawn-table</code> and <code>prawn-svg</code> with <code>gem "gamba"</code> in the Gemfile, and change nothing else. Your documents draw the same pages, pixel for pixel, in less time and in lighter files. This page follows one document through the three stages, the invoice of the benchmarks; here it is as Prawn code, which Gamba runs unchanged:</p>
+        <div class="stage" data-bench="bench/documents/invoice.rb">
+<pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"invoice.pdf"</span><span class="p">)</span> <span class="k">do</span>
+  <span class="n">font_families</span><span class="p">.</span><span class="nf">update</span><span class="p">(</span><span class="s2">"DejaVuSans"</span> <span class="o">=&gt;</span> <span class="p">{</span><span class="ss">normal: </span><span class="s2">"DejaVuSans.ttf"</span><span class="p">,</span> <span class="ss">bold: </span><span class="s2">"DejaVuSans-Bold.ttf"</span><span class="p">})</span>
+  <span class="n">font</span> <span class="s2">"DejaVuSans"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">9</span>
+  <span class="n">image</span> <span class="s2">"letterhead.jpg"</span><span class="p">,</span> <span class="ss">width: </span><span class="mi">200</span>
+  <span class="n">text</span> <span class="s2">"Invoice INV-2026-0001 — Alice Example"</span><span class="p">,</span> <span class="ss">style: :bold</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">14</span>
+  <span class="n">move_down</span> <span class="mi">10</span>
+  <span class="n">lines</span> <span class="o">=</span> <span class="no">Array</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span> <span class="p">{</span> <span class="p">[</span><span class="s2">"SKU</span><span class="si">#{</span><span class="n">_1</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"Gadget, deluxe edition, model </span><span class="si">#{</span><span class="n">_1</span><span class="si">}</span><span class="s2"> with spare parts toolkit"</span><span class="p">,</span> <span class="s2">"2"</span><span class="p">,</span> <span class="s2">"$1,299.00"</span><span class="p">,</span> <span class="s2">"$2,598.00"</span><span class="p">]</span> <span class="p">}</span>
+  <span class="n">table</span><span class="p">([</span><span class="sx">%w[SKU Description Qty Unit Total]</span><span class="p">,</span> <span class="o">*</span><span class="n">lines</span><span class="p">],</span> <span class="ss">header: </span><span class="kp">true</span><span class="p">,</span> <span class="ss">width: </span><span class="n">bounds</span><span class="p">.</span><span class="nf">width</span><span class="p">,</span> <span class="ss">cell_style: </span><span class="p">{</span><span class="ss">padding: </span><span class="mi">3</span><span class="p">})</span>
+<span class="k">end</span></code></pre>
+        </div>
+        <p>What you gain: the <a href="benchmarks.html">speed and weight of the benchmarks</a>, one gem instead of three, and <a href="compatibility.html">Prawn’s bugs fixed</a>, each declared. What can break: not Prawn’s public API, which a contract guards; an extension that patches Prawn’s internals may need a look.</p>
+      </div>
+    </section>
+
+    <section id="adopt" aria-labelledby="adopt-title">
+      <h2 id="adopt-title">2. Native blocks in existing documents</h2>
+      <div class="prose">
+        <p>In any Prawn document, <code>gamba</code> opens a block of the native API at the cursor, and leaves the cursor below what it drew. Move the part of a document that costs you the most code first: usually a table counted by position, or columns placed by hand. Here the invoice’s table becomes a table with named columns, over rows that are hashes:</p>
+        <div class="stage" data-bench="bench/mixed/invoice.rb">
+<pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"invoice.pdf"</span><span class="p">)</span> <span class="k">do</span>
+  <span class="n">font_families</span><span class="p">.</span><span class="nf">update</span><span class="p">(</span><span class="s2">"DejaVuSans"</span> <span class="o">=&gt;</span> <span class="p">{</span><span class="ss">normal: </span><span class="s2">"DejaVuSans.ttf"</span><span class="p">,</span> <span class="ss">bold: </span><span class="s2">"DejaVuSans-Bold.ttf"</span><span class="p">})</span>
+  <span class="n">font</span> <span class="s2">"DejaVuSans"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">9</span>
+  <span class="n">image</span> <span class="s2">"letterhead.jpg"</span><span class="p">,</span> <span class="ss">width: </span><span class="mi">200</span>
+  <span class="n">text</span> <span class="s2">"Invoice INV-2026-0001 — Alice Example"</span><span class="p">,</span> <span class="ss">style: :bold</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">14</span>
+  <span class="n">move_down</span> <span class="mi">10</span>
+  <span class="n">lines</span> <span class="o">=</span> <span class="no">Array</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span> <span class="p">{</span> <span class="p">{</span><span class="ss">sku: </span><span class="s2">"SKU</span><span class="si">#{</span><span class="n">_1</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="ss">description: </span><span class="s2">"Gadget, deluxe edition, model </span><span class="si">#{</span><span class="n">_1</span><span class="si">}</span><span class="s2"> with spare parts toolkit"</span><span class="p">,</span> <span class="ss">quantity: </span><span class="s2">"2"</span><span class="p">,</span> <span class="ss">unit: </span><span class="s2">"$1,299.00"</span><span class="p">,</span> <span class="ss">total: </span><span class="s2">"$2,598.00"</span><span class="p">}</span> <span class="p">}</span>
+  <span class="n">gamba</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+    <span class="n">document</span><span class="p">.</span><span class="nf">table</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="ss">columns: </span><span class="p">{</span><span class="ss">sku: </span><span class="p">{</span><span class="ss">title: </span><span class="s2">"SKU"</span><span class="p">},</span> <span class="ss">description: </span><span class="p">{},</span> <span class="ss">quantity: </span><span class="p">{</span><span class="ss">title: </span><span class="s2">"Qty"</span><span class="p">},</span> <span class="ss">unit: </span><span class="p">{},</span> <span class="ss">total: </span><span class="p">{}},</span> <span class="ss">header: </span><span class="p">{</span><span class="ss">weight: :normal</span><span class="p">},</span> <span class="ss">cell: </span><span class="p">{</span><span class="ss">padding: </span><span class="mi">3</span><span class="p">})</span>
+  <span class="k">end</span>
+<span class="k">end</span></code></pre>
+        </div>
+        <p>The PDF is the same, byte for byte: the native table starts from the font Prawn’s code set, at the cursor Prawn’s code left. Nothing else in the document changes, so each block can be reviewed and released on its own. What you gain: rows taken from your models as they are, options that raise when mistyped instead of being ignored, and boxes measured before they are drawn.</p>
+        <p>Inside the block, <code>document.prawn</code> is the Prawn document itself, for what the native API does not cover yet.</p>
+      </div>
+    </section>
+
+    <section id="native" aria-labelledby="native-title">
+      <h2 id="native-title">3. New documents in the native API</h2>
+      <div class="prose">
+        <p>Write new documents with <code>Gamba.document</code>, and move an existing one when you next rework it. The block receives the document instead of running inside it, so your own methods and instance variables stay in reach, and the document can be split into small classes that <code>draw</code> takes:</p>
+        <div class="stage" data-bench="bench/native/invoice.rb">
+<pre><code class="language-ruby"><span class="no">Gamba</span><span class="p">.</span><span class="nf">document</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">register_font</span> <span class="s2">"DejaVuSans"</span><span class="p">,</span> <span class="ss">normal: </span><span class="s2">"DejaVuSans.ttf"</span><span class="p">,</span> <span class="ss">bold: </span><span class="s2">"DejaVuSans-Bold.ttf"</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">style</span> <span class="ss">:default</span><span class="p">,</span> <span class="ss">font: </span><span class="s2">"DejaVuSans"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">9</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">image</span> <span class="s2">"letterhead.jpg"</span><span class="p">,</span> <span class="ss">width: </span><span class="mi">200</span><span class="p">,</span> <span class="ss">alt: </span><span class="s2">"Example Inc. letterhead"</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Invoice INV-2026-0001 — Alice Example"</span><span class="p">,</span> <span class="ss">weight: :bold</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">14</span>
+  <span class="n">lines</span> <span class="o">=</span> <span class="no">Array</span><span class="p">.</span><span class="nf">new</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span> <span class="p">{</span> <span class="p">{</span><span class="ss">sku: </span><span class="s2">"SKU</span><span class="si">#{</span><span class="n">_1</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="ss">description: </span><span class="s2">"Gadget, deluxe edition, model </span><span class="si">#{</span><span class="n">_1</span><span class="si">}</span><span class="s2"> with spare parts toolkit"</span><span class="p">,</span> <span class="ss">quantity: </span><span class="s2">"2"</span><span class="p">,</span> <span class="ss">unit: </span><span class="s2">"$1,299.00"</span><span class="p">,</span> <span class="ss">total: </span><span class="s2">"$2,598.00"</span><span class="p">}</span> <span class="p">}</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">stack</span><span class="p">(</span><span class="ss">padding: </span><span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span> <span class="k">do</span> <span class="o">|</span><span class="n">stack</span><span class="o">|</span>
+    <span class="n">stack</span><span class="p">.</span><span class="nf">table</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="ss">columns: </span><span class="p">{</span><span class="ss">sku: </span><span class="p">{</span><span class="ss">title: </span><span class="s2">"SKU"</span><span class="p">},</span> <span class="ss">description: </span><span class="p">{},</span> <span class="ss">quantity: </span><span class="p">{</span><span class="ss">title: </span><span class="s2">"Qty"</span><span class="p">},</span> <span class="ss">unit: </span><span class="p">{},</span> <span class="ss">total: </span><span class="p">{}},</span> <span class="ss">header: </span><span class="p">{</span><span class="ss">weight: :normal</span><span class="p">},</span> <span class="ss">cell: </span><span class="p">{</span><span class="ss">padding: </span><span class="mi">3</span><span class="p">})</span>
+  <span class="k">end</span>
+<span class="k">end</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="s2">"invoice.pdf"</span><span class="p">)</span></code></pre>
+        </div>
+        <p>The pages are no longer Prawn’s: fonts use their ligatures and kerning, and paragraphs keep their widows and orphans, as a typesetter would. What you gain on top of stage 2: headers and footers that know their page number, headings that make the PDF’s bookmarks, and a <a href="guide.html#tagged-pdf">tagged PDF</a> for screen readers from one option, since every box already says what it is:</p>
+<pre><code class="language-ruby"><span class="no">Gamba</span><span class="p">.</span><span class="nf">document</span><span class="p">(</span><span class="ss">pdf: :ua</span><span class="p">,</span> <span class="ss">lang: </span><span class="s2">"en"</span><span class="p">,</span> <span class="ss">info: </span><span class="p">{</span><span class="no">Title</span><span class="p">:</span> <span class="s2">"Invoice INV-2026-0001"</span><span class="p">})</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+  <span class="c1"># the same body: the letterhead's alt text is all PDF/UA asks of this invoice</span>
+<span class="k">end</span></code></pre>
+      </div>
+    </section>
+
+    <section id="numbers" aria-labelledby="numbers-title">
+      <h2 id="numbers-title">The invoice at each stage</h2>
+      <p class="note" id="migration-note">Loading the latest numbers…</p>
+      <table id="migration-numbers">
+        <thead><tr><th scope="col">Stage</th><th scope="col" class="number">Time to render</th><th scope="col" class="number">File weight</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="prose">
+        <p>The code of each stage is <code>bench/documents/invoice.rb</code>, <code>bench/mixed/invoice.rb</code> and <code>bench/native/invoice.rb</code>, which <code>rake bench</code> measures before each release; a test checks that this page shows that code, and that each stage draws the same text.</p>
+      </div>
+    </section>
+
+    <section id="idioms" aria-labelledby="idioms-title">
+      <h2 id="idioms-title">Prawn idioms, side by side</h2>
+      <div class="prose">
+        <p>What Prawn code computes by hand, the native API describes. Each pair draws the same text; a test runs both.</p>
+      </div>
+
+      <h3>Columns placed with <code>bounding_box</code></h3>
+      <div class="prose"><p>A row is as high as its tallest child, and what follows starts below it.</p></div>
+      <div class="split">
+        <div>
+          <p class="code-label">Prawn</p>
+<pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"address.pdf"</span><span class="p">)</span> <span class="k">do</span>
+  <span class="n">top</span> <span class="o">=</span> <span class="n">cursor</span>
+  <span class="n">bounding_box</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="n">top</span><span class="p">],</span> <span class="ss">width: </span><span class="mi">250</span><span class="p">)</span> <span class="k">do</span>
+    <span class="n">text</span> <span class="s2">"Alice Martin"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">14</span><span class="p">,</span> <span class="ss">style: :bold</span>
+    <span class="n">text</span> <span class="s2">"1 Example Street, 75001 Paris"</span>
+  <span class="k">end</span>
+  <span class="n">left_bottom</span> <span class="o">=</span> <span class="n">cursor</span>
+  <span class="n">bounding_box</span><span class="p">([</span><span class="n">bounds</span><span class="p">.</span><span class="nf">width</span> <span class="o">-</span> <span class="mi">150</span><span class="p">,</span> <span class="n">top</span><span class="p">],</span> <span class="ss">width: </span><span class="mi">150</span><span class="p">)</span> <span class="k">do</span>
+    <span class="n">text</span> <span class="s2">"Due on 1 December 2026"</span><span class="p">,</span> <span class="ss">align: :right</span>
+  <span class="k">end</span>
+  <span class="n">move_cursor_to</span> <span class="p">[</span><span class="n">left_bottom</span><span class="p">,</span> <span class="n">cursor</span><span class="p">].</span><span class="nf">min</span>
+  <span class="n">move_down</span> <span class="mi">20</span>
+  <span class="n">text</span> <span class="s2">"This starts below the taller column."</span>
+<span class="k">end</span></code></pre>
+        </div>
+        <div>
+          <p class="code-label">Gamba</p>
+<pre><code class="language-ruby"><span class="no">Gamba</span><span class="p">.</span><span class="nf">document</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">stack</span><span class="p">(</span><span class="ss">gap: </span><span class="mi">20</span><span class="p">)</span> <span class="k">do</span> <span class="o">|</span><span class="n">page</span><span class="o">|</span>
+    <span class="n">page</span><span class="p">.</span><span class="nf">row</span><span class="p">(</span><span class="ss">gap: </span><span class="mi">24</span><span class="p">)</span> <span class="k">do</span> <span class="o">|</span><span class="n">row</span><span class="o">|</span>
+      <span class="n">row</span><span class="p">.</span><span class="nf">stack</span> <span class="k">do</span> <span class="o">|</span><span class="n">address</span><span class="o">|</span>
+        <span class="n">address</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Alice Martin"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">14</span><span class="p">,</span> <span class="ss">weight: :bold</span>
+        <span class="n">address</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"1 Example Street, 75001 Paris"</span>
+      <span class="k">end</span>
+      <span class="n">row</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Due on 1 December 2026"</span><span class="p">,</span> <span class="ss">width: </span><span class="mi">150</span><span class="p">,</span> <span class="ss">align: :right</span>
+    <span class="k">end</span>
+    <span class="n">page</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"This starts below the taller column."</span>
+  <span class="k">end</span>
+<span class="k">end</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="s2">"address.pdf"</span><span class="p">)</span></code></pre>
+        </div>
+      </div>
+
+      <h3>Fonts and colours set, then reset, with <code>move_down</code> between</h3>
+      <div class="prose"><p>Styles name text attributes once; a call passes only what differs. Space is a container’s <code>gap</code> or <code>padding</code>, not a cursor moved by hand.</p></div>
+      <div class="split">
+        <div>
+          <p class="code-label">Prawn</p>
+<pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"terms.pdf"</span><span class="p">)</span> <span class="k">do</span>
+  <span class="n">font_families</span><span class="p">.</span><span class="nf">update</span><span class="p">(</span><span class="s2">"DejaVuSans"</span> <span class="o">=&gt;</span> <span class="p">{</span><span class="ss">normal: </span><span class="s2">"DejaVuSans.ttf"</span><span class="p">,</span> <span class="ss">bold: </span><span class="s2">"DejaVuSans-Bold.ttf"</span><span class="p">})</span>
+  <span class="n">font</span> <span class="s2">"DejaVuSans"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">10</span>
+  <span class="n">font_size</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span> <span class="p">{</span> <span class="n">text</span> <span class="s2">"Payment terms"</span><span class="p">,</span> <span class="ss">style: :bold</span> <span class="p">}</span>
+  <span class="n">move_down</span> <span class="mi">6</span>
+  <span class="n">text</span> <span class="s2">"Payment is due within 30 days."</span>
+  <span class="n">fill_color</span> <span class="s2">"666666"</span>
+  <span class="n">text</span> <span class="s2">"Late payments bear interest at three times the legal rate."</span>
+  <span class="n">fill_color</span> <span class="s2">"000000"</span>
+<span class="k">end</span></code></pre>
+        </div>
+        <div>
+          <p class="code-label">Gamba</p>
+<pre><code class="language-ruby"><span class="no">Gamba</span><span class="p">.</span><span class="nf">document</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">register_font</span> <span class="s2">"DejaVuSans"</span><span class="p">,</span> <span class="ss">normal: </span><span class="s2">"DejaVuSans.ttf"</span><span class="p">,</span> <span class="ss">bold: </span><span class="s2">"DejaVuSans-Bold.ttf"</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">style</span> <span class="ss">:default</span><span class="p">,</span> <span class="ss">font: </span><span class="s2">"DejaVuSans"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">10</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">style</span> <span class="ss">:heading</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">16</span><span class="p">,</span> <span class="ss">weight: :bold</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">stack</span><span class="p">(</span><span class="ss">gap: </span><span class="mi">6</span><span class="p">)</span> <span class="k">do</span> <span class="o">|</span><span class="n">terms</span><span class="o">|</span>
+    <span class="n">terms</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Payment terms"</span><span class="p">,</span> <span class="ss">style: :heading</span>
+    <span class="n">terms</span><span class="p">.</span><span class="nf">stack</span> <span class="k">do</span> <span class="o">|</span><span class="n">body</span><span class="o">|</span>
+      <span class="n">body</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Payment is due within 30 days."</span>
+      <span class="n">body</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Late payments bear interest at three times the legal rate."</span><span class="p">,</span> <span class="ss">color: </span><span class="s2">"666666"</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="s2">"terms.pdf"</span><span class="p">)</span></code></pre>
+        </div>
+      </div>
+
+      <h3>Tables counted by position</h3>
+      <div class="prose"><p>Columns are named, rows are hashes or objects answering those names, and a column’s alignment sits with its title.</p></div>
+      <div class="split">
+        <div>
+          <p class="code-label">Prawn</p>
+<pre><code class="language-ruby"><span class="n">lines</span> <span class="o">=</span> <span class="p">[{</span><span class="ss">sku: </span><span class="s2">"A-1"</span><span class="p">,</span> <span class="ss">description: </span><span class="s2">"Gadget"</span><span class="p">,</span> <span class="ss">quantity: </span><span class="mi">2</span><span class="p">},</span> <span class="p">{</span><span class="ss">sku: </span><span class="s2">"B-2"</span><span class="p">,</span> <span class="ss">description: </span><span class="s2">"Gizmo"</span><span class="p">,</span> <span class="ss">quantity: </span><span class="mi">1</span><span class="p">}]</span>
+
+<span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"lines.pdf"</span><span class="p">)</span> <span class="k">do</span>
+  <span class="n">rows</span> <span class="o">=</span> <span class="n">lines</span><span class="p">.</span><span class="nf">map</span> <span class="p">{</span> <span class="o">|</span><span class="n">line</span><span class="o">|</span> <span class="p">[</span><span class="n">line</span><span class="p">[</span><span class="ss">:sku</span><span class="p">],</span> <span class="n">line</span><span class="p">[</span><span class="ss">:description</span><span class="p">],</span> <span class="n">line</span><span class="p">[</span><span class="ss">:quantity</span><span class="p">]]</span> <span class="p">}</span>
+  <span class="n">table</span><span class="p">([</span><span class="sx">%w[SKU Description Qty]</span><span class="p">,</span> <span class="o">*</span><span class="n">rows</span><span class="p">],</span> <span class="ss">header: </span><span class="kp">true</span><span class="p">)</span> <span class="k">do</span>
+    <span class="n">row</span><span class="p">(</span><span class="mi">0</span><span class="p">).</span><span class="nf">font_style</span> <span class="o">=</span> <span class="ss">:bold</span>
+    <span class="n">column</span><span class="p">(</span><span class="mi">2</span><span class="p">).</span><span class="nf">align</span> <span class="o">=</span> <span class="ss">:right</span>
+  <span class="k">end</span>
+<span class="k">end</span></code></pre>
+        </div>
+        <div>
+          <p class="code-label">Gamba</p>
+<pre><code class="language-ruby"><span class="n">lines</span> <span class="o">=</span> <span class="p">[{</span><span class="ss">sku: </span><span class="s2">"A-1"</span><span class="p">,</span> <span class="ss">description: </span><span class="s2">"Gadget"</span><span class="p">,</span> <span class="ss">quantity: </span><span class="mi">2</span><span class="p">},</span> <span class="p">{</span><span class="ss">sku: </span><span class="s2">"B-2"</span><span class="p">,</span> <span class="ss">description: </span><span class="s2">"Gizmo"</span><span class="p">,</span> <span class="ss">quantity: </span><span class="mi">1</span><span class="p">}]</span>
+
+<span class="no">Gamba</span><span class="p">.</span><span class="nf">document</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">table</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="ss">columns: </span><span class="p">{</span>
+    <span class="ss">sku: </span><span class="p">{</span><span class="ss">title: </span><span class="s2">"SKU"</span><span class="p">},</span>
+    <span class="ss">description: </span><span class="p">{},</span>
+    <span class="ss">quantity: </span><span class="p">{</span><span class="ss">title: </span><span class="s2">"Qty"</span><span class="p">,</span> <span class="ss">align: :right</span><span class="p">}</span>
+  <span class="p">})</span>
+<span class="k">end</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="s2">"lines.pdf"</span><span class="p">)</span></code></pre>
+        </div>
+      </div>
+
+      <h3><code>repeat</code> and <code>number_pages</code></h3>
+      <div class="prose"><p>A header and a footer are declared once and run for every page once the pages are counted; the body breaks pages around them without a bounding box of its own.</p></div>
+      <div class="split">
+        <div>
+          <p class="code-label">Prawn</p>
+<pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"report.pdf"</span><span class="p">)</span> <span class="k">do</span>
+  <span class="n">repeat</span><span class="p">(</span><span class="ss">:all</span><span class="p">)</span> <span class="k">do</span>
+    <span class="n">bounding_box</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="n">bounds</span><span class="p">.</span><span class="nf">top</span><span class="p">],</span> <span class="ss">width: </span><span class="n">bounds</span><span class="p">.</span><span class="nf">width</span><span class="p">,</span> <span class="ss">height: </span><span class="mi">20</span><span class="p">)</span> <span class="p">{</span> <span class="n">text</span> <span class="s2">"Example SAS"</span><span class="p">,</span> <span class="ss">style: :bold</span> <span class="p">}</span>
+  <span class="k">end</span>
+  <span class="n">bounding_box</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="n">bounds</span><span class="p">.</span><span class="nf">top</span> <span class="o">-</span> <span class="mi">30</span><span class="p">],</span> <span class="ss">width: </span><span class="n">bounds</span><span class="p">.</span><span class="nf">width</span><span class="p">,</span> <span class="ss">height: </span><span class="n">bounds</span><span class="p">.</span><span class="nf">height</span> <span class="o">-</span> <span class="mi">60</span><span class="p">)</span> <span class="k">do</span>
+    <span class="mi">60</span><span class="p">.</span><span class="nf">times</span> <span class="p">{</span> <span class="o">|</span><span class="n">index</span><span class="o">|</span> <span class="n">text</span> <span class="s2">"Paragraph </span><span class="si">#{</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="si">}</span><span class="s2"> of the report."</span> <span class="p">}</span>
+  <span class="k">end</span>
+  <span class="n">number_pages</span> <span class="s2">"Page &lt;page&gt; of &lt;total&gt;"</span><span class="p">,</span> <span class="ss">at: </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">],</span> <span class="ss">width: </span><span class="n">bounds</span><span class="p">.</span><span class="nf">width</span><span class="p">,</span> <span class="ss">align: :center</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">8</span>
+<span class="k">end</span></code></pre>
+        </div>
+        <div>
+          <p class="code-label">Gamba</p>
+<pre><code class="language-ruby"><span class="no">Gamba</span><span class="p">.</span><span class="nf">document</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">header</span><span class="p">(</span><span class="ss">gap: </span><span class="mi">10</span><span class="p">)</span> <span class="p">{</span> <span class="o">|</span><span class="n">header</span><span class="p">,</span> <span class="n">_page</span><span class="o">|</span> <span class="n">header</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Example SAS"</span><span class="p">,</span> <span class="ss">weight: :bold</span> <span class="p">}</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">footer</span><span class="p">(</span><span class="ss">gap: </span><span class="mi">10</span><span class="p">)</span> <span class="k">do</span> <span class="o">|</span><span class="n">footer</span><span class="p">,</span> <span class="n">page</span><span class="o">|</span>
+    <span class="n">footer</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Page </span><span class="si">#{</span><span class="n">page</span><span class="p">.</span><span class="nf">number</span><span class="si">}</span><span class="s2"> of </span><span class="si">#{</span><span class="n">page</span><span class="p">.</span><span class="nf">total</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="ss">align: :center</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">8</span>
+  <span class="k">end</span>
+  <span class="mi">60</span><span class="p">.</span><span class="nf">times</span> <span class="p">{</span> <span class="o">|</span><span class="n">index</span><span class="o">|</span> <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Paragraph </span><span class="si">#{</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="si">}</span><span class="s2"> of the report."</span> <span class="p">}</span>
+<span class="k">end</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="s2">"report.pdf"</span><span class="p">)</span></code></pre>
+        </div>
+      </div>
+
+      <h3>Room left on the page, measured by hand</h3>
+      <div class="prose"><p>A heading with <code>keep_with_next</code> moves to the next page with the start of what follows it, whatever their size.</p></div>
+      <div class="split">
+        <div>
+          <p class="code-label">Prawn</p>
+<pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"totals.pdf"</span><span class="p">)</span> <span class="k">do</span>
+  <span class="mi">50</span><span class="p">.</span><span class="nf">times</span> <span class="p">{</span> <span class="o">|</span><span class="n">index</span><span class="o">|</span> <span class="n">text</span> <span class="s2">"Line </span><span class="si">#{</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="si">}</span><span class="s2"> of the invoice"</span> <span class="p">}</span>
+  <span class="c1"># Room for the heading and the lines under it, measured by hand.</span>
+  <span class="n">start_new_page</span> <span class="k">if</span> <span class="n">cursor</span> <span class="o">&lt;</span> <span class="mi">50</span>
+  <span class="n">text</span> <span class="s2">"Totals"</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">16</span><span class="p">,</span> <span class="ss">style: :bold</span>
+  <span class="n">text</span> <span class="s2">"Subtotal: $2,598.00"</span>
+  <span class="n">text</span> <span class="s2">"Total: $3,117.60"</span>
+<span class="k">end</span></code></pre>
+        </div>
+        <div>
+          <p class="code-label">Gamba</p>
+<pre><code class="language-ruby"><span class="no">Gamba</span><span class="p">.</span><span class="nf">document</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">style</span> <span class="ss">:heading</span><span class="p">,</span> <span class="ss">size: </span><span class="mi">16</span><span class="p">,</span> <span class="ss">weight: :bold</span><span class="p">,</span> <span class="ss">keep_with_next: </span><span class="kp">true</span>
+  <span class="mi">50</span><span class="p">.</span><span class="nf">times</span> <span class="p">{</span> <span class="o">|</span><span class="n">index</span><span class="o">|</span> <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Line </span><span class="si">#{</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="si">}</span><span class="s2"> of the invoice"</span> <span class="p">}</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Totals"</span><span class="p">,</span> <span class="ss">style: :heading</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">stack</span> <span class="k">do</span> <span class="o">|</span><span class="n">totals</span><span class="o">|</span>
+    <span class="n">totals</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Subtotal: $2,598.00"</span>
+    <span class="n">totals</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Total: $3,117.60"</span>
+  <span class="k">end</span>
+<span class="k">end</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="s2">"totals.pdf"</span><span class="p">)</span></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="prawn" aria-labelledby="prawn-title">
+      <h2 id="prawn-title">What still goes through Prawn</h2>
+      <div class="prose">
+        <p>SVG, vector graphics, text boxes at fixed positions, links and encryption have no native call yet: <code>document.prawn</code> gives a native document all of Prawn’s API, and what it draws takes its place in the flow. Prawn’s table of arrays stays at <code>document.prawn.table</code>, and a native table’s block receives the <code>Prawn::Table</code> for spans and single cells.</p>
+        <p>The <a href="guide.html#native">guide</a> describes every native call, and <code>test/contract/gamba.yml</code> lists each public method with its signature: a change there is a decision, never an accident.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="family">
+    <p>Gems by <a href="https://github.com/levups">Level UP Solutions</a></p>
+    <nav aria-label="Level UP Solutions gems">
+      <ul>
+        <li><a href="https://levups.github.io/super-slim/">SuperSlim</a></li>
+        <li><a href="https://levups.github.io/agentry/">Agentry</a></li>
+        <li><a href="https://levups.github.io/gamba/" aria-current="page">Gamba</a></li>
+        <li><a href="https://levups.github.io/crumbly/">Crumbly</a></li>
+        <li><a href="https://levups.github.io/maptain/">Maptain</a></li>
+      </ul>
+    </nav>
+    <p><a href="https://github.com/levups/gamba">Source on GitHub</a></p>
+  </footer>
+</div>
+<script src="site.js"></script>
+</body>
+</html>
