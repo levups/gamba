@@ -6,9 +6,10 @@ Gem::Specification.new do |spec|
   spec.name = "gamba"
   spec.version = Gamba::VERSION
   spec.authors = ["Level UP Solutions"]
-  spec.summary = "A faster rewrite of Prawn, prawn-table and prawn-svg that draws the same pages"
-  spec.description = "Gamba is a Ruby library that writes PDF files. It is a faster rewrite of Prawn 2.5, prawn-table " \
-                     "and prawn-svg: code written for them runs unchanged and draws the same pages, in lighter files."
+  spec.summary = "PDFs from layout you describe, tagged for screen readers; runs Prawn code unchanged, faster"
+  spec.description = "Gamba is a Ruby library that writes PDF files from stacks, rows, tables, headers and footers it " \
+                     "measures and places, tagged for PDF/UA. It also runs code written for Prawn 2.5, prawn-table " \
+                     "and prawn-svg unchanged, drawing the same pages faster and in lighter files."
   spec.homepage = "https://github.com/levups/gamba"
   spec.metadata = {
     "source_code_uri" => spec.homepage,

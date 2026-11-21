@@ -5,7 +5,14 @@ const METRICS = [
   { key: "bytes", title: "File weight", better: "lower", format: (value) => formatBytes(value) },
   { key: "peak_memory_megabytes", title: "Peak memory of the process", better: "lower", format: (value) => `${formatNumber(value)} MB` }
 ];
-const ENGINE_NAMES = { prawn: "Prawn", gamba: "Gamba", gamba_native: "Gamba, own API", gamba_tagged: "Gamba, own API, PDF/UA" };
+const ENGINE_NAMES = { prawn: "Prawn", gamba: "Gamba", gamba_mixed: "Gamba, one native block", gamba_native: "Gamba, own API", gamba_tagged: "Gamba, own API, PDF/UA" };
+const MIGRATION_STAGES = [
+  ["prawn", "Before: Prawn 2.5 and prawn-table"],
+  ["gamba", "1. The same code on Gamba"],
+  ["gamba_mixed", "2. Its table as a native block"],
+  ["gamba_native", "3. Written in the native API"],
+  ["gamba_tagged", "3. The same, tagged for PDF/UA"]
+];
 const DOCUMENT_DESCRIPTIONS = {
   invoice: "A one-page invoice: an embedded TrueType font, a JPEG letterhead, a ten-line table.",
   report: "A 101-page report: an embedded TrueType font, a PNG with alpha and a JPEG on every page, justified text.",
@@ -78,7 +85,7 @@ function renderHome(benchmarks) {
   const allocations = ratiosBy(benchmarks, "allocations");
   const weight = ratiosBy(benchmarks, "bytes");
   const memory = ratiosBy(benchmarks, "peak_memory_megabytes");
-  fill("#byline-speed", `Prawn’s API, ${formatRatio(weakest(speed).ratio)} faster or more.`);
+  fill("#byline-speed", `Prawn code runs on it too, ${formatRatio(weakest(speed).ratio)} faster or more.`);
 
   const tile = (value, label, detail) => element("div", { class: "tile" },
     element("span", { class: "tile-value" }, value), element("span", { class: "tile-label" }, label), element("span", { class: "tile-detail" }, detail));
@@ -92,7 +99,7 @@ function renderHome(benchmarks) {
 }
 
 function renderBenchmarks(benchmarks) {
-  fill("#bench-note", `Each document rendered by Prawn 2.5 with prawn-table, by Gamba, and with Gamba’s own API untagged and tagged. ${measuredOn(benchmarks)}`);
+  fill("#bench-note", `Each document rendered by Prawn 2.5 with prawn-table, by Gamba, with one native block where there is one, and with Gamba’s own API untagged and tagged. ${measuredOn(benchmarks)}`);
   const documents = document.getElementById("documents");
   for (const [name, measures] of Object.entries(benchmarks.results)) {
     const rowsFor = (key) => Object.entries(measures).map(([engine, engineMeasures]) => ({ name: ENGINE_NAMES[engine] || engine, value: engineMeasures[key] }));
@@ -103,9 +110,25 @@ function renderBenchmarks(benchmarks) {
   }
 }
 
+// The invoice through the stages of the migration page; a column the last `rake bench` did not measure says so.
+function renderMigration(benchmarks) {
+  const body = document.querySelector("#migration-numbers tbody");
+  if (!body) return;
+  const invoice = benchmarks.results.invoice;
+  for (const [column, stage] of MIGRATION_STAGES) {
+    const measures = invoice[column];
+    const cells = measures
+      ? [formatSeconds(measures.median_milliseconds), formatBytes(measures.bytes)].map((text) => element("td", { class: "number" }, text))
+      : [element("td", { class: "number", colspan: 2 }, "measured from the next release")];
+    body.append(element("tr", {}, element("th", { scope: "row" }, stage), ...cells));
+  }
+  fill("#migration-note", measuredOn(benchmarks));
+}
+
 fetch("benchmarks.json").then((response) => response.json()).then((benchmarks) => {
   renderHome(benchmarks);
+  renderMigration(benchmarks);
   if (document.getElementById("documents")) renderBenchmarks(benchmarks);
 }).catch(() => {
-  fill("#bench-note, #tiles-note", "The benchmark numbers could not be loaded: see docs/benchmarks.json in the repository.");
+  fill("#bench-note, #tiles-note, #migration-note", "The benchmark numbers could not be loaded: see docs/benchmarks.json in the repository.");
 });
