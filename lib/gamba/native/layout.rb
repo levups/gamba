@@ -127,26 +127,35 @@ module Gamba
     end
 
     # A box. Its role says what it is to a reader, for tagged PDF: a heading of a level, a paragraph, a list and
-    # its items, a table, a figure with its alternative text, or an artifact, which only decorates the page.
+    # its items, a table, a figure with its alternative text, or an artifact, which only decorates the page. lang
+    # is the language of its text, when it differs from the document's.
     class Node
-      OPTIONS = %i[width grow keep_with_next role alt].freeze
+      OPTIONS = %i[width grow keep_with_next role alt lang].freeze
       ROLES = %i[artifact].freeze
       DEFAULT_ROLE = nil
       KIND = "a box"
+      # The standard structure type of each role (ISO 32000-1 §14.8.4).
+      STRUCTURE_TYPES = {
+        p: :P, h1: :H1, h2: :H2, h3: :H3, h4: :H4, h5: :H5, h6: :H6, list: :L, list_item: :LI, figure: :Figure, table: :Table
+      }.freeze
 
-      attr_reader :width, :grow, :keep_with_next, :role, :alt
+      attr_reader :width, :grow, :keep_with_next, :role, :alt, :lang
 
-      def initialize(width: nil, grow: nil, keep_with_next: false, role: self.class::DEFAULT_ROLE, alt: nil)
+      def initialize(width: nil, grow: nil, keep_with_next: false, role: self.class::DEFAULT_ROLE, alt: nil, lang: nil)
         raise ArgumentError, "width and grow exclude each other: a box is as wide as told, or shares what is left" if width && grow
         accepted = self.class::ROLES + (self.class::DEFAULT_ROLE ? [] : [nil])
         raise ArgumentError, "role is #{role.inspect}: #{self.class::KIND} takes #{self.class::ROLES.map(&:inspect).join(", ")}" unless accepted.include?(role)
         raise ArgumentError, "alt is the alternative text of a figure: give it with role: :figure, not #{role.inspect}" if alt && role != :figure
+        alt = Gamba::Tagging.text(alt)
+        raise ArgumentError, "alt is #{alt.inspect}: give the text a reader hears in place of the figure" if alt && !Gamba::Tagging.visible_text?(alt)
+        raise ArgumentError, "lang is #{lang.inspect}: give a language tag, \"fr\" or \"en-GB\"" if lang && !(lang.is_a?(String) && lang.match?(Gamba::Tagging::LANGUAGE_TAG))
 
         @width = width
         @grow = grow
         @keep_with_next = keep_with_next
         @role = role
         @alt = alt
+        @lang = lang
       end
 
       # A box is measured when it is placed and again by the boxes around it: once per width is enough.
@@ -157,6 +166,20 @@ module Gamba
       # The least of this box that can start a page: all of it, unless it can be split.
       def first_height(prawn, width)
         height(prawn, width)
+      end
+
+      # What a container or the document calls: in a tagged document, the box flows or is painted within its
+      # structure element (Gamba::Tagging), or as an artifact.
+      def flow_tagged(prawn, cursor, left, width)
+        return flow(prawn, cursor, left, width) unless prawn.tagged?
+
+        tag(prawn) { flow(prawn, cursor, left, width) }
+      end
+
+      def paint_tagged(prawn, left, top, width, stretched_height = nil)
+        return paint_stretched(prawn, left, top, width, stretched_height) unless prawn.tagged?
+
+        tag(prawn) { paint_stretched(prawn, left, top, width, stretched_height) }
       end
 
       # A box that cannot be split goes to the next page when the rest of this one is too short for it.
@@ -173,8 +196,30 @@ module Gamba
 
       private
 
+      # Only a container in a line of a grid is stretched to the line's height.
+      def paint_stretched(prawn, left, top, width, stretched_height)
+        stretched_height ? paint(prawn, left, top, width, stretched_height) : paint(prawn, left, top, width)
+      end
+
       def relative(prawn, left, top)
         [left - prawn.bounds.absolute_left, top - prawn.bounds.absolute_bottom]
+      end
+
+      # Without a role, a box makes no element unless it says its language; a list item's content goes in its body.
+      def tag(prawn, &)
+        return prawn.tag_artifact(&) if role == :artifact
+        return (lang ? prawn.tag_structure(:Div, Lang: lang, &) : yield) if role.nil?
+
+        prawn.tag_structure(STRUCTURE_TYPES.fetch(role), Alt: alt, Lang: lang) do
+          next prawn.tag_structure(:LBody) { tag_body(prawn, &) } if role == :list_item
+
+          tag_body(prawn, &)
+        end
+      end
+
+      # A box that draws content marks it as its element's.
+      def tag_body(prawn, &)
+        prawn.tag_content(&)
       end
     end
 
@@ -587,18 +632,25 @@ module Gamba
       def decorate(prawn, left, top, width, height, graphic_state = nil)
         return unless decorated?
 
-        prawn.save_graphics_state(graphic_state) do
-          corner = relative(prawn, left, top)
-          if @background
-            prawn.fill_color(@background)
-            prawn.fill_rectangle(corner, width, height)
-          end
-          if @border_width
-            prawn.line_width(@border_width)
-            prawn.stroke_color(@border_color)
-            prawn.stroke_rectangle(corner, width, height)
+        prawn.tag_artifact do
+          prawn.save_graphics_state(graphic_state) do
+            corner = relative(prawn, left, top)
+            if @background
+              prawn.fill_color(@background)
+              prawn.fill_rectangle(corner, width, height)
+            end
+            if @border_width
+              prawn.line_width(@border_width)
+              prawn.stroke_color(@border_color)
+              prawn.stroke_rectangle(corner, width, height)
+            end
           end
         end
+      end
+
+      # A container's element groups its children's.
+      def tag_body(_prawn)
+        yield
       end
 
       def inner_width(width)
@@ -631,7 +683,7 @@ module Gamba
         child_top = top - @padding_top
         @children.each do |child|
           child_width = child_width(child, width)
-          child.paint(prawn, left + @padding_left, child_top, child_width)
+          child.paint_tagged(prawn, left + @padding_left, child_top, child_width)
           child_top -= child.height(prawn, child_width) + @gap
         end
       end
@@ -664,7 +716,7 @@ module Gamba
         @children.each_with_index do |child, index|
           cursor.y -= @gap unless index.zero? || cursor.at_page_top?
           keep_with_what_follows(prawn, cursor, width, index)
-          child.flow(prawn, cursor, left + @padding_left, child_width(child, width))
+          child.flow_tagged(prawn, cursor, left + @padding_left, child_width(child, width))
         end
         # The bottom padding of a plain stack ends with the page, so that a decorated stack holding it is not drawn
         # past the page. A decorated stack's own is kept clear on every page, and the gap below its last line ends
@@ -730,7 +782,7 @@ module Gamba
 
       def paint_children(prawn, child_left, top, width)
         @children.zip(child_widths(width)) do |child, child_width|
-          child.paint(prawn, child_left, top - @padding_top, child_width)
+          child.paint_tagged(prawn, child_left, top - @padding_top, child_width)
           child_left += child_width + @gap
         end
       end
@@ -826,9 +878,9 @@ module Gamba
           line_height = height(prawn, width)
           @children.zip(child_widths(width)) do |child, child_width|
             if child.is_a?(Container)
-              child.paint(prawn, child_left, top, child_width, line_height)
+              child.paint_tagged(prawn, child_left, top, child_width, line_height)
             else
-              child.paint(prawn, child_left, top, child_width)
+              child.paint_tagged(prawn, child_left, top, child_width)
             end
             child_left += child_width + @gap
           end
@@ -876,9 +928,9 @@ module Gamba
 
     # Named text attributes, and what they come to for Prawn once a call's own are added.
     class Styles
-      TEXT_ATTRIBUTES = %i[font size weight italic color align leading widows orphans keep_with_next role].freeze
+      TEXT_ATTRIBUTES = %i[font size weight italic color align leading widows orphans keep_with_next role lang].freeze
       # Attributes of the paragraph's place on the page, not of its glyphs: the layout reads them, Prawn does not.
-      LAYOUT_ATTRIBUTES = %i[widows orphans keep_with_next role].freeze
+      LAYOUT_ATTRIBUTES = %i[widows orphans keep_with_next role lang].freeze
       FONT_STYLES = %i[normal bold italic bold_italic].freeze
       DEFAULT_STYLE = :default
 
@@ -927,11 +979,67 @@ module Gamba
         layout = attributes.slice(*LAYOUT_ATTRIBUTES)
         attributes = attributes.except(*LAYOUT_ATTRIBUTES)
         font = attributes.delete(:font)
-        font_options = (font.nil? || @prawn.font_families.key?(font)) ? {} : {features: @default_font_features}
-        {font:, font_options:, color: attributes.delete(:color), text_options: text_options(attributes), bookmarks: @bookmarks, **layout}
+        font_options = single_face?(font) ? {features: @default_font_features} : {}
+        color = attributes.delete(:color)
+        text_options = text_options(attributes)
+        check_face(font, text_options[:style])
+        {font:, font_options:, color:, text_options:, bookmarks: @bookmarks, **layout}
+      end
+
+      # A font given by its file, or by the name of one standard face (Courier-Bold), rather than a family.
+      def single_face?(font)
+        return false if font.nil? || @prawn.font_families.key?(font.to_s)
+
+        (@single_faces ||= {}).fetch(font.to_s) do |name|
+          @single_faces[name] = Prawn::Fonts::AFM::BUILT_INS.include?(name) || File.file?(name)
+        end
+      end
+
+      # A face the font lacks: Prawn raises BadFontFamily or UnknownFont, which say neither what is missing nor how to
+      # add it.
+      def check_face(font, font_style, alternative = nil, in_table: false)
+        return if font.nil? || font_style.nil? || font_style == :normal
+
+        name = font.to_s
+        faces = @prawn.font_families[name]
+        if faces
+          # A family named after a standard font falls back on it, as in Prawn.
+          return if faces.key?(font_style) || Prawn::Fonts::AFM::BUILT_INS.include?(name)
+
+          lacking = "#{name.inspect} is registered without #{font_style}"
+        elsif !single_face?(font)
+          return
+        elsif (family, styled = standard_family(name, font_style, in_table))
+          raise ArgumentError, "#{name.inspect} is one face of #{family}: name the family, font: #{family.inspect}, " \
+            "#{styled}#{alternative}"
+        elsif %w[Symbol ZapfDingbats].include?(name)
+          raise ArgumentError, "#{name.inspect} is a standard font of one face, without #{font_style}#{alternative}"
+        elsif Prawn::Fonts::AFM::BUILT_INS.include?(name)
+          lacking = "#{name.inspect} is one face of a standard font, without #{font_style}"
+        else
+          lacking = "#{name.inspect} is a single face, without #{font_style}"
+        end
+        raise ArgumentError, "#{lacking}: register its faces, document.register_font \"Name\", normal: \"Name.ttf\", " \
+          "#{font_style}: \"Name-#{font_style}.ttf\", then font: \"Name\"#{alternative}"
       end
 
       private
+
+      # Courier for Courier-Bold, and the options that reach the face it would take, while the document still has that
+      # standard face. Out of a table, that face joins its own style to the one asked; in a table, the header or the
+      # styling block asked the rest, so the columns take its own style alone.
+      def standard_family(name, font_style, in_table)
+        family, faces = Prawn::Document::BUILT_IN_FONT_FAMILIES.find { |_family, standard| standard.value?(name) }
+        return unless family
+
+        styles = in_table ? [faces.key(name)] : [faces.key(name), font_style]
+        bold, italic = %w[bold italic].map { |part| styles.any? { |style| style.to_s.include?(part) } }
+        face = Styles.font_style(bold ? :bold : nil, italic)
+        return unless @prawn.font_families.dig(family, face) == faces[face] && @prawn.font_families.dig(family, font_style)
+
+        options = [("weight: :bold" if bold), ("italic: true" if italic)].compact.join(", ")
+        [family, in_table ? "with #{options} in its columns" : "with #{options}"]
+      end
 
       def named(name)
         return {} unless name
@@ -949,3 +1057,7 @@ module Gamba
     end
   end
 end
+
+# The other boxes, so that Gamba::Layout loaded alone defines them all.
+require_relative "table"
+require_relative "band"

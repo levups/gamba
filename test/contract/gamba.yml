@@ -9,6 +9,7 @@ Gamba::Document:
   "#barcode": [req data, keyrest options]
   "#data_matrix": [req data, keyrest options]
   "#draw": [req component]
+  "#factur_x": [req invoice, key profile, key filename, key description]
   "#page_break": []
   "#prawn": []
   "#row": [keyrest options]
@@ -40,3 +41,17 @@ Gamba::Layout::Container:
   "#text": [req string, key style, key width, key grow, keyrest attributes]
 Prawn::Document:
   "#gamba": []
+  "#factur_x": [req invoice, key profile, key filename, key description]
+# An invoice as data, for Factur-X: what it computes, and its XML.
+Gamba::Invoice:
+  "#allowance_total": []
+  "#charge_total": []
+  "#due": []
+  "#grand_total": []
+  "#line_total": []
+  "#tax_basis_total": []
+  "#tax_breakdown": []
+  "#tax_total": []
+  "#to_xml": [key profile]
+Gamba::Invoice::Line:
+  "#net_amount": []

@@ -3,13 +3,14 @@
 
 # Releases the gem through a pull request, as main takes no direct push. CHANGELOG.md's Unreleased section
 # becomes the version's and the version constant is bumped on a branch release/vX.Y.Z, whose pull request merges
-# itself once CI is green. The merge commit then gets a signed tag vX.Y.Z, which starts
-# .github/workflows/release.yml: it publishes the gem to RubyGems and the GitHub release. The same file in every
-# Level UP Solutions gem.
+# itself once CI is green. Its merge starts .github/workflows/release.yml, which waits for the release environment's
+# approval, tags the merge commit vX.Y.Z, and publishes the gem to RubyGems and the GitHub release. The same file in
+# every Level UP Solutions gem.
 #
 #   bin/release minor              # or patch, major, or an exact version such as 1.2.0
 #   bin/release minor --dry-run    # shows the notes and the changes, touches nothing
-#   bin/release --tag 1.2.0        # waits for the release pull request, then tags it (after a Ctrl-C)
+#   bin/release minor --write      # writes the changes and stops, for a pull request opened by hand
+#   bin/release --wait 1.2.0       # waits for the release pull request, then opens its approval (after a Ctrl-C)
 #
 # Used by the release workflow too:
 #
@@ -27,9 +28,11 @@ require "tempfile"
 CHANGELOG = "CHANGELOG.md"
 REFERENCE = /^\[([^\]]+)\]: (\S+)$/
 
+# Returns what the command writes on stdout: callers parse it (JSON, a branch, a commit), so whatever it writes on
+# stderr (gh's hints, git's progress) is shown only when it fails.
 def run(*command)
-  output, status = Open3.capture2e(*command)
-  abort "#{command.join(" ")} failed:\n#{output}" unless status.success?
+  output, errors, status = Open3.capture3(*command)
+  abort "#{command.join(" ")} failed:\n#{output}#{errors}" unless status.success?
   output
 end
 
@@ -41,15 +44,16 @@ end
 spec = Gem::Specification.load(Dir["*.gemspec"].first) or abort "No gemspec here"
 current = spec.version
 repo_url = spec.metadata["source_code_uri"] || spec.homepage
-display_name = File.read("README.md", encoding: "UTF-8")[/\A# (\S+)/, 1] || spec.name
+# The README's title, past a logo: "# <img src=\"docs/logo.svg\" alt=\"\"> Maptain" names Maptain.
+display_name = File.read("README.md", encoding: "UTF-8")[/\A# (?:<[^>]*>\s*)*([^\s<]+)/, 1] || spec.name
 changelog = File.read(CHANGELOG, encoding: "UTF-8")
 
-# Waits for the release pull request to merge, then tags its merge commit and pushes the tag alone. Stops when
-# the pull request can't merge by itself: closed, auto-merge turned off, or a required check failed.
+# Waits for the release pull request to merge, then opens the release workflow's run, which waits for approval.
+# Stops when the pull request can't merge by itself: closed, auto-merge turned off, or a required check failed.
 publish = lambda do |target|
   tag = "v#{target}"
   branch = "release/#{tag}"
-  resume = "bin/release --tag #{target} tags it once merged"
+  resume = "bin/release --wait #{target} picks up from there"
   puts "Waiting for #{branch} to merge (Ctrl-C stops waiting; #{resume})"
   commit = loop do
     output, status = Open3.capture2("gh", "pr", "view", branch, "--json", "state,url,mergeCommit,autoMergeRequest")
@@ -58,7 +62,7 @@ publish = lambda do |target|
       url = pull_request["url"]
       oid = pull_request.dig("mergeCommit", "oid")
       break oid if pull_request["state"] == "MERGED" && oid
-      abort "#{url} was closed unmerged: #{tag} not pushed" if pull_request["state"] == "CLOSED"
+      abort "#{url} was closed unmerged: #{tag} not released" if pull_request["state"] == "CLOSED"
     end
     if status.success? && pull_request["state"] == "OPEN"
       abort "#{url} has auto-merge off: merge it, then #{resume}" if pull_request["autoMergeRequest"].nil?
@@ -72,18 +76,20 @@ publish = lambda do |target|
   rescue Interrupt
     abort "\nStopped waiting: #{resume}"
   end
-  run("git", "fetch", "--quiet", "--tags", "origin", "main")
-  notes = run("git", "show", "#{commit}:#{CHANGELOG}")
-  abort "#{commit[0, 7]} has no #{target} section in #{CHANGELOG}" unless notes.match?(section(target.to_s))
-  tagged = Open3.capture2("git", "rev-parse", "--verify", "--quiet", "#{tag}^{commit}").first.strip
-  if tagged.empty?
-    run("git", "tag", "--annotate", "--sign", tag, "-m", "#{display_name} #{target}", commit)
-  elsif tagged != commit
-    abort "#{tag} already tags #{tagged[0, 7]}, not the merge commit #{commit[0, 7]}"
+  # The run starts a few seconds after the merge: until then, the list is empty.
+  url = 30.times do
+    found = Open3.capture2("gh", "run", "list", "--workflow", "release.yml", "--commit", commit, "--json", "url", "--jq", ".[0].url").first.strip
+    break found unless found.empty?
+    sleep 5
   end
-  run("git", "push", "origin", tag)
-  puts "Pushed #{tag}: #{repo_url}/actions/workflows/release.yml publishes it to RubyGems, then #{repo_url}/releases/tag/#{tag}"
-  # Local housekeeping, after the release is out: a failure here only warns.
+  url = "#{repo_url}/actions/workflows/release.yml" unless url.is_a?(String)
+  puts "Merged: #{url} tags #{commit[0, 7]} #{tag} and publishes it once the release environment is approved"
+  begin
+    Open3.capture2e(RUBY_PLATFORM.include?("darwin") ? "open" : "xdg-open", url) if $stdout.tty?
+  rescue SystemCallError # no browser to open: the link above is enough
+  end
+  # Local housekeeping, once merged: a failure here only warns.
+  Open3.capture2e("git", "fetch", "--quiet", "--tags", "origin", "main")
   if run("git", "branch", "--show-current").strip == "main" && run("git", "status", "--porcelain", "--untracked-files=no").empty?
     output, status = Open3.capture2e("git", "merge", "--quiet", "--ff-only", "origin/main")
     warn "main not fast-forwarded to origin/main:\n#{output}" unless status.success?
@@ -93,12 +99,14 @@ end
 
 mode = :release
 dry_run = false
+write_only = false
 assume_yes = false
 OptionParser.new do |parser|
-  parser.banner = "Usage: bin/release (patch | minor | major | X.Y.Z) [--dry-run] [--yes] | --tag X.Y.Z"
+  parser.banner = "Usage: bin/release (patch | minor | major | X.Y.Z) [--dry-run | --write] [--yes] | --wait X.Y.Z"
   parser.on("--dry-run", "Show the notes and the changes, touch nothing") { dry_run = true }
   parser.on("--yes", "Do not ask before opening the release pull request") { assume_yes = true }
-  parser.on("--tag", "Wait for the release pull request of the version given, then tag it") { mode = :tag }
+  parser.on("--write", "Write the changes and stop, for a pull request opened by hand") { write_only = true }
+  parser.on("--wait", "Wait for the release pull request of the version given to merge") { mode = :wait }
   parser.on("--check", "Fail unless the tag given matches the gemspec's version and has notes") { mode = :check }
   parser.on("--notes", "Print the release notes of the tag given") { mode = :notes }
   parser.on("--title", "Print the release title of the tag given") { mode = :title }
@@ -120,7 +128,7 @@ if mode != :release
     puts "", "**Full diff**: #{compare}" if compare&.include?("/compare/")
   when :title
     puts "#{display_name} #{version}"
-  when :tag
+  when :wait
     publish.call(Gem::Version.new(version))
   end
   exit
@@ -151,7 +159,8 @@ abort "#{target} is not above #{released.max}, the last release" if released.any
 abort "#{target} is below #{current}, the gemspec's version" if target < current
 previous = released.max
 
-runs = JSON.parse(run("gh", "run", "list", "--commit", head, "--workflow", "ci.yml", "--json", "status,conclusion,url"))
+# The release pull request's own CI still runs before it merges: --write, for setups without gh, skips this check.
+runs = write_only ? [{"conclusion" => "success"}] : JSON.parse(run("gh", "run", "list", "--commit", head, "--workflow", "ci.yml", "--json", "status,conclusion,url"))
 unless runs.first&.fetch("conclusion") == "success"
   state = runs.first ? runs.first.values_at("status", "conclusion", "url").join(" ").squeeze(" ") : "no run"
   abort "CI is not green on #{head[0, 7]} (#{state}): wait for it, or fix it"
@@ -189,7 +198,7 @@ if target != current
 end
 changes.reject! { |path, text| File.read(path, encoding: "UTF-8") == text }
 
-puts "#{display_name} #{current} → #{target}, through a pull request, then tagged #{tag}", ""
+puts "#{display_name} #{current} → #{target}, through a pull request, then tagged #{tag} by release.yml", ""
 puts changelog[section(target.to_s), 1].strip, ""
 if dry_run
   changes.each do |path, text|
@@ -204,16 +213,21 @@ if dry_run
   exit
 end
 
-abort "Nothing to change for #{target}: if its pull request merged, bin/release --tag #{target} tags it" if changes.empty?
+abort "Nothing to change for #{target}: if its pull request merged, release.yml publishes it" if changes.empty?
+if write_only
+  changes.each { |path, text| File.write(path, text) }
+  puts "Wrote #{changes.keys.join(", ")}: once a pull request merges them into main, release.yml publishes #{tag}"
+  exit
+end
 unless assume_yes
-  print "Open the release pull request, then push #{tag} and publish #{spec.name} #{target} once it merges? [y/N] "
+  print "Open the release pull request, which publishes #{spec.name} #{target} once it merges and you approve? [y/N] "
   abort "Stopped" unless $stdin.gets.to_s.strip.casecmp?("y")
 end
 
 branch = "release/#{tag}"
 title = "Release #{target}"
-body = "#{changelog[section(target.to_s), 1].strip}\n\nOnce merged, `bin/release` tags the merge commit #{tag}, " \
-  "which publishes the gem."
+body = "#{changelog[section(target.to_s), 1].strip}\n\nOnce merged, the release workflow tags the merge commit " \
+  "#{tag} and publishes the gem, after the release environment's approval."
 begin
   run("git", "switch", "--quiet", "--create", branch)
   changes.each { |path, text| File.write(path, text) }
@@ -224,7 +238,7 @@ begin
   run("gh", "pr", "merge", branch, "--auto", "--squash")
 rescue SystemExit
   warn "Stopped before #{branch}'s pull request merges by itself. Either finish by hand (open it, merge it, then " \
-    "bin/release --tag #{target}), or undo and start again: git switch main && git branch -D #{branch} && " \
+    "release.yml publishes it), or undo and start again: git switch main && git branch -D #{branch} && " \
     "git push origin :#{branch} (the notes are in #{branch}'s commit)"
   raise
 end

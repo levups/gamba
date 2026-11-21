@@ -2,6 +2,7 @@
 
 require_relative "test_helper"
 require_relative "support/layout_trees"
+require_relative "support/pdf_objects"
 require "open3"
 require "prawn"
 
@@ -19,6 +20,8 @@ class LayoutFuzzTest < Minitest::Test
   DESCENDER = 0.207
   # A tree whose boxes cannot fit their page or their width is refused; most must be placed.
   MINIMUM_PLACED_SHARE = 0.6
+  TAGGED_SHARE = 4
+  TAGGED_FONT_DIRECTORY = File.join(Oracle::ROOT, "corpus/cache/prawn/data/fonts")
 
   # Each stack kept together as it is flowed: whether it fits on an empty page, and the ids of what it holds.
   module KeptStacks
@@ -67,7 +70,42 @@ class LayoutFuzzTest < Minitest::Test
     assert_operator placed, :>=, CASES * MINIMUM_PLACED_SHARE, "seed #{SEED}: too few trees fit their pages to test anything"
   end
 
+  # The same trees as PDF/UA documents, one in TAGGED_SHARE: every content drawn is tagged or an artifact (else
+  # drawing raises), and each page's marked content is balanced and mapped back to its elements.
+  def test_random_box_trees_tagged_mark_their_content_on_every_page
+    skip CORPUS_MISSING_MESSAGE unless File.directory?(TAGGED_FONT_DIRECTORY)
+
+    generator = LayoutTrees.new(SEED)
+    sources = Array.new(CASES) { generator.document }.each_slice(TAGGED_SHARE).map(&:first)
+    failures = sources.each_with_index.filter_map do |source, index|
+      tagged_source = tagged(source)
+      problem = begin
+        PdfObjects.new(eval(tagged_source, binding, "tree.rb").to_s).marked_content_problem # rubocop:disable Security/Eval
+      rescue Prawn::Errors::CannotFit
+        nil
+      rescue Prawn::Errors::PdfUaViolation => exception
+        exception.message
+      end
+      next unless problem
+
+      path = File.join(DIRECTORY, format("tagged_tree_%04d.rb", index))
+      FileUtils.mkdir_p(DIRECTORY)
+      File.write(path, tagged_source)
+      "#{path}: #{problem}"
+    end
+
+    assert_empty failures, "seed #{SEED}"
+  end
+
   private
+
+  # PDF/UA embeds its fonts: DejaVu Sans stands in for Helvetica. Its headings skip no level: all are h1. One
+  # stack in three is an artifact, decorations and all.
+  def tagged(source)
+    stacks = 0
+    source.gsub(/role: :h\d/, "role: :h1").gsub(".stack(") { ((stacks += 1) % 3).zero? ? ".stack(role: :artifact, " : _1 }.sub("Gamba.document(", %{Gamba.document(pdf: :ua, lang: "en", info: {Title: "Tree"}, })
+      .sub("do |document|\n", %(do |document|\n  document.register_font "DejaVu", normal: "#{TAGGED_FONT_DIRECTORY}/DejaVuSans.ttf", bold: "#{TAGGED_FONT_DIRECTORY}/DejaVuSans-Bold.ttf"\n  document.style :default, font: "DejaVu"\n))
+  end
 
   def problem(source)
     KeptStacks.recorded = []

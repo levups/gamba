@@ -68,6 +68,8 @@ module Gamba
         matrix, *sizes = transformation(page)
         copy.data = @copier.copy(matrix ? page.except(:Parent, :B, *BOXES, :Rotate, :Contents) : page.except(:Parent, :B))
         copy.data[:Parent] = @pages_reference
+        # A page names its resources even when it has none (ISO 32000-1 §7.7.3.3): qpdf 12.4 repairs a page without.
+        copy.data[:Resources] ||= {}
         if matrix
           reshape(copy.data, page, matrix, *sizes)
           annotations_to_move << [copy.data[:Annots], matrix] if copy.data[:Annots]

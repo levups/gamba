@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gamba: PDF files from Ruby, with Prawn’s API, faster</title>
-<meta name="description" content="Gamba is a Ruby library that writes PDF files. It runs code written for Prawn unchanged and draws the same pages, faster and in lighter files. Tables and SVG included.">
-<meta property="og:title" content="Gamba: PDF files from Ruby, with Prawn’s API, faster">
-<meta property="og:description" content="A Ruby library that writes PDF files. It is a rewrite of Prawn, prawn-table and prawn-svg that draws the same pages, faster and in lighter files, with PDF/A-3 and Factur-X on top.">
+<title>Gamba: PDF files from Ruby, laid out and tagged for you</title>
+<meta name="description" content="Gamba is a Ruby library that writes PDF files from layout you describe: stacks, rows, tables, headers, tagged for screen readers. It also runs code written for Prawn unchanged, faster and in lighter files.">
+<meta property="og:title" content="Gamba: PDF files from Ruby, laid out and tagged for you">
+<meta property="og:description" content="A Ruby library that writes PDF files from layout you describe, tagged for screen readers. It also runs code written for Prawn, prawn-table and prawn-svg unchanged, faster and in lighter files.">
 <meta property="og:type" content="website">
 <link rel="canonical" href="https://levups.github.io/gamba/">
 <meta property="og:url" content="https://levups.github.io/gamba/">
 <meta property="og:site_name" content="Level UP Solutions">
 <meta name="twitter:card" content="summary">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Gamba","description":"Prawn's API, rewritten for speed: same pages, lighter files","url":"https://levups.github.io/gamba/","codeRepository":"https://github.com/levups/gamba","programmingLanguage":"Ruby","runtimePlatform":"Ruby 3.3 or later","license":"https://github.com/levups/gamba/blob/main/LICENSE","author":{"@type":"Organization","name":"Level UP Solutions","url":"https://levups.com"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Gamba","description":"PDFs from layout you describe, tagged for screen readers; runs Prawn code unchanged, faster","url":"https://levups.github.io/gamba/","codeRepository":"https://github.com/levups/gamba","programmingLanguage":"Ruby","runtimePlatform":"Ruby 3.3 or later","license":"https://github.com/levups/gamba/blob/main/LICENSE","author":{"@type":"Organization","name":"Level UP Solutions","url":"https://levups.com"}}</script>
 <meta name="theme-color" content="#c2361b">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,6 +26,7 @@
   <nav class="site-nav" aria-label="Site">
     <a class="brand" href="./" aria-current="page">Gamba</a>
     <a href="guide.html">Guide</a>
+    <a href="migration.html">Migration</a>
     <a href="compatibility.html">Compatibility</a>
     <a href="benchmarks.html">Benchmarks</a>
     <a href="https://github.com/levups/gamba">GitHub</a>
@@ -34,11 +35,11 @@
   <main id="main">
     <header class="hero">
       <h1 class="wordmark">Gamba</h1>
-      <p class="byline"><span id="byline-speed">Prawn’s API, rewritten for speed.</span><span class="byline-sub">The same pages, pixel for pixel.</span></p>
+      <p class="byline"><span>PDFs laid out for you.</span><span class="byline-sub" id="byline-speed">Prawn code runs on it too, faster.</span></p>
       <div>
-        <p class="summary">Gamba is a Ruby library that writes PDF files: invoices, reports, labels. It is a rewrite of Prawn, the PDF library most Ruby apps use, and of its companions prawn-table and prawn-svg. Code written for Prawn runs unchanged, and the files come out faster and lighter, with PDF/A-3 and Factur-X on top.</p>
+        <p class="summary">Gamba is a Ruby library that writes PDF files: invoices, reports, labels. You describe stacks, rows, tables, headers and footers; it measures them, places them, breaks pages where a reader expects, and tags the result for screen readers. It also runs code written for Prawn, the PDF library most Ruby apps use, and for prawn-table and prawn-svg, unchanged: the same pages, faster and in lighter files. An application moves to the native API one block at a time.</p>
         <code class="install">gem "gamba"</code>
-        <p class="links"><a href="guide.html">Get started</a><a href="compatibility.html">Where it differs from Prawn</a><a href="benchmarks.html">Benchmarks</a></p>
+        <p class="links"><a href="guide.html">Get started</a><a href="migration.html">Move from Prawn</a><a href="compatibility.html">Where it differs from Prawn</a><a href="benchmarks.html">Benchmarks</a></p>
       </div>
     </header>
 
@@ -52,8 +53,8 @@
     <section aria-labelledby="why-title">
       <h2 id="why-title">Why</h2>
       <div class="prose">
-        <p>Prawn draws good pages, slowly. Profiling an invoice with a table shows where the time goes: line breaking rebuilds its regular expressions for every line, every number is formatted then patched, and TrueType fonts are read again for each document.</p>
-        <p>Gamba keeps Prawn’s Ruby API and its pages, and rewrites what sits underneath. Your code does not change; the PDF it produces looks the same, weighs less, and comes out faster.</p>
+        <p>Prawn draws good pages, but its caller computes the layout: a cursor moved by hand, columns placed in points, the room left on a page measured before each heading. What a document needs beyond drawing, such as a structure for screen readers, has no place in that API. And it is slow: line breaking rebuilds its regular expressions for every line, every number is formatted then patched, and TrueType fonts are read again for each document.</p>
+        <p>Gamba has an API of its own, where layout is described and every box says what it is. Underneath, it rewrites Prawn’s engine and keeps its Ruby API and its pages, so existing code runs unchanged, faster, and adopts the native API one block at a time.</p>
       </div>
     </section>
 
@@ -61,24 +62,39 @@
       <h2 id="changes-title">What changes</h2>
       <div class="cards">
         <div class="card">
+          <h3>Layout described, not computed</h3>
+          <p>Stacks, rows, grids, tables with named columns, headers and footers that know their page. Each box is measured before it is drawn, and pages break between lines, never leaving one alone.</p>
+          <p><a href="guide.html#native">Gamba’s own API</a></p>
+        </div>
+        <div class="card">
+          <h3>Adopted one block at a time</h3>
+          <p>In a Prawn document, <code>gamba { |document| ... }</code> draws native boxes at the cursor: the rest of the document does not change, and its PDF stays the same byte for byte.</p>
+          <p><a href="migration.html">Migration</a></p>
+        </div>
+        <div class="card">
           <h3>One gem instead of three</h3>
           <p><code>pdf.table</code> and <code>pdf.svg</code> work without prawn-table or prawn-svg; <code>require "prawn/table"</code> and <code>require "prawn-svg"</code> keep working.</p>
           <p><a href="guide.html#installation">Installation</a></p>
         </div>
         <div class="card">
-          <h3>Lighter files, same pixels</h3>
-          <p>Every PDF is written as PDF 1.5: compressed streams, the other objects packed in one compressed object stream, a cross-reference stream. Identical images are embedded once.</p>
-          <p><a href="guide.html#output">Output</a></p>
+          <h3>Lighter files, fonts read once</h3>
+          <p>Every PDF is written as PDF 1.5, its objects packed in a compressed stream, and identical images are embedded once. A font is parsed once per process and shared by every document and thread; <code>Gamba.eager_load!</code> loads it all before a server forks.</p>
+          <p><a href="guide.html#output">Output</a> · <a href="guide.html#fonts">Fonts</a></p>
         </div>
         <div class="card">
-          <h3>Fonts parsed once per process</h3>
-          <p>A TrueType or OpenType font is read once, frozen and shared by every document and thread, until its file changes. <code>Gamba.eager_load!</code> loads it all before a server forks.</p>
-          <p><a href="guide.html#fonts">Fonts</a></p>
+          <h3>PDF/UA, PDF/A-3 and Factur-X</h3>
+          <p><code>pdf: :ua</code> tags a native document for screen readers from its boxes’ roles; <code>pdf_a: true</code> writes a PDF/A-3b document; <code>factur_x</code> embeds the invoice XML your invoicing system produced.</p>
+          <p><a href="guide.html#pdf-a">PDF/A, PDF/UA and Factur-X</a></p>
         </div>
         <div class="card">
-          <h3>PDF/A-3 and Factur-X</h3>
-          <p><code>pdf_a: true</code> writes a PDF/A-3b document; <code>factur_x</code> embeds the invoice XML your invoicing system produced.</p>
-          <p><a href="guide.html#pdf-a">PDF/A and Factur-X</a></p>
+          <h3>Codes and pages, drawn as vectors</h3>
+          <p>QR codes, DataMatrix, Code 128, EAN, Code 39 and ITF-14, encoded in pure Ruby and drawn sharp at any size. A page of another PDF draws like an image, or under every page as letterhead.</p>
+          <p><a href="guide.html#barcodes">QR codes and barcodes</a></p>
+        </div>
+        <div class="card">
+          <h3>Rails, and your tests</h3>
+          <p><code>render pdf:</code> and <code>.pdf.rb</code> templates in Rails, Active Storage files as images. The oracle’s checks come as Minitest assertions and RSpec matchers: same text, same pages, valid PDF.</p>
+          <p><a href="guide.html#rails">Rails</a> · <a href="guide.html#comparing">Comparing an app’s PDFs</a></p>
         </div>
         <div class="card">
           <h3>Prawn’s bugs, fixed and declared</h3>
@@ -107,15 +123,22 @@
         <div>
           <p class="code-label">Gemfile</p>
 <pre><code class="language-ruby"><span class="n">gem</span> <span class="s2">"gamba"</span> <span class="c1"># instead of prawn, prawn-table and prawn-svg</span></code></pre>
-        </div>
-        <div>
-          <p class="code-label">Your code, unchanged</p>
+          <p class="code-label">Your Prawn code, unchanged</p>
 <pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">generate</span><span class="p">(</span><span class="s2">"hello.pdf"</span><span class="p">)</span> <span class="k">do</span>
   <span class="n">text</span> <span class="s2">"Hello, World!"</span>
   <span class="n">table</span> <span class="p">[</span><span class="sx">%w[SKU Qty]</span><span class="p">,</span> <span class="sx">%w[A-1 2]</span><span class="p">]</span>
 <span class="k">end</span></code></pre>
         </div>
+        <div>
+          <p class="code-label">Gamba’s own API</p>
+<pre><code class="language-ruby"><span class="no">Gamba</span><span class="p">.</span><span class="nf">document</span> <span class="k">do</span> <span class="o">|</span><span class="n">document</span><span class="o">|</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">footer</span> <span class="p">{</span> <span class="o">|</span><span class="n">footer</span><span class="p">,</span> <span class="n">page</span><span class="o">|</span> <span class="n">footer</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Page </span><span class="si">#{</span><span class="n">page</span><span class="p">.</span><span class="nf">number</span><span class="si">}</span><span class="s2"> of </span><span class="si">#{</span><span class="n">page</span><span class="p">.</span><span class="nf">total</span><span class="si">}</span><span class="s2">"</span> <span class="p">}</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">text</span> <span class="s2">"Hello, World!"</span><span class="p">,</span> <span class="ss">role: :h1</span>
+  <span class="n">document</span><span class="p">.</span><span class="nf">table</span><span class="p">([{</span><span class="ss">sku: </span><span class="s2">"A-1"</span><span class="p">,</span> <span class="ss">quantity: </span><span class="mi">2</span><span class="p">}],</span> <span class="ss">columns: </span><span class="p">{</span><span class="ss">sku: </span><span class="p">{</span><span class="ss">title: </span><span class="s2">"SKU"</span><span class="p">},</span> <span class="ss">quantity: </span><span class="p">{</span><span class="ss">title: </span><span class="s2">"Qty"</span><span class="p">}})</span>
+<span class="k">end</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="s2">"hello.pdf"</span><span class="p">)</span></code></pre>
+        </div>
       </div>
+      <p class="more"><a href="migration.html">Move existing Prawn code, stage by stage</a></p>
     </section>
   </main>
 

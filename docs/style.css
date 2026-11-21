@@ -57,13 +57,13 @@ h3 { font-size: 1.05rem; margin: 0 0 0.75rem; }
 .charts { display: grid; gap: 2.5rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
 .chart { margin: 0; }
 .chart small { color: var(--muted); font-weight: 400; }
-.columns { display: grid; grid-template-columns: repeat(var(--count, 5), 1fr); gap: 2px; height: 14rem; align-items: end; border-bottom: 1px solid var(--ink); margin-bottom: 2rem; }
+.columns { display: grid; grid-template-columns: repeat(var(--count, 5), 1fr); gap: 2px; height: 14rem; align-items: end; border-bottom: 1px solid var(--ink); margin-bottom: 3.6rem; }
 .column { position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
 .column-bar { width: 0.9rem; min-height: 2px; background: var(--rail); border-radius: 4px 4px 0 0; }
 .column-bar.ours { background: var(--accent); }
 .column-value { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.3rem; white-space: nowrap; }
 .column.ours .column-value { color: var(--ink); font-weight: 600; }
-.column-name { position: absolute; bottom: -1.7rem; font-size: 0.8125rem; }
+.column-name { position: absolute; top: calc(100% + 0.35rem); font-size: 0.8125rem; line-height: 1.15; text-align: center; }
 .column:hover .column-bar, .column:focus-visible .column-bar { outline: 2px solid var(--ink); outline-offset: 1px; }
 .column:focus-visible { outline: none; }
 .chart details { font-size: 0.875rem; }

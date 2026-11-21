@@ -12,7 +12,7 @@ module Gamba
 
     OPTIONS = %i[
       page_size page_layout margin left_margin right_margin top_margin bottom_margin background info print_scaling
-      pdf_a lang background_pdf background_pdf_page
+      pdf_a pdf lang background_pdf background_pdf_page
     ].freeze
     TEXT_ATTRIBUTES = Layout::Styles::TEXT_ATTRIBUTES
     # No Prawn page to match here, so fonts that have ligatures and GPOS kerning use them.
@@ -37,9 +37,13 @@ module Gamba
       self
     end
 
-    # Text attributes under a name: text "…", style: name. The :default style applies to every text.
+    # Text attributes under a name: text "…", style: name. The :default style applies to every text; in PDF/A and
+    # PDF/UA its font is also the document's default, which Prawn's code starts from: Helvetica, Prawn's,
+    # cannot be embedded. It is looked up when first used, so it may be registered after.
     def style(name, **attributes)
       @styles.define(name, attributes)
+      font = attributes[:font]
+      @prawn.default_font_family = font if font && name == Layout::Styles::DEFAULT_STYLE && (@prawn.pdf_a? || @prawn.pdf_ua?)
       self
     end
 
@@ -61,6 +65,12 @@ module Gamba
 
     def footer(gap: 0, &block)
       declare_band(:footer, gap, block)
+    end
+
+    # Embeds the invoice's Factur-X XML: a Gamba::Invoice, or the XML as a String. The document is a PDF/A one.
+    def factur_x(invoice, profile: :en16931, filename: PdfA::FACTUR_X_FILENAME, description: "Factur-X invoice")
+      @prawn.factur_x(invoice, profile:, filename:, description:)
+      self
     end
 
     def to_s
@@ -111,7 +121,7 @@ module Gamba
     def place(box)
       bounds = @prawn.bounds
       cursor = Layout::Cursor.new(@prawn)
-      box.flow(@prawn, cursor, bounds.absolute_left, [box.width || bounds.width, bounds.width].min)
+      box.flow_tagged(@prawn, cursor, bounds.absolute_left, [box.width || bounds.width, bounds.width].min)
       @prawn.y = cursor.y
     end
   end

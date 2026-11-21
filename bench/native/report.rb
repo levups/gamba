@@ -5,9 +5,9 @@ document.style :chapter, weight: :bold, size: 16, keep_with_next: true
 paragraph = "A quarterly report gathers sales figures, charts and summary tables from every region: " \
   "each part counts, from the raw data all the way to the layout of each page. "
 50.times do |chapter|
-  document.image "#{DATA_DIRECTORY}/images/dice.png", width: 120, align: :right
+  document.image "#{DATA_DIRECTORY}/images/dice.png", width: 120, align: :right, alt: "Two dice"
   document.text "Chapter #{chapter + 1}", style: :chapter
   12.times { document.text paragraph * 4, align: :justify }
-  document.image "#{DATA_DIRECTORY}/images/stef.jpg", width: 80
+  document.image "#{DATA_DIRECTORY}/images/stef.jpg", width: 80, alt: "A portrait of Stef"
   document.page_break
 end

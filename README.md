@@ -1,12 +1,13 @@
 # Gamba
 
 Gamba is a Ruby library that writes PDF files: invoices, reports, labels, anything you can lay out as text, tables,
-images and shapes. It is a faster rewrite of [Prawn](https://github.com/prawnpdf/prawn), the most widely used PDF
-library for Ruby, together with its two companion gems, prawn-table and prawn-svg.
+images and shapes. You describe the layout, stacks, rows, tables, headers and footers, and Gamba measures it, places
+it, breaks pages where a reader expects them, and tags the result for screen readers.
 
-Code written for Prawn 2.5 runs on Gamba unchanged and draws the same pages, down to the pixel. The difference is
-speed and size: a one-page invoice renders about five times faster and the file is a quarter lighter (see
-[Performance](#performance)).
+It also runs code written for [Prawn](https://github.com/prawnpdf/prawn) 2.5, the most widely used PDF library for
+Ruby, and for its companions prawn-table and prawn-svg, unchanged and down to the pixel: a one-page invoice renders
+about four times faster and the file is a quarter lighter (see [Performance](#performance)). An application moves
+from one API to the other one block at a time ([the migration guide](https://levups.github.io/gamba/migration.html)).
 
 Website and guide: https://levups.github.io/gamba/
 
@@ -25,6 +26,19 @@ without them.
 ## A first document
 
 ```ruby
+require "gamba"
+
+Gamba.document do |document|
+  document.footer { |footer, page| footer.text "Page #{page.number} of #{page.total}" }
+  document.text "Hello, World!", role: :h1
+  document.table([{sku: "A-1", quantity: 2}], columns: {sku: {title: "SKU"}, quantity: {title: "Qty"}})
+end.write("hello.pdf")
+```
+
+This writes `hello.pdf` with a heading, which also makes the PDF's first bookmark, a two-row table and a footer
+numbering the pages. The same document with Prawn's API, which Gamba runs as it is:
+
+```ruby
 require "prawn"
 
 Prawn::Document.generate("hello.pdf") do
@@ -33,9 +47,9 @@ Prawn::Document.generate("hello.pdf") do
 end
 ```
 
-This writes `hello.pdf` with a line of text and a two-row table. Everything else Prawn documents works the same
-way: fonts, colors, images, columns, page numbers, links, encryption. Prawn's manual applies as it is, and
-[the guide](https://levups.github.io/gamba/guide.html) covers what Gamba adds.
+Everything else Prawn documents works the same way: fonts, colors, images, columns, page numbers, links,
+encryption. Prawn's manual applies as it is, and [the guide](https://levups.github.io/gamba/guide.html) covers what
+Gamba adds.
 
 The constant is still `Prawn`, so you don't have to rename anything. `Prawn::VERSION` reports `2.5.0`, the
 version of the API Gamba reproduces, for code that checks it. Gamba's own version is `Gamba::VERSION`.
@@ -83,8 +97,9 @@ document.table(lines, columns: {sku: {title: "SKU", width: 60}, description: {},
 Pages break where a reader expects them: a paragraph leaves no single line at the bottom or the top of a page
 (`widows` and `orphans`, 2 unless told), and a heading with `keep_with_next: true` moves with what follows it.
 
-Text, styles, components, stacks, rows, grids, tables, images, headers, footers and these page breaks are there today;
-boxes with a background split across pages come next ([the plan](https://github.com/levups/gamba/issues/69)).
+Text, styles, components, stacks, rows, grids, tables, images, codes, headers, footers, these page breaks and
+semantic roles are there today; forms, signatures and complex scripts come next
+([the plan](https://github.com/levups/gamba/issues/69)).
 
 Ligatures and kerning from OpenType fonts, per font:
 
@@ -93,13 +108,34 @@ font "Inter.ttf", features: %i[liga kern]
 ```
 
 PDF/A-3b archival files, and Factur-X electronic invoices (the French and German standard that embeds the invoice
-data as XML inside the PDF). Gamba embeds the XML your invoicing system produced; it does not build it.
+data as XML inside the PDF). Gamba writes the XML of the EN 16931 profile from a `Gamba::Invoice`, which computes the
+totals and the VAT breakdown with EN 16931's rounding, in exact decimals; or it embeds the XML your invoicing system
+produced, in any profile.
 
 ```ruby
+invoice = Gamba::Invoice.new(number: "INV-2026-0001", issued_on: Date.new(2026, 11, 12), due_on: Date.new(2026, 12, 12),
+  seller: {name: "Example SAS", vat: "FR32123456789", address: {lines: "1 Example Street", postcode: "75001", city: "Paris", country: "FR"}},
+  buyer: {name: "Alice Martin", address: {lines: "2 Example Avenue", postcode: "69001", city: "Lyon", country: "FR"}},
+  lines: [{name: "Post", quantity: 2, unit_price: "50.00", vat_rate: 20}])
+invoice.due # => (120/1)
+
 Prawn::Document.new(pdf_a: true, info: {Title: "Invoice INV-2026-0001"}) do
   font "Inter.ttf" # PDF/A needs embedded fonts: the 14 standard ones raise, and so does encryption
   # ...
-  factur_x File.read("factur-x.xml"), profile: :en16931 # or minimum, basic_wl, basic, extended
+  factur_x invoice # or File.read("factur-x.xml"), profile: :basic (minimum, basic_wl, basic, en16931, extended)
+end
+```
+
+Tagged PDF for screen readers: `pdf: :ua` (PDF/UA-1) and `pdf_a: :a` (PDF/A-3a) tag the boxes of Gamba's own API
+from their roles, and raise where a rule is broken (a figure without `alt`, a list item outside a list; under `pdf: :ua`
+also no `lang`, no title, a skipped heading level).
+
+```ruby
+Gamba.document(pdf: :ua, lang: "en", info: {Title: "Quarterly report"}) do |document|
+  document.register_font "Inter", normal: "Inter.ttf"
+  document.style :default, font: "Inter"
+  document.text "Quarterly report", role: :h1
+  document.image "chart.png", alt: "Sales by month, 2026"
 end
 ```
 
@@ -232,12 +268,14 @@ Ruby 4.0.9:
 
 | Document | Prawn | Gamba | Allocations, Prawn → Gamba | Weight, Prawn → Gamba |
 |---|---:|---:|---:|---:|
-| Invoice, one page | 22.1 ms | 4.5 ms | 163,881 → 31,366 | 38,766 → 28,992 bytes |
-| Report, 101 pages | 559.4 ms | 216.0 ms | 3,350,853 → 2,089,008 | 207,815 → 164,924 bytes |
-| Catalog, 1,000 table rows | 544.9 ms | 265.6 ms | 3,979,977 → 2,078,343 | 147,731 → 134,082 bytes |
+| Invoice, one page | 22.5 ms | 5.2 ms | 163,879 → 26,718 | 38,766 → 28,990 bytes |
+| Report, 101 pages | 529.0 ms | 152.8 ms | 3,350,867 → 766,398 | 207,815 → 164,923 bytes |
+| Catalog, 1,000 table rows | 545.7 ms | 242.2 ms | 3,979,956 → 1,717,915 | 147,731 → 134,085 bytes |
 
 Files are lighter because Gamba compresses streams and packs objects together, which PDF 1.5 allows and Prawn
-doesn't do. Charts and peak memory are on the [benchmarks page](https://levups.github.io/gamba/benchmarks.html).
+doesn't do. The same documents written with Gamba's own API are measured untagged and tagged for PDF/UA: tagging
+costs 8 to 21% more allocations and 8 to 65% in weight, the catalog's structure tree holding each of its cells.
+Charts and peak memory are on the [benchmarks page](https://levups.github.io/gamba/benchmarks.html).
 
 ## How we know the pages are the same
 
@@ -297,10 +335,10 @@ bin/release minor             # or patch, major, or an exact version such as 1.2
 ```
 
 `main` takes no direct push, so `bin/release` dates the notes and bumps the version on a `release/vX.Y.Z` branch,
-opens a pull request that merges itself once CI is green, and waits for it. It then pushes a signed `vX.Y.Z` tag on
-the merge commit (`bin/release --tag X.Y.Z` does it if you stopped waiting). The tag starts the Release workflow,
-which publishes the gem to RubyGems through trusted publishing and creates the GitHub release with the notes and
-the `.gem`.
+opens a pull request that merges itself once CI is green, and waits for it (`bin/release --wait X.Y.Z` if you
+stopped it). The merge starts the Release workflow, which waits for a maintainer's approval, tags the merge commit
+`vX.Y.Z`, publishes the gem to RubyGems through trusted publishing and creates the GitHub release with the notes
+and the `.gem`.
 
 ## License
 

@@ -29,7 +29,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Ruby
-        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
+        uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
           ruby-version: "4.0"
           bundler-cache: true
@@ -55,7 +55,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Ruby
-        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
+        uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
@@ -87,11 +87,40 @@ jobs:
             test "$attempt" -lt 3 || exit 1
           done
           sudo chown -R "$USER" ~/.cache/apt-archives
-      - name: Set up Java for Mustang, the Factur-X validator
-        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+      - name: Set up Java for Mustang, the Factur-X validator, and veraPDF
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: "21"
+      # The PDF/A, PDF/UA and tagged PDF tests run veraPDF: locally they skip without it, here they fail.
+      - name: Install veraPDF, the PDF/A and PDF/UA validator
+        run: |
+          mkdir -p ~/.cache/gamba-tools
+          zip=~/.cache/gamba-tools/verapdf-greenfield-1.30.4-installer.zip
+          test -f "$zip" || curl -sSfL -o "$zip" https://software.verapdf.org/releases/1.30/verapdf-greenfield-1.30.4-installer.zip
+          # The installer runs in CI: the SHA-256 of the zip whose PGP signature (.asc) checked against the key of
+          # veraPDF's technical lead, 13DD102B4DD69354D12DE5A83184863278B17FE7.
+          echo "04415ef3f149526a3048b9889723e81320ddf013bd891bcc7f0f297f3eadcc23  $zip" | sha256sum --check --strict
+          unzip -q -o "$zip" -d "$RUNNER_TEMP/verapdf"
+          cat > "$RUNNER_TEMP/verapdf/auto-install.xml" <<XML
+          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+          <AutomatedInstallation langpack="eng">
+          <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
+          <com.izforge.izpack.panels.target.TargetPanel id="install_dir"><installpath>$HOME/verapdf</installpath></com.izforge.izpack.panels.target.TargetPanel>
+          <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select">
+          <pack index="0" name="veraPDF GUI" selected="true"/>
+          <pack index="1" name="veraPDF Batch files" selected="true"/>
+          <pack index="2" name="veraPDF Validation model" selected="false"/>
+          <pack index="3" name="veraPDF Documentation" selected="false"/>
+          <pack index="4" name="veraPDF Sample Plugins" selected="false"/>
+          </com.izforge.izpack.panels.packs.PacksPanel>
+          <com.izforge.izpack.panels.install.InstallPanel id="install"/>
+          <com.izforge.izpack.panels.finish.FinishPanel id="finish"/>
+          </AutomatedInstallation>
+          XML
+          java -jar "$RUNNER_TEMP/verapdf/verapdf-greenfield-1.30.4/verapdf-izpack-installer-1.30.4.jar" "$RUNNER_TEMP/verapdf/auto-install.xml"
+          echo "$HOME/verapdf" >> "$GITHUB_PATH"
+          "$HOME/verapdf/verapdf" --version
       - name: Install Prawn, the oracle
         run: BUNDLE_GEMFILE=oracle/Gemfile bundle install
       - name: Fetch the corpus
@@ -141,7 +170,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up Ruby
-        uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
+        uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
           ruby-version: "4.0"
           bundler-cache: true
