@@ -99,16 +99,20 @@ jobs:
           fi
       - name: Build the gem
         run: gem build *.gemspec
-      - name: Get RubyGems credentials (trusted publishing)
-        uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
-      - name: Publish to RubyGems
+      - name: Check whether RubyGems has it
+        id: rubygems
         run: |
           name=$(ruby -e 'puts Gem::Specification.load(Dir["*.gemspec"].first).name')
           if curl --silent --fail --output /dev/null "https://rubygems.org/api/v2/rubygems/$name/versions/${TAG#v}.json"; then
-            echo "$name ${TAG#v} is already on RubyGems"
-          else
-            gem push *.gem
+            echo "$name ${TAG#v} is already on RubyGems (an earlier run, or a new gem's first version pushed by hand)"
+            echo "published=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: Get RubyGems credentials (trusted publishing)
+        if: steps.rubygems.outputs.published != 'true'
+        uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
+      - name: Publish to RubyGems
+        if: steps.rubygems.outputs.published != 'true'
+        run: gem push *.gem
       - name: Create the GitHub release
         run: |
           if gh release view "$TAG" > /dev/null 2>&1; then
