@@ -82,6 +82,8 @@ class InvoiceRulesTest < Minitest::Test
 
   # Where Mustang's syntax rules report a rule under their own id: CII writes BR-61's account only when it has one.
   MUSTANG_ID_BY_RULE = {"BR-61" => "CII-SR-470"}.freeze
+  # Rules of EN 16931 that Mustang checks only in the extended profile: its EN 16931 schematrons leave them out.
+  NOT_CHECKED_BY_MUSTANG = %w[BR-CO-25].freeze
 
   def test_the_valid_invoice_breaks_no_rule
     assert_empty invoice.violations(rules: :fr)
@@ -128,7 +130,7 @@ class InvoiceRulesTest < Minitest::Test
 
   def test_mustang_reports_each_rule_gamba_names
     skip_without_mustang
-    cases = BROKEN_EN16931.merge(BROKEN_FR)
+    cases = BROKEN_EN16931.merge(BROKEN_FR).except(*NOT_CHECKED_BY_MUSTANG)
     reported = cases.each_slice((cases.size / 4.0).ceil).map do |slice|
       Thread.new { slice.to_h { |rule, changes| [rule, mustang_rules(invoice(**changes))] } }
     end.map(&:value).reduce(:merge)
