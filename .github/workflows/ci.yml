@@ -154,6 +154,7 @@ jobs:
       matrix:
         # ruby-head, then this gem's extra ones.
         ruby: [ruby-head, truffleruby-head]
+        rails: [{version: "8.1", gemfile: Gemfile}, {version: "8.0", gemfile: gemfiles/rails_8_0.gemfile}]
     env:
       BUNDLE_GEMFILE: ${{ matrix.rails.gemfile != 'Gemfile' && matrix.rails.gemfile || '' }}
     steps: *test-steps
