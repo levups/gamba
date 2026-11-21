@@ -43,7 +43,8 @@ end
 spec = Gem::Specification.load(Dir["*.gemspec"].first) or abort "No gemspec here"
 current = spec.version
 repo_url = spec.metadata["source_code_uri"] || spec.homepage
-display_name = File.read("README.md", encoding: "UTF-8")[/\A# (\S+)/, 1] || spec.name
+# The README's title, past a logo: "# <img src=\"docs/logo.svg\" alt=\"\"> Maptain" names Maptain.
+display_name = File.read("README.md", encoding: "UTF-8")[/\A# (?:<[^>]*>\s*)*([^\s<]+)/, 1] || spec.name
 changelog = File.read(CHANGELOG, encoding: "UTF-8")
 
 # Waits for the release pull request to merge, then tags its merge commit and pushes the tag alone. Stops when
