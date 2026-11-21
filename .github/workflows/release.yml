@@ -38,7 +38,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(ruby -e 'puts Gem::Specification.load(Dir["*.gemspec"].first).version')
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$version" --silent 2> /dev/null; then
+          # Released once its GitHub release exists, the last step: a tag alone is a run to finish.
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$version" --silent 2> /dev/null; then
             echo "v$version is already released"; exit 0
           fi
           bin/release --check "v$version" || { echo "$version has no notes yet: nothing to release"; exit 0; }
