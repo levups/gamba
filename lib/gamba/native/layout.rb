@@ -979,11 +979,67 @@ module Gamba
         layout = attributes.slice(*LAYOUT_ATTRIBUTES)
         attributes = attributes.except(*LAYOUT_ATTRIBUTES)
         font = attributes.delete(:font)
-        font_options = (font.nil? || @prawn.font_families.key?(font)) ? {} : {features: @default_font_features}
-        {font:, font_options:, color: attributes.delete(:color), text_options: text_options(attributes), bookmarks: @bookmarks, **layout}
+        font_options = single_face?(font) ? {features: @default_font_features} : {}
+        color = attributes.delete(:color)
+        text_options = text_options(attributes)
+        check_face(font, text_options[:style])
+        {font:, font_options:, color:, text_options:, bookmarks: @bookmarks, **layout}
+      end
+
+      # A font given by its file, or by the name of one standard face (Courier-Bold), rather than a family.
+      def single_face?(font)
+        return false if font.nil? || @prawn.font_families.key?(font.to_s)
+
+        (@single_faces ||= {}).fetch(font.to_s) do |name|
+          @single_faces[name] = Prawn::Fonts::AFM::BUILT_INS.include?(name) || File.file?(name)
+        end
+      end
+
+      # A face the font lacks: Prawn raises BadFontFamily or UnknownFont, which say neither what is missing nor how to
+      # add it.
+      def check_face(font, font_style, alternative = nil, in_table: false)
+        return if font.nil? || font_style.nil? || font_style == :normal
+
+        name = font.to_s
+        faces = @prawn.font_families[name]
+        if faces
+          # A family named after a standard font falls back on it, as in Prawn.
+          return if faces.key?(font_style) || Prawn::Fonts::AFM::BUILT_INS.include?(name)
+
+          lacking = "#{name.inspect} is registered without #{font_style}"
+        elsif !single_face?(font)
+          return
+        elsif (family, styled = standard_family(name, font_style, in_table))
+          raise ArgumentError, "#{name.inspect} is one face of #{family}: name the family, font: #{family.inspect}, " \
+            "#{styled}#{alternative}"
+        elsif %w[Symbol ZapfDingbats].include?(name)
+          raise ArgumentError, "#{name.inspect} is a standard font of one face, without #{font_style}#{alternative}"
+        elsif Prawn::Fonts::AFM::BUILT_INS.include?(name)
+          lacking = "#{name.inspect} is one face of a standard font, without #{font_style}"
+        else
+          lacking = "#{name.inspect} is a single face, without #{font_style}"
+        end
+        raise ArgumentError, "#{lacking}: register its faces, document.register_font \"Name\", normal: \"Name.ttf\", " \
+          "#{font_style}: \"Name-#{font_style}.ttf\", then font: \"Name\"#{alternative}"
       end
 
       private
+
+      # Courier for Courier-Bold, and the options that reach the face it would take, while the document still has that
+      # standard face. Out of a table, that face joins its own style to the one asked; in a table, the header or the
+      # styling block asked the rest, so the columns take its own style alone.
+      def standard_family(name, font_style, in_table)
+        family, faces = Prawn::Document::BUILT_IN_FONT_FAMILIES.find { |_family, standard| standard.value?(name) }
+        return unless family
+
+        styles = in_table ? [faces.key(name)] : [faces.key(name), font_style]
+        bold, italic = %w[bold italic].map { |part| styles.any? { |style| style.to_s.include?(part) } }
+        face = Styles.font_style(bold ? :bold : nil, italic)
+        return unless @prawn.font_families.dig(family, face) == faces[face] && @prawn.font_families.dig(family, font_style)
+
+        options = [("weight: :bold" if bold), ("italic: true" if italic)].compact.join(", ")
+        [family, in_table ? "with #{options} in its columns" : "with #{options}"]
+      end
 
       def named(name)
         return {} unless name

@@ -3,12 +3,14 @@
 require_relative "test_helper"
 require_relative "support/pdf_objects"
 require "prawn"
+require_relative "../bench/native_bench"
 
 # Tagged PDF, PDF/UA-1 and PDF/A-3a: a structure tree read back with qpdf, checked by veraPDF when installed
 # (brew install verapdf), and pages identical to those of the same document untagged.
 class TaggingTest < Minitest::Test
-  DATA_DIRECTORY = File.join(Oracle::ROOT, "corpus/cache/prawn/data")
-  BENCH_DIRECTORY = File.join(Oracle::ROOT, "bench/native")
+  DATA_DIRECTORY = NativeBench::DATA_DIRECTORY
+  # veraPDF's profile for each standard of the benchmarks page.
+  PROFILE_BY_STANDARD = {"pdf_ua" => "ua1"}.freeze
   TAGGED = {pdf: :ua, pdf_a: :a, lang: "en", info: {Title: "Quarterly report"}}.freeze
 
   def setup
@@ -25,13 +27,23 @@ class TaggingTest < Minitest::Test
   end
 
   def test_the_bench_examples_pass_once_tagged
-    %w[invoice report catalog].each do |name|
-      body = File.read(File.join(BENCH_DIRECTORY, "#{name}.rb"))
-      pdf = Gamba.document(**TAGGED) { |document| eval(body, binding, name) }.to_s # rubocop:disable Security/Eval
+    paths = Dir[File.join(NativeBench::DIRECTORY, "*.rb")]
+    refute_empty paths
+    require_verapdf
 
-      assert_valid "ua1", pdf
-      assert_valid "3a", pdf
+    paths.each do |path|
+      body = File.read(path)
+      both = Gamba.document(**TAGGED) { |document| NativeBench.write(document, body, path) }.to_s
+
+      assert_valid "ua1", both
+      assert_valid "3a", both
+      # As bench/run.rb renders them for the benchmarks page.
+      NativeBench::OPTIONS_BY_STANDARD.each_key { |standard| assert_valid PROFILE_BY_STANDARD.fetch(standard), NativeBench.render(body, path, standard) }
     end
+  end
+
+  def test_a_bench_standard_is_one_the_bench_knows
+    assert_raises(KeyError) { NativeBench.render("", "invoice.rb", "pdf_x") }
   end
 
   def test_the_structure_follows_the_boxes_and_reads_in_their_order

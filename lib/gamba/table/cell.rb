@@ -33,6 +33,9 @@ module Prawn
       attr_accessor :borders, :content, :background_color
       # In a tagged document, :header for a cell of the table header, :repeated for its copy atop a later page.
       attr_writer :tag_role
+      # Set by Gamba's own tables: a text cell is measured in the font it is drawn in. prawn-table measures it in the
+      # document's, and Prawn's tables keep that.
+      attr_writer :sized_in_its_font
 
       def self.make(pdf, content, options = {})
         at = options.delete(:at) || [0, pdf.cursor]
