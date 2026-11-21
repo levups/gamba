@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gamba: PDF files from Ruby, with Prawn’s API, faster</title>
+<title>Gamba: PDF files from Ruby, laid out and tagged for you</title>
 <meta name="description" content="Gamba is a Ruby library that writes PDF files from layout you describe: stacks, rows, tables, headers, tagged for screen readers. It also runs code written for Prawn unchanged, faster and in lighter files.">
-<meta property="og:title" content="Gamba: PDF files from Ruby, with Prawn’s API, faster">
+<meta property="og:title" content="Gamba: PDF files from Ruby, laid out and tagged for you">
 <meta property="og:description" content="A Ruby library that writes PDF files from layout you describe, tagged for screen readers. It also runs code written for Prawn, prawn-table and prawn-svg unchanged, faster and in lighter files.">
 <meta property="og:type" content="website">
 <link rel="canonical" href="https://levups.github.io/gamba/">
 <meta property="og:url" content="https://levups.github.io/gamba/">
 <meta property="og:site_name" content="Level UP Solutions">
 <meta name="twitter:card" content="summary">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Gamba","description":"Prawn's API, rewritten for speed: same pages, lighter files","url":"https://levups.github.io/gamba/","codeRepository":"https://github.com/levups/gamba","programmingLanguage":"Ruby","runtimePlatform":"Ruby 3.3 or later","license":"https://github.com/levups/gamba/blob/main/LICENSE","author":{"@type":"Organization","name":"Level UP Solutions","url":"https://levups.com"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Gamba","description":"PDFs from layout you describe, tagged for screen readers; runs Prawn code unchanged, faster","url":"https://levups.github.io/gamba/","codeRepository":"https://github.com/levups/gamba","programmingLanguage":"Ruby","runtimePlatform":"Ruby 3.3 or later","license":"https://github.com/levups/gamba/blob/main/LICENSE","author":{"@type":"Organization","name":"Level UP Solutions","url":"https://levups.com"}}</script>
 <meta name="theme-color" content="#c2361b">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -77,19 +77,24 @@
           <p><a href="guide.html#installation">Installation</a></p>
         </div>
         <div class="card">
-          <h3>Lighter files, same pixels</h3>
-          <p>Every PDF is written as PDF 1.5: compressed streams, the other objects packed in one compressed object stream, a cross-reference stream. Identical images are embedded once.</p>
-          <p><a href="guide.html#output">Output</a></p>
-        </div>
-        <div class="card">
-          <h3>Fonts parsed once per process</h3>
-          <p>A TrueType or OpenType font is read once, frozen and shared by every document and thread, until its file changes. <code>Gamba.eager_load!</code> loads it all before a server forks.</p>
-          <p><a href="guide.html#fonts">Fonts</a></p>
+          <h3>Lighter files, fonts read once</h3>
+          <p>Every PDF is written as PDF 1.5, its objects packed in a compressed stream, and identical images are embedded once. A font is parsed once per process and shared by every document and thread; <code>Gamba.eager_load!</code> loads it all before a server forks.</p>
+          <p><a href="guide.html#output">Output</a> · <a href="guide.html#fonts">Fonts</a></p>
         </div>
         <div class="card">
           <h3>PDF/UA, PDF/A-3 and Factur-X</h3>
           <p><code>pdf: :ua</code> tags a native document for screen readers from its boxes’ roles; <code>pdf_a: true</code> writes a PDF/A-3b document; <code>factur_x</code> embeds the invoice XML your invoicing system produced.</p>
           <p><a href="guide.html#pdf-a">PDF/A, PDF/UA and Factur-X</a></p>
+        </div>
+        <div class="card">
+          <h3>Codes and pages, drawn as vectors</h3>
+          <p>QR codes, DataMatrix, Code 128, EAN, Code 39 and ITF-14, encoded in pure Ruby and drawn sharp at any size. A page of another PDF draws like an image, or under every page as letterhead.</p>
+          <p><a href="guide.html#barcodes">QR codes and barcodes</a></p>
+        </div>
+        <div class="card">
+          <h3>Rails, and your tests</h3>
+          <p><code>render pdf:</code> and <code>.pdf.rb</code> templates in Rails, Active Storage files as images. The oracle’s checks come as Minitest assertions and RSpec matchers: same text, same pages, valid PDF.</p>
+          <p><a href="guide.html#rails">Rails</a> · <a href="guide.html#comparing">Comparing an app’s PDFs</a></p>
         </div>
         <div class="card">
           <h3>Prawn’s bugs, fixed and declared</h3>
