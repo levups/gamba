@@ -13,7 +13,7 @@ require_relative "../test/support/oracle"
 require_relative "native_bench"
 
 ITERATIONS = Integer(ENV.fetch("BENCH_ITERATIONS", "20"))
-PROCESSES = Integer(ENV.fetch("BENCH_PROCESSES", "7"))
+PROCESSES = Integer(ENV.fetch("BENCH_PROCESSES", "8"))
 TIME_COMMAND = RUBY_PLATFORM.include?("darwin") ? ["/usr/bin/time", "-l"] : ["/usr/bin/time", "-v"]
 
 def peak_memory_megabytes(time_report)
@@ -38,14 +38,15 @@ def measure(engine, document, standard = nil)
   JSON.parse(output.lines.last, symbolize_names: true).merge(peak_memory_megabytes: peak_memory_megabytes(report))
 end
 
-# Of an even count, the mean of the two middle values, so that no column leans to its slower half.
+# Of an even count, the mean of the two middle values, so that no column leans to its slower half, rounded half to
+# even so that ties do not all lean up.
 def median(values)
   sorted = values.sort
   middle = sorted.size / 2
   return sorted[middle] if sorted.size.odd?
 
   mean = (sorted[middle - 1] + sorted[middle]) / 2.0
-  sorted.all?(Integer) ? mean.round : mean.round(1)
+  sorted.all?(Integer) ? mean.round(half: :even) : mean.round(1, half: :even)
 end
 
 # What each column of the results renders: the document with Prawn's API on each engine, and with Gamba's own API
@@ -60,8 +61,8 @@ end
 
 # A Williams design: over as many rounds as columns, each column takes each place once and follows each other column
 # once (an even count of columns, as here), so neither a slower moment of the machine nor a heavier neighbour falls
-# on one column more than another. Only a multiple of the columns balances all the rounds: 7, the default the site's
-# numbers were measured with, repeats the first three orders.
+# on one column more than another. Only a multiple of the columns balances all the rounds: 8, the default, balances
+# the four columns twice.
 def order(count, round)
   first = [0] + (1...count).map { |step| step.odd? ? (step + 1) / 2 : count - (step / 2) }
   first.map { |index| (index + round) % count }
