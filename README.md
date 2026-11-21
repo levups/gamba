@@ -108,13 +108,21 @@ font "Inter.ttf", features: %i[liga kern]
 ```
 
 PDF/A-3b archival files, and Factur-X electronic invoices (the French and German standard that embeds the invoice
-data as XML inside the PDF). Gamba embeds the XML your invoicing system produced; it does not build it.
+data as XML inside the PDF). Gamba writes the XML of the EN 16931 profile from a `Gamba::Invoice`, which computes the
+totals and the VAT breakdown with EN 16931's rounding, in exact decimals; or it embeds the XML your invoicing system
+produced, in any profile.
 
 ```ruby
+invoice = Gamba::Invoice.new(number: "INV-2026-0001", issued_on: Date.new(2026, 11, 12), due_on: Date.new(2026, 12, 12),
+  seller: {name: "Example SAS", vat: "FR32123456789", address: {lines: "1 Example Street", postcode: "75001", city: "Paris", country: "FR"}},
+  buyer: {name: "Alice Martin", address: {lines: "2 Example Avenue", postcode: "69001", city: "Lyon", country: "FR"}},
+  lines: [{name: "Post", quantity: 2, unit_price: "50.00", vat_rate: 20}])
+invoice.due # => (120/1)
+
 Prawn::Document.new(pdf_a: true, info: {Title: "Invoice INV-2026-0001"}) do
   font "Inter.ttf" # PDF/A needs embedded fonts: the 14 standard ones raise, and so does encryption
   # ...
-  factur_x File.read("factur-x.xml"), profile: :en16931 # or minimum, basic_wl, basic, extended
+  factur_x invoice # or File.read("factur-x.xml"), profile: :basic (minimum, basic_wl, basic, en16931, extended)
 end
 ```
 

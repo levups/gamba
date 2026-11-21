@@ -67,6 +67,12 @@ module Gamba
       declare_band(:footer, gap, block)
     end
 
+    # Embeds the invoice's Factur-X XML: a Gamba::Invoice, or the XML as a String. The document is a PDF/A one.
+    def factur_x(invoice, profile: :en16931, filename: PdfA::FACTUR_X_FILENAME, description: "Factur-X invoice")
+      @prawn.factur_x(invoice, profile:, filename:, description:)
+      self
+    end
+
     def to_s
       prawn.render
     end
