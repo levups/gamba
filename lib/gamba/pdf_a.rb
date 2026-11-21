@@ -45,10 +45,12 @@ module Gamba
       !@pdf_a_conformance.nil?
     end
 
-    def factur_x(xml, profile: :en16931, filename: FACTUR_X_FILENAME, description: "Factur-X invoice")
+    # The invoice is a Gamba::Invoice, whose XML Gamba writes, or the XML itself as a String.
+    def factur_x(invoice, profile: :en16931, filename: FACTUR_X_FILENAME, description: "Factur-X invoice")
       raise Prawn::Errors::PdfAViolation, "Factur-X invoices are PDF/A-3 documents: create this one with pdf_a: true" unless pdf_a?
 
       level = FACTUR_X_LEVEL_BY_PROFILE.fetch(profile) { raise ArgumentError, "Unknown Factur-X profile #{profile.inspect}: #{FACTUR_X_LEVEL_BY_PROFILE.keys.join(", ")}" }
+      xml = invoice.is_a?(Gamba::Invoice) ? invoice.to_xml(profile:) : invoice
       @factur_x = {xml: xml.b, level:, relationship: RELATIONSHIP_BY_PROFILE.fetch(profile), filename:, description:}
     end
 
