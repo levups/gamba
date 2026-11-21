@@ -27,9 +27,11 @@ require "tempfile"
 CHANGELOG = "CHANGELOG.md"
 REFERENCE = /^\[([^\]]+)\]: (\S+)$/
 
+# Returns what the command writes on stdout: callers parse it (JSON, a branch, a commit), so whatever it writes on
+# stderr (gh's hints, git's progress) is shown only when it fails.
 def run(*command)
-  output, status = Open3.capture2e(*command)
-  abort "#{command.join(" ")} failed:\n#{output}" unless status.success?
+  output, errors, status = Open3.capture3(*command)
+  abort "#{command.join(" ")} failed:\n#{output}#{errors}" unless status.success?
   output
 end
 
