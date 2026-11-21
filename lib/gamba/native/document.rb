@@ -68,8 +68,8 @@ module Gamba
     end
 
     # Embeds the invoice's Factur-X XML: a Gamba::Invoice, or the XML as a String. The document is a PDF/A one.
-    def factur_x(invoice, profile: :en16931, filename: PdfA::FACTUR_X_FILENAME, description: "Factur-X invoice")
-      @prawn.factur_x(invoice, profile:, filename:, description:)
+    def factur_x(invoice, profile: :en16931, rules: :en16931, filename: PdfA::FACTUR_X_FILENAME, description: "Factur-X invoice")
+      @prawn.factur_x(invoice, profile:, rules:, filename:, description:)
       self
     end
 

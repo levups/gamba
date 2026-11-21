@@ -126,6 +126,10 @@ Prawn::Document.new(pdf_a: true, info: {Title: "Invoice INV-2026-0001"}) do
 end
 ```
 
+The invoice is checked against the EN 16931 business rules first, and with `factur_x invoice, rules: :fr` against those
+of France's e-invoicing reform too; `Gamba::Invoice::RuleViolation` names each rule broken, such as
+`BR-CO-25: an invoice with an amount due needs due_on or payment_terms`.
+
 Tagged PDF for screen readers: `pdf: :ua` (PDF/UA-1) and `pdf_a: :a` (PDF/A-3a) tag the boxes of Gamba's own API
 from their roles, and raise where a rule is broken (a figure without `alt`, a list item outside a list; under `pdf: :ua`
 also no `lang`, no title, a skipped heading level).

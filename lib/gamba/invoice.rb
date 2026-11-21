@@ -7,8 +7,8 @@ module Gamba
   # Rationals, given as Strings such as "12.50", Integers, Rationals or BigDecimals, never Floats; totals and the
   # VAT breakdown are computed with EN 16931's rounding, each amount to the cent.
   Invoice = Data.define(:number, :type, :issued_on, :currency, :seller, :buyer, :lines, :allowances, :charges, :due_on,
-    :delivered_on, :period, :buyer_reference, :order_reference, :preceding_invoice, :notes, :payment, :payment_terms,
-    :exemptions, :paid)
+    :delivered_on, :deliver_to, :period, :buyer_reference, :order_reference, :preceding_invoice, :notes, :payment,
+    :payment_terms, :exemptions, :paid)
 
   class Invoice
     TYPE_CODE_BY_NAME = {invoice: "380", credit_note: "381"}.freeze
@@ -120,6 +120,13 @@ module Gamba
       end
     end
 
+    # Where the goods go (BG-13), when not to the buyer.
+    Delivery = Data.define(:name, :address) do
+      def initialize(address:, name: nil)
+        super(name: Invoice.text(name, "deliver_to name"), address: Invoice.build(Address, address, "deliver_to address"))
+      end
+    end
+
     # An allowance or a charge: on a line, or on the whole invoice with the VAT category it falls in.
     Adjustment = Data.define(:amount, :reason, :reason_code, :vat_category, :vat_rate) do
       def initialize(amount:, reason: nil, reason_code: nil, vat_category: nil, vat_rate: nil)
@@ -176,7 +183,7 @@ module Gamba
     TaxBreakdown = Data.define(:vat_category, :vat_rate, :basis, :amount, :exemption)
 
     def initialize(number:, issued_on:, seller:, buyer:, lines:, type: :invoice, currency: "EUR", allowances: [], charges: [], due_on: nil,
-      delivered_on: nil, period: nil, buyer_reference: nil, order_reference: nil, preceding_invoice: nil, notes: [], payment: nil,
+      delivered_on: nil, deliver_to: nil, period: nil, buyer_reference: nil, order_reference: nil, preceding_invoice: nil, notes: [], payment: nil,
       payment_terms: nil, exemptions: {}, paid: 0)
       raise ArgumentError, "currency is #{currency.inspect}: give its ISO 4217 code, such as \"EUR\"" unless currency.is_a?(String) && currency.match?(/\A[A-Z]{3}\z/)
       raise ArgumentError, "an invoice has at least one line" if lines.is_a?(Array) && lines.empty?
@@ -188,7 +195,8 @@ module Gamba
         issued_on: Invoice.date(issued_on, "issued_on", required: true), currency:,
         seller: Invoice.build(Party, seller, "seller"), buyer: Invoice.build(Party, buyer, "buyer"),
         lines: Invoice.list(Line, lines, "lines"), allowances: Invoice.list(Adjustment, allowances, "allowances"), charges: Invoice.list(Adjustment, charges, "charges"),
-        due_on: Invoice.date(due_on, "due_on"), delivered_on: Invoice.date(delivered_on, "delivered_on"), period:,
+        due_on: Invoice.date(due_on, "due_on"), delivered_on: Invoice.date(delivered_on, "delivered_on"),
+        deliver_to: deliver_to && Invoice.build(Delivery, deliver_to, "deliver_to"), period:,
         buyer_reference: Invoice.text(buyer_reference, "buyer_reference"), order_reference: Invoice.text(order_reference, "order_reference"),
         preceding_invoice: preceding_invoice && Invoice.build(Reference, preceding_invoice.is_a?(String) ? {number: preceding_invoice} : preceding_invoice, "preceding_invoice"),
         notes: Invoice.list(Note, notes.map { _1.is_a?(String) ? {text: _1} : _1 }, "notes"),
@@ -247,8 +255,17 @@ module Gamba
       grand_total - paid
     end
 
-    # The Cross Industry Invoice XML of the profile, as Factur-X and ZUGFeRD embed it.
-    def to_xml(profile: :en16931)
+    # The business rules the invoice breaks: EN 16931's, and with rules: :fr those France adds.
+    def violations(rules: :en16931)
+      Rules.check(self, rules)
+    end
+
+    # The Cross Industry Invoice XML of the profile, as Factur-X and ZUGFeRD embed it, once the invoice passes the
+    # rules: RuleViolation lists those it breaks. rules: nil writes it unchecked.
+    def to_xml(profile: :en16931, rules: :en16931)
+      found = violations(rules:)
+      raise RuleViolation, found unless found.empty?
+
       CrossIndustryInvoice.new(self, profile).to_s
     end
   end
