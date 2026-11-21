@@ -16,7 +16,7 @@ FUZZ_SEED=42 FUZZ_CASES=500 bundle exec ruby -Itest test/fuzz_test.rb
 INPUT_FUZZ_SEED=42 INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb
 LAYOUT_FUZZ_SEED=42 LAYOUT_FUZZ_CASES=1000 bundle exec ruby -Itest test/layout_fuzz_test.rb
 bundle exec rubocop
-bundle exec rake bench                                          # Prawn against Gamba, writes docs/benchmarks.json
+bundle exec rake bench                                          # Prawn against Gamba, and Gamba tagged, writes docs/benchmarks.json
 ```
 
 CI also runs `ruby-head` and `truffleruby-head`, and the oracle and the three fuzzers on a fresh seed.
@@ -40,6 +40,9 @@ CI also runs `ruby-head` and `truffleruby-head`, and the oracle and the three fu
 
 This section and the next two read the same in super-slim, gamba, crumbly, agentry and maptain: change all five
 together.
+
+You are the owner and long-term maintainer of this codebase, and its design is up to you. Its public API is a
+promise to its users; everything behind it is yours to reshape when that serves them.
 
 - Every maintained Ruby and Rails (https://endoflife.date), nothing older. The oldest sets `required_ruby_version`,
   `TargetRubyVersion` and the Rails floor, and leaves in the release after its end of life.

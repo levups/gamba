@@ -10,7 +10,7 @@ module Prawn
     }.freeze
 
     def font(name = nil, options = DEFAULT_FONT_OPTIONS)
-      return @font || font("Helvetica") if name.nil?
+      return @font || font(@default_font_family || "Helvetica") if name.nil?
       raise Errors::NotOnPage if pages.empty? && !page.in_stamp_stream?
 
       new_font = find_font(name.to_s, options)
@@ -60,7 +60,7 @@ module Prawn
     end
 
     def save_font
-      @font ||= find_font("Helvetica")
+      @font ||= find_font(@default_font_family || "Helvetica")
       original_font = @font
       original_size = @font_size
       yield

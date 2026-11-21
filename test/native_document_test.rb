@@ -27,7 +27,7 @@ class NativeDocumentTest < Minitest::Test
   def test_an_unknown_text_attribute_raises_with_the_accepted_ones
     error = assert_raises(ArgumentError) { Gamba.document.text("Hello", colour: "ff0000", sise: 3) }
 
-    assert_match(/\Aunknown options :colour, :sise: accepted options are :font, :size, :weight, :italic, :color, :align, :leading, :widows, :orphans, :keep_with_next, :role\z/, error.message)
+    assert_match(/\Aunknown options :colour, :sise: accepted options are :font, :size, :weight, :italic, :color, :align, :leading, :widows, :orphans, :keep_with_next, :role, :lang\z/, error.message)
   end
 
   def test_an_unknown_style_attribute_raises_when_the_style_is_defined
@@ -64,6 +64,107 @@ class NativeDocumentTest < Minitest::Test
     document.text "B", style: :title
 
     assert_equal [["A", "Courier", 10.0], ["B", "Courier", 18.0]], glyphs(document.to_s).map { _1.first(3) }
+  end
+
+  # Prawn's table sizes its columns in the document's font: a native cell is measured in its own.
+  # Prawn's inline formatting measures without the cell's style: the bold header was sized in regular.
+  def test_an_inline_formatted_header_in_a_font_of_its_own_is_sized_in_it
+    table = ->(cell, ambient) {
+      Gamba.document { |document|
+        document.prawn.font(ambient) if ambient
+        document.stack { |stack| stack.table([{sku: "S", description: "G"}], columns: {sku: {title: "Reference number"}, description: {title: "Item"}}, cell:) { |prawn_table| prawn_table.row(0).inline_format = true } }
+      }
+    }
+
+    assert_equal glyphs(table.call({font: "Helvetica"}, nil).to_s), glyphs(table.call({font: "Helvetica"}, "Courier").to_s)
+  end
+
+  def test_a_standard_name_registered_without_bold_takes_the_standard_face_as_in_prawn
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
+    document = Gamba.document { |gamba| gamba.register_font "Helvetica", normal: FONT }
+    document.text "x", font: "Helvetica", weight: :bold
+    document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Helvetica"}) }
+
+    assert_match(/%%EOF/, document.to_s)
+  end
+
+  def test_a_table_sizes_its_columns_in_its_font_whatever_the_documents
+    table = ->(document) { document.stack { |stack| stack.table([{sku: "SKU1", description: "Gadget, deluxe edition"}], columns: {sku: {}, description: {}}, cell: {font: "Courier"}) } }
+    in_helvetica = Gamba.document { |document| document.text "Intro" }.tap(&table)
+    in_courier = Gamba.document { |document| document.text "Intro" }.tap { |document| document.prawn.font("Courier") }.tap(&table)
+
+    assert_equal glyphs(in_courier.to_s).drop(5), glyphs(in_helvetica.to_s).drop(5)
+  end
+
+  def test_a_table_in_a_cell_is_drawn_in_the_font_it_was_sized_in
+    document = Gamba.document { |gamba| gamba.stack(width: 300) { |stack| stack.table([{sku: "SKU1", parts: [["WWWWMMMM WWMM"]]}], cell: {font: "Courier"}) } }
+
+    assert_equal "SkuPartsSKU1WWWWMMMMWWMM", glyphs(document.to_s).map(&:first).join.delete(" ")
+  end
+
+  def test_a_prawn_table_in_a_cell_is_drawn_in_the_font_it_was_sized_in
+    document = Gamba.document
+    document.style :default, font: "Courier"
+    inner = document.prawn.make_table([["filling little list"]])
+    document.stack(width: 300) { |stack| stack.table([{sku: "SKU1", parts: inner}]) }
+
+    assert_equal "SkuPartsSKU1fillinglittlelist", glyphs(document.to_s).map(&:first).join.delete(" ")
+  end
+
+  def test_a_colored_text_renders_under_prawn_debug
+    debug = Prawn.debug
+    Prawn.debug = true
+    document = Gamba.document { |gamba| gamba.text "Red", color: "ff0000" }
+
+    assert_equal "Red", glyphs(document.to_s).map(&:first).join
+  ensure
+    Prawn.debug = debug
+  end
+
+  def test_a_cell_the_styling_block_sets_in_another_font_is_sized_in_it
+    rows = [{sku: "SKU1", description: "Gadget, deluxe edition"}]
+    document = Gamba.document { |gamba| gamba.stack(width: 220) { |stack| stack.table(rows, columns: {sku: {}, description: {}}) { |table| table.column(1).font = "Courier" } } }
+
+    # Sized in Helvetica, the narrower, the description wrapped on two lines.
+    assert_equal 1, glyphs(document.to_s).select { _1[1] == "Courier" && _1.first != " " }.map(&:last).uniq.size
+  end
+
+  # As a text: the style of the Prawn code around the table changes neither what its cells draw nor their size.
+  def test_a_table_in_a_bold_or_italic_document_stays_regular
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
+    words = %w[Gadget deluxe edition with spare parts toolkit and manual]
+    table = lambda do |document|
+      document.register_font "DejaVuSans", normal: FONT, bold: BOLD_FONT
+      document.stack(width: 200) { |stack| stack.table([{sku: "SKU1", description: words.join(" ")}], columns: {sku: {}, description: {}}, cell: {font: "DejaVuSans"}) }
+    end
+    pdfs = %i[bold italic].map do |style|
+      Prawn::Document.new do
+        font "Times-Roman", style: style
+        gamba(&table)
+      end.render
+    end
+    regular = Gamba.document(&table)
+
+    assert_equal "SkuDescriptionSKU1#{words.join}", glyphs(regular.to_s).map(&:first).join.delete(" ")
+    pdfs.each { |pdf| assert_equal glyphs(regular.to_s), glyphs(pdf) }
+  end
+
+  def test_a_table_lays_out_the_same_tagged_or_not
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
+    table = lambda do |document|
+      document.register_font "DejaVuSans", normal: FONT, bold: BOLD_FONT
+      document.style :default, font: "DejaVuSans", size: 9
+      document.stack { |stack| stack.table([{sku: "SKU1", description: "Gadget, deluxe edition"}], columns: {sku: {title: "SKU"}, description: {}}) }
+      # Measured through Prawn's inline formatting, which takes no style from the options.
+      document.stack { |stack| stack.table([{sku: "SKU1", description: "Gadget"}], columns: {sku: {}, description: {}}) { |prawn_table| prawn_table.row(0).inline_format = true } }
+    end
+    plain = Gamba.document(&table)
+    tagged = Gamba.document(pdf: :ua, lang: "en", info: {Title: "Table"}, &table)
+
+    assert_equal glyphs(tagged.to_s), glyphs(plain.to_s)
   end
 
   def test_a_native_call_draws_what_the_prawn_call_draws
@@ -163,6 +264,104 @@ class NativeDocumentTest < Minitest::Test
     prawn = Prawn::Document.new { font(FONT) { text "AVATAR office" } }
 
     assert_operator glyphs(native.to_s).last[3], :<, glyphs(prawn.render).last[3]
+  end
+
+  # Prawn raised BadFontFamily, which names neither the font nor the face.
+  def test_a_font_given_by_its_file_has_no_bold_and_says_so
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
+    text = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: FONT, weight: :bold } }
+    assert_includes text.message, "is a single face, without bold: register its faces"
+    table = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}) } } }
+    assert_includes table.message, "or header: {weight: :normal}"
+    regular = Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}, header: {weight: :normal}) } }
+    assert_equal "SkuSKU1", glyphs(regular.to_s).map(&:first).join
+    widths = nil
+    measured = Gamba.document { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: FONT}, header: {weight: :normal}) { |table| widths = table.cells.map(&:natural_content_width) } } }
+    assert_equal "SkuSKU1", glyphs(measured.to_s).map(&:first).join
+    assert widths.all?(&:positive?)
+    inherited = Prawn::Document.new do |prawn|
+      prawn.font FONT
+      prawn.gamba { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], header: {weight: :normal}) } }
+    end
+    assert_equal "SkuSKU1", glyphs(inherited.render).map(&:first).join
+  end
+
+  def test_a_face_a_font_lacks_says_what_to_name_instead
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
+    registered = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.register_font "Body", normal: FONT
+        document.text "Italic", font: "Body", italic: true
+      end
+    end
+    assert_includes registered.message, %("Body" is registered without italic: register its faces)
+    standard = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Courier-Bold", weight: :bold } }
+    assert_includes standard.message, %("Courier-Bold" is one face of Courier: name the family, font: "Courier")
+    oblique = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Italic", font: "Helvetica-Oblique", italic: true } }
+    assert_includes oblique.message, %("Helvetica-Oblique" is one face of Helvetica)
+    in_table = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Courier-Bold"}) } } }
+    assert_includes in_table.message, %(font: "Courier", with weight: :bold in its columns)
+    oblique_header = assert_raises(ArgumentError) { Gamba.document { |document| document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Courier-Oblique"}) } } }
+    assert_includes oblique_header.message, %(font: "Courier", with italic: true in its columns; or header: {weight: :normal})
+    followed = Gamba.document { |document| document.stack { |stack| stack.table([{a: "b"}], cell: {font: "Courier"}, columns: {a: {italic: true}}) } }
+    assert_equal "Ab", glyphs(followed.to_s).map(&:first).join
+    unregistered = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.prawn.font_families.delete("Courier")
+        document.text "Bold", font: "Courier", weight: :bold
+      end
+    end
+    refute_includes unregistered.message, "one face of Courier"
+    regular = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.prawn.font_families.delete("Courier")
+        document.text "Bold", font: "Courier-Bold", weight: :bold
+      end
+    end
+    assert_includes regular.message, %("Courier-Bold" is one face of a standard font, without bold: register its faces)
+    overridden = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.register_font "Helvetica", normal: FONT, bold: FONT
+        document.text "Bold", font: "Helvetica-Bold", weight: :bold
+      end
+    end
+    assert_includes overridden.message, %("Helvetica-Bold" is one face of a standard font, without bold: register its faces)
+    bold_oblique = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Both", font: "Courier-Bold", italic: true } }
+    assert_includes bold_oblique.message, %(font: "Courier", with weight: :bold, italic: true)
+    single = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.prawn.font_families.update("Body" => {normal: FONT})
+        document.text "Bold", font: FONT, weight: :bold
+      end
+    end
+    assert_includes single.message, "is a single face, without bold: register its faces"
+    symbol = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: "Symbol", weight: :bold } }
+    assert_equal %("Symbol" is a standard font of one face, without bold), symbol.message
+    path = assert_raises(ArgumentError) { Gamba.document { |document| document.text "Bold", font: Pathname(FONT), weight: :bold } }
+    assert_includes path.message, %(#{FONT.inspect} is a single face)
+    header = assert_raises(ArgumentError) do
+      Gamba.document do |document|
+        document.register_font "Body", normal: FONT, bold: FONT
+        document.stack { |stack| stack.table([{a: "b"}], header: {italic: true}, cell: {font: "Body"}) }
+      end
+    end
+    assert_includes header.message, "registered without bold_italic"
+    assert_includes header.message, "; or header: {weight: :normal, italic: false}"
+  end
+
+  # Its own regular, as in Prawn: a family without one takes the style of the document around.
+  def test_a_family_without_a_regular_takes_the_documents_style
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
+
+    pdf = Prawn::Document.new do
+      font_families["BoldOnly"] = {bold: BOLD_FONT}
+      font "Times-Roman", style: :bold
+      gamba { |document| document.stack { |stack| stack.table([{sku: "SKU1"}], cell: {font: "BoldOnly"}) } }
+    end
+
+    assert_equal ["DejaVuSans-Bold"], glyphs(pdf.render).map { _1[1] }.uniq
   end
 
   def test_a_registered_font_can_turn_its_features_off

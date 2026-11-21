@@ -90,7 +90,7 @@ class PdfATest < Minitest::Test
   end
 
   def assert_valid_pdf_a(pdf)
-    skip "veraPDF is not installed" unless system("which verapdf", out: File::NULL)
+    require_verapdf
 
     with_pdf_file(pdf) do |path|
       report, = Open3.capture2e("verapdf", "--flavour", "3b", "--format", "text", path)

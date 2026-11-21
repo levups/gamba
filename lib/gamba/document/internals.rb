@@ -34,6 +34,7 @@ module Prawn
       end
 
       def add_content(string)
+        check_tagged_content(string) if @tagging
         open_graphics_state if page.stack.empty?
         page.content_stream << string << "\n"
       end
@@ -256,9 +257,11 @@ module Prawn
           page.finalize
         end
         @before_render_callbacks.each { _1.call(self) }
+        finalize_tagging if tagged?
         finalize_pdf_a if pdf_a?
+        finalize_metadata if pdf_a? || pdf_ua?
         PDF::Core::Writer.call(objects: @objects, root: @root, info: @info, version: @version, trailer: @trailer, encryption: @encryption,
-          identified: pdf_a?)
+          identified: pdf_a? || pdf_ua?)
       end
     end
   end

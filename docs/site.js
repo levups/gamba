@@ -5,7 +5,7 @@ const METRICS = [
   { key: "bytes", title: "File weight", better: "lower", format: (value) => formatBytes(value) },
   { key: "peak_memory_megabytes", title: "Peak memory of the process", better: "lower", format: (value) => `${formatNumber(value)} MB` }
 ];
-const ENGINE_NAMES = { prawn: "Prawn", gamba: "Gamba", gamba_native: "Gamba, own API" };
+const ENGINE_NAMES = { prawn: "Prawn", gamba: "Gamba", gamba_native: "Gamba, own API", gamba_tagged: "Gamba, own API, PDF/UA" };
 const DOCUMENT_DESCRIPTIONS = {
   invoice: "A one-page invoice: an embedded TrueType font, a JPEG letterhead, a ten-line table.",
   report: "A 101-page report: an embedded TrueType font, a PNG with alpha and a JPEG on every page, justified text.",
@@ -31,7 +31,7 @@ const capitalized = (name) => name.charAt(0).toUpperCase() + name.slice(1);
 
 function columnChart({ title, better, rows, format = formatNumber, heading = "h3" }) {
   const maximum = Math.max(...rows.map((row) => row.value));
-  const columns = element("div", { class: "columns", style: { "--count": rows.length }, role: "img", "aria-label": `${title}: ${rows.map((row) => `${row.name} ${format(row.value)}`).join(", ")}` });
+  const columns = element("div", { class: "columns", style: { "--count": rows.length }, role: "img", "aria-label": `${title}: ${rows.map((row) => `${row.name} ${format(row.value)}`).join("; ")}` });
   for (const row of rows) {
     const ours = row.name.startsWith("Gamba") ? " ours" : "";
     columns.append(element("div", { class: `column${ours}`, title: `${row.label || row.name}: ${format(row.value)}` },
@@ -40,7 +40,7 @@ function columnChart({ title, better, rows, format = formatNumber, heading = "h3
       element("span", { class: "column-name" }, row.name)));
   }
   const table = element("table", {},
-    element("thead", {}, element("tr", {}, element("th", { scope: "col" }, "Engine"), element("th", { scope: "col", class: "number" }, title))),
+    element("thead", {}, element("tr", {}, element("th", { scope: "col" }, "Rendered by"), element("th", { scope: "col", class: "number" }, title))),
     element("tbody", {}, ...rows.map((row) => element("tr", {},
       element("th", { scope: "row" }, row.label || row.name),
       element("td", { class: "number" }, format(row.value))))));
@@ -59,9 +59,9 @@ function ratiosBy(benchmarks, key) {
 const weakest = (ratios) => ratios.reduce((weakest, entry) => entry.ratio < weakest.ratio ? entry : weakest);
 const strongest = (ratios) => ratios.reduce((strongest, entry) => entry.ratio > strongest.ratio ? entry : strongest);
 
-function measuredOn(benchmarks) {
+function measuredOn(benchmarks, per = "column") {
   const ruby = benchmarks.ruby.split(" (")[0].replace("ruby", "Ruby");
-  return `Measured on ${ruby} with YJIT, median of ${benchmarks.processes} fresh processes per engine, each timing ${benchmarks.iterations} renders.`;
+  return `Measured on ${ruby} with YJIT, median of ${benchmarks.processes} fresh processes per ${per}, each timing ${benchmarks.iterations} renders.`;
 }
 
 function memoryTile(memory, tile) {
@@ -88,11 +88,11 @@ function renderHome(benchmarks) {
     tile(formatRatio(weakest(allocations).ratio), "fewer allocations, at the least", `The ${strongest(allocations).name}: ${formatNumber(strongest(allocations).gamba)} objects instead of ${formatNumber(strongest(allocations).prawn)}`),
     tile(formatPercent(1 - 1 / weakest(weight).ratio), "lighter files, at the least", `The ${strongest(weight).name}: ${formatBytes(strongest(weight).gamba)} instead of ${formatBytes(strongest(weight).prawn)}, the same pixels`),
     memoryTile(memory, tile));
-  fill("#tiles-note", `${measuredOn(benchmarks)} Each headline is the weakest of the three documents on the benchmarks page.`);
+  fill("#tiles-note", `${measuredOn(benchmarks, "engine")} Each headline is the weakest of the three documents on the benchmarks page.`);
 }
 
 function renderBenchmarks(benchmarks) {
-  fill("#bench-note", `Each document rendered by Prawn 2.5 with prawn-table, and by Gamba. ${measuredOn(benchmarks)}`);
+  fill("#bench-note", `Each document rendered by Prawn 2.5 with prawn-table, by Gamba, and with Gamba’s own API untagged and tagged. ${measuredOn(benchmarks)}`);
   const documents = document.getElementById("documents");
   for (const [name, measures] of Object.entries(benchmarks.results)) {
     const rowsFor = (key) => Object.entries(measures).map(([engine, engineMeasures]) => ({ name: ENGINE_NAMES[engine] || engine, value: engineMeasures[key] }));

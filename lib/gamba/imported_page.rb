@@ -12,6 +12,7 @@ module Gamba
     FONT_PROGRAMS = %i[FontFile FontFile2 FontFile3].freeze
     TYPE3 = PDF::Core::Name.new(value: "Type3")
     FORM = PDF::Core::Name.new(value: "Form")
+    MARKED_CONTENT_OPERATOR = %r{(?:\A|[\x00\t\n\f\r >])(?:BDC|BMC)(?:\z|[\x00\t\n\f\r ()<>\[\]{}/%])}
 
     attr_reader :width, :height, :form
 
@@ -47,7 +48,12 @@ module Gamba
       end
 
       page = source.pages[number - 1].last
-      check_fonts_embedded(page[:Resources], {}) if document.pdf_a?
+      if document.pdf_a? || document.pdf_ua?
+        # PDF/A and PDF/UA both embed every font; PDF/UA names the error when both apply, as everywhere else.
+        @embedding_violation = document.pdf_ua? ? [Prawn::Errors::PdfUaViolation, "PDF/UA"] : [Prawn::Errors::PdfAViolation, "PDF/A"]
+        check_fonts_embedded(page[:Resources], {})
+      end
+      check_no_marked_content(page[:Contents], document) if document.tagged?
       @form = document.ref!(form_dictionary(page, source.copier))
       @form.stream, filters = content(page[:Contents], source.copier)
       @form.data.merge!(filters)
@@ -85,6 +91,17 @@ module Gamba
       [streams.map { @reader.decoded(_1) }.join("\n"), {}]
     end
 
+    # The page is drawn as one figure or artifact: marked content of its own would nest in it, which tagged PDF
+    # forbids, and its MCIDs would point at a structure tree left behind. The operator follows whitespace or the >> of
+    # its properties, and comes before whitespace, a delimiter or the end: /P<</MCID 0>>BDC(a)Tj is written too.
+    def check_no_marked_content(contents, document)
+      streams = Array(@reader.resolve(contents)).map { @reader.resolve(_1) }.grep(PDF::Core::Reader::Stream)
+      return unless streams.any? { @reader.decoded(_1).match?(MARKED_CONTENT_OPERATOR) }
+
+      error, standard = document.pdf_ua? ? [Prawn::Errors::PdfUaViolation, "PDF/UA"] : [Prawn::Errors::PdfAViolation, "PDF/A-3a"]
+      raise error, "#{standard} cannot import a page that has marked content of its own, a page of a tagged PDF: Gamba does not merge structure trees yet"
+    end
+
     # PDF/A wants every font's program in the file: a page that leaves one to the viewer raises.
     def check_fonts_embedded(resources, visited)
       resources = @reader.resolve(resources)
@@ -113,7 +130,8 @@ module Gamba
       return if descriptor.is_a?(Hash) && FONT_PROGRAMS.any? { descriptor[_1] }
 
       name = @reader.resolve(font[:BaseFont])
-      raise Prawn::Errors::PdfAViolation, "PDF/A embeds every font: the page uses #{name.respond_to?(:value) ? name.value : "a font"} without its font file"
+      error, standard = @embedding_violation
+      raise error, "#{standard} embeds every font: the page uses #{name.respond_to?(:value) ? name.value : "a font"} without its font file"
     end
   end
 end
