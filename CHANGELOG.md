@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-11-21
+
+Gamba gets an API of its own next to Prawn's, `Gamba.document`: layout described in boxes instead of computed, tables with named columns, barcodes, PDF templates, Rails rendering, test assertions and tagged PDF/UA.
+
+**Breaking**
+- `pdf_a:` accepts only `true`, `false`, `nil`, `:a` and `:b`, and raises `ArgumentError` on anything else instead of ignoring it.
+
+**New**
+- `Gamba.document` builds a document with an explicit receiver (no `instance_eval`), named styles, and options checked against typos; `gamba { |document| ... }` opens it inside existing Prawn code, and `document.prawn` reaches Prawn's API from it.
+- Layout in boxes: `stack`, `row` and `grid(columns:)`, with `gap`, `padding`, `background` and borders; pages break between children and inside paragraphs and tables, decorated stacks included, which draw their frame on each page.
+- Typesetter page breaks: `widows` and `orphans` (2 lines each by default) and `keep_with_next`, usable in named styles; `page_break` starts a new page.
+- `header` and `footer` built for each page with its `number` and the real `total`, their room taken from the page.
+- Native tables with named columns: rows as hashes or objects, per-column `title`, `width`, `align` and font, a header repeated on every page, `stripes`, and cells measured in the font they draw in.
+- `image`, `table`, `pdf_page`, `qr_code`, `barcode` and `data_matrix` are boxes of the layout, with `align`.
+- `pdf_page` draws a page of an existing PDF like an image, and `background_pdf` puts a letterhead under every page (also `start_new_page(background_pdf:)`); each page is written once.
+- Vector barcodes in pure Ruby: QR codes (versions 1 to 40, all levels), Code 128, EAN-13, EAN-8, Code 39, ITF-14 with check digits, and DataMatrix ECC 200.
+- Tagged PDF: `pdf: :ua` writes PDF/UA-1 and `pdf_a: :a` PDF/A-3a from the boxes' `role:` (headings, paragraphs, lists, figures with `alt:`, tables) and `lang:`, headers, footers and decoration as artifacts; what breaks the standard raises `PdfUaViolation` or `PdfAViolation`. Headings also make the PDF's bookmarks, tagged or not.
+- Rails: `render pdf:` in controllers, `.pdf.rb` templates drawing on `document` with the view's helpers, `Gamba.eager_load!` before Rails eager loads, and Active Storage attachments read by `image` and `pdf_page` without a temporary file. No Rails dependency.
+- Test helpers: `require "gamba/minitest"` (`assert_pdf_text`, `assert_same_pages`, `assert_valid_pdf`, `assert_pdf_a`) and `require "gamba/rspec"` (`have_pdf_text`, `have_same_pages_as`, `be_a_valid_pdf`, `be_pdf_a`), with failures that say what the page reads instead.
+- Unknown faces in Gamba's own API raise an `ArgumentError` saying what to name instead, such as the family `Courier` with `weight: :bold` rather than `Courier-Bold`.
+
+**Faster**
+- Text in a font loaded with `features: %i[liga kern]` is no longer about three times slower to render than without them: shaping builds nothing per glyph and reads each kerned pair once per document, for the same bytes.
+
+**Fixed**
+- `Gamba.combine` gives a copied page without resources an empty dictionary, as ISO 32000-1 requires; qpdf 12.4 warned about such pages.
+
 ## [2.0.2] — 2026-11-07
 
 SVGs that users send can no longer crash or stall a server through `<use>`, `<image>` or `<tref>`.
@@ -104,7 +131,8 @@ speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
   place of combine_pdf.
 - `Gamba::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
 
-[Unreleased]: https://github.com/levups/gamba/compare/v2.0.2...HEAD
+[Unreleased]: https://github.com/levups/gamba/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/levups/gamba/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/levups/gamba/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/levups/gamba/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/levups/gamba/compare/v1.1.0...v2.0.0
