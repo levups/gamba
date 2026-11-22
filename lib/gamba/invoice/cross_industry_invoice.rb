@@ -83,6 +83,12 @@ module Gamba
 
       def header_delivery
         element("ram:ApplicableHeaderTradeDelivery") do
+          if (delivery = @invoice.deliver_to)
+            element("ram:ShipToTradeParty") do
+              element("ram:Name", delivery.name)
+              address(delivery.address)
+            end
+          end
           element("ram:ActualDeliverySupplyChainEvent") { date("ram:OccurrenceDateTime", @invoice.delivered_on) } if @invoice.delivered_on
         end
       end
@@ -133,17 +139,20 @@ module Gamba
               element("ram:TradingBusinessName", party.trading_name)
             end
           end
-          address = party.address
-          element("ram:PostalTradeAddress") do
-            element("ram:PostcodeCode", address.postcode)
-            %w[ram:LineOne ram:LineTwo ram:LineThree].zip(address.lines) { |line_name, line| element(line_name, line) }
-            element("ram:CityName", address.city)
-            element("ram:CountryID", address.country)
-            element("ram:CountrySubDivisionName", address.subdivision)
-          end
+          address(party.address)
           element("ram:URIUniversalCommunication") { element("ram:URIID", party.electronic_address.id, schemeID: party.electronic_address.scheme) } if party.electronic_address
           element("ram:SpecifiedTaxRegistration") { element("ram:ID", party.vat, schemeID: "VA") } if party.vat
           element("ram:SpecifiedTaxRegistration") { element("ram:ID", party.tax_registration, schemeID: "FC") } if party.tax_registration
+        end
+      end
+
+      def address(address)
+        element("ram:PostalTradeAddress") do
+          element("ram:PostcodeCode", address.postcode)
+          %w[ram:LineOne ram:LineTwo ram:LineThree].zip(address.lines) { |line_name, line| element(line_name, line) }
+          element("ram:CityName", address.city)
+          element("ram:CountryID", address.country)
+          element("ram:CountrySubDivisionName", address.subdivision)
         end
       end
 
