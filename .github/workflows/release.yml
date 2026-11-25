@@ -29,7 +29,7 @@ jobs:
           fetch-depth: 0 # the commit that wrote the version's notes
           filter: blob:none
       - name: Set up Ruby
-        uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
+        uses: ruby/setup-ruby@20eb24b0d509e2b9ed9b6d42ddfeb992915e0564 # v1.341.0
         with:
           ruby-version: "4.0"
       - name: Find an untagged version with notes
@@ -87,7 +87,7 @@ jobs:
           persist-credentials: false
           ref: ${{ needs.version.outputs.commit }}
       - name: Set up Ruby
-        uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
+        uses: ruby/setup-ruby@20eb24b0d509e2b9ed9b6d42ddfeb992915e0564 # v1.341.0
         with:
           ruby-version: "4.0"
           rubygems: latest # 4.1+ attaches a Sigstore attestation to gem push
