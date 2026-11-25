@@ -64,8 +64,9 @@ def inline_node(node, url)
   return "" unless node.element? && !node.matches?(SKIPPED)
 
   text = inline(node, url)
-  # Spans side by side with nothing between them (badges) are told apart with a dot.
-  text = " · #{text}" if node.name == "span" && node.previous_sibling&.name == "span"
+  # A span right after another element, with nothing between them (badges, a count after a link), is told apart
+  # with a dot.
+  text = " · #{text}" if node.name == "span" && node.previous_sibling&.element?
   case node.name
   when "code" then code_span(node.text.gsub(/\s+/, " "))
   when "a" then node["href"] ? "[#{text.strip}](#{resolve(url, node["href"])})" : text
