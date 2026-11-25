@@ -1,0 +1,1122 @@
+# Gamba
+
+Gamba is a Ruby library that writes PDF files: invoices, reports, labels, anything you can lay out as text, tables,
+images and shapes. You describe the layout, stacks, rows, tables, headers and footers, and Gamba measures it, places
+it, breaks pages where a reader expects them, and tags the result for screen readers.
+
+It also runs code written for [Prawn](https://github.com/prawnpdf/prawn) 2.5, the most widely used PDF library for
+Ruby, and for its companions prawn-table and prawn-svg, unchanged and down to the pixel: a one-page invoice renders
+about four times faster and the file is a quarter lighter (see [Performance](https://github.com/levups/gamba#performance)). An application moves
+from one API to the other one block at a time ([the migration guide](https://levups.github.io/gamba/migration.html)).
+
+Website and guide: https://levups.github.io/gamba/
+
+Coding agents can start from <https://levups.github.io/gamba/llms.txt>, or read this README and the
+website's pages as one Markdown file: <https://levups.github.io/gamba/llms-full.txt>.
+
+## Installation
+
+Gamba needs Ruby 3.3 or later. In your Gemfile, replace `prawn`, `prawn-table` and `prawn-svg` with one line:
+
+```ruby
+gem "gamba"
+```
+
+Gamba refuses to load if the prawn gem is in the same bundle, so remove it. Your existing `require "prawn"`,
+`require "prawn/table"` and `require "prawn-svg"` lines keep working, and `pdf.table` and `pdf.svg` are available
+without them.
+
+## A first document
+
+```ruby
+require "gamba"
+
+Gamba.document do |document|
+  document.footer { |footer, page| footer.text "Page #{page.number} of #{page.total}" }
+  document.text "Hello, World!", role: :h1
+  document.table([{sku: "A-1", quantity: 2}], columns: {sku: {title: "SKU"}, quantity: {title: "Qty"}})
+end.write("hello.pdf")
+```
+
+This writes `hello.pdf` with a heading, which also makes the PDF's first bookmark, a two-row table and a footer
+numbering the pages. The same document with Prawn's API, which Gamba runs as it is:
+
+```ruby
+require "prawn"
+
+Prawn::Document.generate("hello.pdf") do
+  text "Hello, World!"
+  table [%w[SKU Qty], %w[A-1 2]]
+end
+```
+
+Everything else Prawn documents works the same way: fonts, colors, images, columns, page numbers, links,
+encryption. Prawn's manual applies as it is, and [the guide](https://levups.github.io/gamba/guide.html) covers what
+Gamba adds.
+
+The constant is still `Prawn`, so you don't have to rename anything. `Prawn::VERSION` reports `2.5.0`, the
+version of the API Gamba reproduces, for code that checks it. Gamba's own version is `Gamba::VERSION`.
+
+## What Gamba adds
+
+Anything that would change how a page looks compared with Prawn is off until you ask for it.
+
+An API of its own, next to Prawn's. The block receives the document instead of running inside it, options are
+keywords, and a mistyped one raises instead of being ignored:
+
+```ruby
+document = Gamba.document(page_size: "A4", lang: "en") do |document|
+  document.style :title, size: 18, weight: :bold
+  document.text "Invoice INV-2026-0001", style: :title
+  document.draw InvoiceLines.new(invoice) # any object with call(document)
+end
+document.write("invoice.pdf")
+```
+
+Layout is described instead of computed: a `stack` puts boxes one under the other and breaks pages between them, a
+`row` puts them side by side, and each is measured before anything is drawn.
+
+```ruby
+document.row(gap: 24, padding: 12, background: "f5f5f5") do |row|
+  row.stack(gap: 4) { |stack| stack.text "Alice Martin", style: :title; stack.text "1 Example Street" }
+  row.text "Due on 1 December 2026", width: 150, align: :right
+end
+```
+
+Code written for Prawn adopts it one block at a time, `gamba { |document| document.text "Total", style: :title }`,
+and `document.prawn` gives a native document all of Prawn's API. A header and a footer are declared once, and know
+their page:
+
+```ruby
+document.footer(gap: 12) { |footer, page| footer.text "Page #{page.number} of #{page.total}", align: :center }
+```
+
+Tables have named columns, and rows that are hashes or objects, so nothing is counted by position:
+
+```ruby
+document.table(lines, columns: {sku: {title: "SKU", width: 60}, description: {}, total: {align: :right, weight: :bold}})
+```
+
+Pages break where a reader expects them: a paragraph leaves no single line at the bottom or the top of a page
+(`widows` and `orphans`, 2 unless told), and a heading with `keep_with_next: true` moves with what follows it.
+
+Text, styles, components, stacks, rows, grids, tables, images, codes, headers, footers, these page breaks and
+semantic roles are there today; forms, signatures and complex scripts come next
+([the plan](https://github.com/levups/gamba/issues/69)).
+
+Ligatures and kerning from OpenType fonts, per font:
+
+```ruby
+font "Inter.ttf", features: %i[liga kern]
+```
+
+PDF/A-3b archival files, and Factur-X electronic invoices (the French and German standard that embeds the invoice
+data as XML inside the PDF). Gamba writes the XML of the EN 16931 profile from a `Gamba::Invoice`, which computes the
+totals and the VAT breakdown with EN 16931's rounding, in exact decimals; or it embeds the XML your invoicing system
+produced, in any profile.
+
+```ruby
+invoice = Gamba::Invoice.new(number: "INV-2026-0001", issued_on: Date.new(2026, 11, 12), due_on: Date.new(2026, 12, 12),
+  seller: {name: "Example SAS", vat: "FR32123456789", address: {lines: "1 Example Street", postcode: "75001", city: "Paris", country: "FR"}},
+  buyer: {name: "Alice Martin", address: {lines: "2 Example Avenue", postcode: "69001", city: "Lyon", country: "FR"}},
+  lines: [{name: "Post", quantity: 2, unit_price: "50.00", vat_rate: 20}])
+invoice.due # => (120/1)
+
+Prawn::Document.new(pdf_a: true, info: {Title: "Invoice INV-2026-0001"}) do
+  font "Inter.ttf" # PDF/A needs embedded fonts: the 14 standard ones raise, and so does encryption
+  # ...
+  factur_x invoice # or File.read("factur-x.xml"), profile: :basic (minimum, basic_wl, basic, en16931, extended)
+end
+```
+
+The invoice is checked against the EN 16931 business rules first, and with `factur_x invoice, rules: :fr` against those
+of France's e-invoicing reform too; `Gamba::Invoice::RuleViolation` names each rule broken, such as
+`BR-CO-25: an invoice with an amount due needs due_on or payment_terms`.
+
+Tagged PDF for screen readers: `pdf: :ua` (PDF/UA-1) and `pdf_a: :a` (PDF/A-3a) tag the boxes of Gamba's own API
+from their roles, and raise where a rule is broken (a figure without `alt`, a list item outside a list; under `pdf: :ua`
+also no `lang`, no title, a skipped heading level).
+
+```ruby
+Gamba.document(pdf: :ua, lang: "en", info: {Title: "Quarterly report"}) do |document|
+  document.register_font "Inter", normal: "Inter.ttf"
+  document.style :default, font: "Inter"
+  document.text "Quarterly report", role: :h1
+  document.image "chart.png", alt: "Sales by month, 2026"
+end
+```
+
+Merging existing PDFs, such as carrier labels or supplier invoices, one page after another. This replaces the
+combine_pdf gem for that use:
+
+```ruby
+Gamba.combine([label, other_label], page_size: [288, 432], orientation: :portrait)
+```
+
+Drawing on a page of an existing PDF, such as a letterhead or a pre-printed form, under every page or anywhere at
+any size. It is written once, however many pages use it:
+
+```ruby
+Prawn::Document.new(background_pdf: "letterhead.pdf") do
+  pdf_page "terms.pdf", page: 2, width: 200
+end
+```
+
+QR codes, DataMatrix and barcodes (Code 128, EAN-13, EAN-8, Code 39, ITF-14) in pure Ruby, drawn as vectors: one
+fill per code, read back by zbar and libdmtx in CI:
+
+```ruby
+qr_code "https://example.com/pay/INV-2026-0001", at: [400, 700], size: 80, level: :m
+barcode "0123456789012", type: :ean13, width: 120, height: 40, text: true
+data_matrix "alice@example.com", size: 40
+```
+
+Rails, 8.0 and later, with nothing to configure: controllers render PDFs, `.pdf.rb` templates draw them with the
+view's helpers and translations, and Gamba loads before the server forks when the application eager loads:
+
+```ruby
+render pdf: InvoiceDocument.new(@invoice), filename: "invoice.pdf" # anything answering to_pdf, or a document
+```
+
+Outside Rails, loading font and SVG support once, before a server such as Puma or Unicorn forks its workers, so they
+share it in memory:
+
+```ruby
+Gamba.eager_load!
+```
+
+### More on combining PDFs
+
+`Gamba.combine` takes the bytes of each PDF and returns the bytes of the merged one. It reads the cross-reference
+formats PDF writers use, including incremental updates, and files encrypted with an owner password only (RC4,
+AES-128 and AES-256). A file that needs a password to open raises `Prawn::Errors::EncryptedPDF`, and a damaged one
+it cannot repair raises `Prawn::Errors::MalformedPDF`.
+
+Pages are copied as they were encoded, and resources several files share, like a carrier's fonts and logo, are
+written once. With `page_size`, each page is scaled from its lower left corner to fit, keeping its proportions.
+With `orientation`, a page the other way round turns a quarter counterclockwise, as combine_pdf does. A page's
+`/Rotate` is applied to its content, where combine_pdf left it to the viewer. Outlines, forms and tagged structure
+are not carried over.
+
+## Files your users send
+
+Applications often put user content into PDFs: an uploaded logo, a font, a name typed in a form, a PDF to attach.
+Any of it can be built to attack the server that renders it.
+
+- SVG images fetch nothing from the web unless you pass `enable_web_requests: true`. prawn-svg 0.40 fetched by
+  default, so a submitted SVG could make your server request any URL. prawn-svg 1.0 plans the same default as
+  Gamba.
+- An SVG reads only what you allow. Base64 `data:` URLs of PNG, JPEG and SVG images always load; `http` and
+  `https` URLs need `enable_web_requests: true`; files need `enable_file_requests_with_root`, and only regular
+  files inside that directory load, symbolic links in it followed. Any other URL, path or scheme is skipped with a
+  warning, and an entity the SVG declares from a file or URL is never read.
+- An SVG can't make Gamba loop or run out of stack through references (`<use>`, `<tref>`, gradients) or deep
+  nesting. An SVG it loads with `<use>` or `<image>` is checked the same way, SVG images stop 16 levels inside
+  one another, and they draw within the budget of the SVG that embeds them.
+- Fonts an SVG declares with `@font-face` disappear once it is drawn, and one that is not a font is left out. In
+  prawn-svg, an uploaded SVG declaring a "Helvetica" font changed the font of the application's own text.
+- A damaged or malicious PNG, JPEG, TrueType, OpenType or PDF file either renders or raises an error Gamba names
+  (`Prawn::Errors::UnsupportedImageType`, `Prawn::Images::JPG::FormatError`, `Gamba::TrueType::Error`,
+  `Prawn::Errors::MalformedPDF`, or `Prawn::Errors::CannotFit` when a damaged font makes a glyph wider than the
+  page). A PNG
+  inflates no further than the size its header gives. CI corrupts sample files on every run to check this.
+- `Gamba.combine` and `pdf_page` stop at 64 levels of nested arrays and dictionaries and at 256 MB of decompressed data, and
+  ignores references that lead back to themselves, so a crafted PDF can't send it into a loop or fill
+  memory.
+- Text with inline formatting (`inline_format: true`) is parsed in linear time, whatever the markup.
+- The `/ID` of an encrypted PDF depends on its passwords, so it reveals nothing about the content to someone
+  without them.
+
+Inline formatting still turns `<link href="...">` into a clickable link. Escape user text before you put it inside
+markup. A word with no space to break at, thousands of characters long, takes time that grows with the square of its
+length, as in Prawn: limit the length of what users type.
+
+To report a vulnerability, see [SECURITY.md](https://github.com/levups/gamba/blob/main/SECURITY.md).
+
+## Checking your app's PDFs
+
+Tests that check a PDF's bytes break on every harmless change. Gamba's own checks, those its oracle compares it with
+Prawn by, come as assertions for Minitest and matchers for RSpec, loaded only on request. They need `mutool`, and
+`pdftoppm` and `qpdf` for pages and validity; a missing tool fails with its install command, or skips the check
+with `Gamba::Testing.missing_tools = :skip`.
+
+```ruby
+require "gamba/minitest" # in test_helper.rb
+
+assert_pdf_text pdf, "Invoice INV-2026-0001", page: 1 # bytes or a path; a Regexp works too
+assert_same_pages expected_pdf, pdf                   # text, positions and pixels in MuPDF and Poppler
+assert_valid_pdf pdf                                  # qpdf and Poppler
+assert_pdf_a pdf                                      # veraPDF
+```
+
+```ruby
+require "gamba/rspec" # in spec_helper.rb
+
+expect(pdf).to have_pdf_text("Invoice INV-2026-0001", page: 1)
+expect(pdf).to have_same_pages_as(expected_pdf)
+expect(pdf).to be_a_valid_pdf
+```
+
+Before switching, you can compare what your app produces under both libraries. `script/capture_pdfs.rb` saves
+every PDF your test suite renders, named after the test. Run the suite once with Prawn and once with Gamba, then
+compare the two directories with the same checks:
+
+```sh
+GAMBA_CAPTURE_DIRECTORY=tmp/prawn RUBYOPT=-r/path/to/gamba/script/capture_pdfs.rb bin/rails test
+GAMBA_CAPTURE_DIRECTORY=tmp/gamba RUBYOPT=-r/path/to/gamba/script/capture_pdfs.rb bin/rails test
+ruby /path/to/gamba/script/capture_pdfs.rb tmp/prawn tmp/gamba
+```
+
+## Performance
+
+`bundle exec rake bench` renders each document in `bench/documents` with Prawn 2.5 and with Gamba, in 7 fresh
+YJIT processes each, taking turns. Each process times 20 renders, and the table shows the median of the 7, on
+Ruby 4.0.9:
+
+| Document | Prawn | Gamba | Allocations, Prawn → Gamba | Weight, Prawn → Gamba |
+|---|---:|---:|---:|---:|
+| Invoice, one page | 22.5 ms | 5.2 ms | 163,879 → 26,718 | 38,766 → 28,990 bytes |
+| Report, 101 pages | 529.0 ms | 152.8 ms | 3,350,867 → 766,398 | 207,815 → 164,923 bytes |
+| Catalog, 1,000 table rows | 545.7 ms | 242.2 ms | 3,979,956 → 1,717,915 | 147,731 → 134,085 bytes |
+
+Files are lighter because Gamba compresses streams and packs objects together, which PDF 1.5 allows and Prawn
+doesn't do. The same documents written with Gamba's own API are measured untagged and tagged for PDF/UA: tagging
+costs 8 to 21% more allocations and 8 to 65% in weight, the catalog's structure tree holding each of its cells.
+Charts and peak memory are on the [benchmarks page](https://levups.github.io/gamba/benchmarks.html).
+
+## How we know the pages are the same
+
+The test suite renders every example of Prawn's and prawn-table's manuals, and every sample SVG of prawn-svg, once
+with the original gems and once with Gamba. For each pair it compares the text and its position to 0.01 pt, the
+pixels at 150 dpi in two unrelated renderers (MuPDF and Poppler), whether `qpdf --check` accepts the file, and its
+size. We call this the oracle.
+
+Gamba does not copy Prawn's bugs. When Prawn crashes, writes an invalid PDF or contradicts its own documentation,
+Gamba fixes it, and the [compatibility page](https://levups.github.io/gamba/compatibility.html) lists each fix with
+its proof.
+
+## Development
+
+Prawn runs from its own bundle, `oracle/Gemfile`, so the oracle can compare the two. The tests need `mutool`,
+`pdftoppm`, `qpdf`, `zbarimg` and `dmtxread` (`brew install mupdf-tools poppler qpdf zbar dmtx-utils`), and Prawn's
+manual and sample data, which `rake corpus:fetch` downloads into `corpus/cache`. Without that cache, the comparison tests are skipped.
+
+```sh
+bundle install && BUNDLE_GEMFILE=oracle/Gemfile bundle install
+bundle exec rake corpus:fetch
+bundle exec rake test
+bundle exec rubocop
+```
+
+Other commands:
+
+```sh
+ORACLE_CANDIDATE=prawn bundle exec rake test                     # Prawn against itself, to check the oracle
+FUZZ_SEED=42 FUZZ_CASES=500 bundle exec ruby -Itest test/fuzz_test.rb  # random documents, compared with Prawn
+INPUT_FUZZ_SEED=42 INPUT_FUZZ_CASES=400 bundle exec ruby -Itest test/input_fuzz_test.rb  # corrupted images and fonts
+bundle exec rake bench                                           # writes docs/benchmarks.json
+```
+
+`ruby -Itest script/fuzz_minimize.rb tmp/fuzz/documents/fuzz_0042.rb` shrinks a failing fuzz document. PDF/A
+files are also checked by veraPDF when it is installed (`brew install verapdf`).
+
+The files that define what "compatible" means:
+
+- `test/oracle_passing.txt`: examples that must stay identical to Prawn's. One that becomes identical joins it.
+- `test/divergences.yml`: Prawn bugs Gamba fixes, with the specification that proves each one and the exact
+  differences the oracle must find.
+- `test/oracle_examples`: documents of our own, for cases the manuals don't show.
+- `test/contract/prawn-2.5.0.yml`: Prawn's public methods, generated by `script/contract_extract.rb`. Every call
+  Prawn accepts must keep working; exceptions are settled in `test/contract/decisions.yml`.
+
+See [CONTRIBUTING.md](https://github.com/levups/gamba/blob/main/CONTRIBUTING.md) before opening a pull request.
+
+### Releasing
+
+Pull requests leave `CHANGELOG.md` alone. A release starts by writing its notes under `## [Unreleased]`, from the
+pull requests merged since the last tag, without committing them. Then, from an up-to-date `main` with green CI:
+
+```sh
+bin/release minor --dry-run   # shows the notes and the changes, writes nothing
+bin/release minor             # or patch, major, or an exact version such as 1.2.0
+```
+
+`main` takes no direct push, so `bin/release` dates the notes and bumps the version on a `release/vX.Y.Z` branch,
+opens a pull request that merges itself once CI is green, and waits for it (`bin/release --wait X.Y.Z` if you
+stopped it). The merge starts the Release workflow, which waits for a maintainer's approval, tags the merge commit
+`vX.Y.Z`, publishes the gem to RubyGems through trusted publishing and creates the GitHub release with the notes
+and the `.gem`.
+
+## License
+
+By Level UP Solutions. Gamba is derived from Prawn, PDF::Core, TTFunk and prawn-table, by Gregory Brown and their
+contributors, and is licensed like them: under Matz's original terms for Ruby, or the GPLv2, or the GPLv3. Its SVG
+support comes from prawn-svg, by Roger Nesbitt, under the MIT license. See `LICENSE`.
+
+## Gamba Compatibility
+
+<https://levups.github.io/gamba/compatibility.html>
+
+Gamba draws the pages Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 draw. Every exception is on this page, declared in the repository and checked by the oracle.
+
+### Prawn bugs Gamba fixes
+
+A bug counts only when a specification or Prawn’s own documentation proves it; a mere preference becomes an option. `test/divergences.yml` lists each one, its proof, the examples that show it, and the exact differences the oracle must report: no more, no fewer.
+
+| Prawn’s behaviour | Proof |
+| --- | --- |
+| Encrypted documents have no `/ID` in their trailer, so qpdf and strict readers reject them | ISO 32000-1 §7.5.5, trailer dictionary, ID: “Required if an Encrypt entry is present” |
+| Built-in fonts measure Ÿ (byte 159) as ÿ, so right-aligned or wrapped text holding it overflows | ISO 32000-1 Annex D.2: WinAnsiEncoding maps byte 237 octal to Ydieresis, not ydieresis |
+| The faces of one font collection share their width cache, so text in one face is measured with another’s widths | `Prawn::Font#eql?` compares the file name, family and size, which every face of a `.ttc` shares; Prawn documents each face as a font of its own |
+| TrueType-flavoured subsetting of CFF fonts changes how their glyphs rasterize | The subset Prawn embeds (through TTFunk) renders differently from the unmodified font program; Gamba keeps outlines and hints untouched, and renders like the font itself |
+| A `transparent` block whose content crosses a page break draws the next page opaque | Prawn documents `transparent` as setting the opacity of the content within the block, and ISO 32000-1 §8.4.1 starts each page with the default graphics state, opaque; Gamba sets the opacity of the blocks still open again on the new page, after its header and background |
+| A `blend_mode` block whose content crosses a page break draws the next page in the normal blend mode | Prawn documents `blend_mode` as setting the blend mode, restored after the block, and ISO 32000-1 §8.4.1 starts each page with the default graphics state, blend mode Normal; Gamba sets the blend mode of the blocks still open again on the new page, like their opacity |
+| Colours, line width, dash, cap and join styles set before a block whose content crosses a page break are lost once it ends: what follows draws black, with thin solid lines | Prawn documents `save_graphics_state` as restoring the graphic state after the block, and ISO 32000-1 §8.4.2 has `Q` restore the state `q` saved; on the new page the block closes the page’s own state instead, so Gamba writes back the settings in effect before the block |
+| A blend mode set without a block is lost on the next page | Prawn documents `blend_mode` without a block as setting the blend mode for what follows, and ISO 32000-1 §8.4.1 starts each page with blend mode Normal; Prawn writes the colours and line settings again on a new page, not the blend mode, which Gamba sets again after reopening the blocks still open |
+| A gradient set as the fill or stroke is lost on the next page, which paints with the colour set before the gradient | ISO 32000-1 §8.6.6.2 makes the gradient the current colour until another replaces it; Prawn writes the current colours again on a new page but never records a gradient, so Gamba records it and paints with it there, while `fill_color` and `stroke_color` return what they return in Prawn |
+| `text_rendering_mode`, `character_spacing`, `word_spacing`, `horizontal_text_scaling` and `rise` blocks whose text flows onto the next page draw that page without them, though Prawn lays it out with them | ISO 32000-1 §9.3.1 makes the text state part of the graphics state, which §8.4.1 resets on each page; Gamba writes the text state of the blocks still open on the new page, before its header, again after a block ending there closes the state holding it, and on a page reached through `go_to_page`, where page numbers and repeaters no longer take the text state of a block left open there |
+| A `text_rendering_mode` block or a text box drawn after `forget_text_rendering_mode!` ends with a `Tr` missing its operand: Poppler drops the text drawn after it | ISO 32000-1 §9.3.6 gives `Tr` one operand, the rendering mode; Prawn writes back the forgotten, unknown mode without one, and Gamba writes nothing back, so the text after it draws in the mode the block left |
+| Page numbers, repeaters and other content drawn on a page again, once a block that began there ended on another page, are drawn inside that block: faded, rotated or recoloured on that page only | ISO 32000-1 §8.4.2 has a state saved by `q` last until its `Q`, which such a block writes on another page; Gamba closes, on the page `go_to_page` reaches, the states of blocks that have ended, and keeps those of blocks still open |
+| A `transparent` or `blend_mode` block whose content flows onto a page that exists already, reached through `go_to_page`, draws it there opaque, in the normal blend mode | Prawn documents both as applying to the content within the block, and ISO 32000-1 §8.4.1 starts each page with the default graphics state; Gamba reopens the blocks still open on that page, on top of what it drew already, as it does on a new page |
+| Colours, line settings, a gradient or a blend mode set before text that flows onto a page that exists already, reached through `go_to_page`, are lost there: the text goes on in that page's own colours, black by default | Prawn writes them again on a new page, never on one that exists; Gamba writes back there the settings in effect, as on a new page, while `go_to_page` called directly, for page numbers and repeaters, keeps the page's own, as in Prawn |
+| A table whose rows hold no cell, such as `table([[]])`, raises NoMethodError | prawn-table raises `EmptyTable`, an error it names, for data without rows, and documents `table` as drawing its cells; rows without one have nothing to draw, so Gamba draws nothing and leaves the cursor where it was |
+
+### SVG web requests
+
+SVG images do not fetch anything from the web unless asked to: `svg data, enable_web_requests: true`. prawn-svg 0.40 fetches by default, which lets a submitted SVG make the server request any URL. prawn-svg 1.0 plans the same default as Gamba.
+
+### Files from users
+
+A font, an image or a PDF a user sends can be built to make a parser loop, crash or fill memory. Where Prawn hangs or crashes on such a file, Gamba raises an error it names. Valid files draw the same pages.
+
+- **Fonts.** A composite glyph that contains itself hangs Prawn and crashes TTFunk; Gamba embeds it once. A cmap whose ranges overlap until they cover millions of codes, which takes Prawn minutes to read, raises `Gamba::TrueType::Error`. A `.otf` file with TrueType outlines, or a `.ttf` with CFF ones, embeds by its outlines rather than its extension.
+- **Images.** A truncated JPEG, or one of zero width, height or bit depth, raises `Prawn::Images::JPG::FormatError` where Prawn raised NoMethodError or wrote NaN into the page. An indexed PNG needs a palette of 1 to 256 colors, and a transparency chunk too short for its samples is ignored, as viewers do.
+- **SVG.** prawn-svg finds an element by its id with an XPath query built from the id, so an id holding a quote ran XPath of its own, and a missing one read the whole document again: Gamba reads the ids once. A `<use>` that draws its own ancestor is skipped, where prawn-svg overflowed the stack, and `<use>` elements draw at most 20,000 elements in all, where sixteen levels of two kept prawn-svg drawing for minutes. Gradients that refer to each other paint nothing. A document nesting elements deeper than 256 levels, or whose entities expand past REXML's limits, raises `Prawn::SVG::Document::InvalidSVGData`. Descendant selectors match in polynomial time, and a selector whose value holds a bracket, which REXML's XPath parser misreads, matches nothing. Faces an SVG declares with `@font-face` are gone once it is drawn: prawn-svg left them in the document's font families, so an uploaded SVG declaring “Helvetica” changed the application's own text. A transform or text position that is infinite leaves its element out, where prawn-svg wrote NaN into the page. Masks inside masks, and text inside an SVG embedded with `<image>`, render; and a directory or device inside `enable_file_requests_with_root` is skipped like a missing file. An SVG loaded by `<use>` or `<image>` is checked like the document, where prawn-svg overflowed the stack on one nested too deep and raised a bare `RuntimeError` on entities expanding too far, in an attribute too. A `<tref>` inside the text it refers to is skipped, one referring to a missing text draws nothing, and `<tref>` elements share the budget of `<use>`, where prawn-svg overflowed the stack, raised NoMethodError and took minutes. SVG images inside SVG images stop at 16 levels, where one embedding itself over the web made prawn-svg fetch it until the stack ran out, and draw within the budget of the SVG that embeds them, which a `<use>` of an SVG image multiplied. A `data:` URL is decoded once per document. An `@font-face` whose source is not a font is left out with a warning, where it stopped the whole SVG.
+- **Inline formatting.** Markup with tags that never close is read in linear time, where Prawn takes minutes on a few hundred kilobytes, and a style opened again and again stays one style.
+- **Combined PDFs.** A number too large for a float, in a page's boxes, no longer writes NaN into the combined page.
+- **PDF/A metadata.** A title or author holding a control character, or bytes that are not text, raises `Prawn::Errors::PdfAViolation`: XML cannot hold them, and the XMP would not parse.
+- **Encryption.** The file identifier of an encrypted document mixes in its passwords, so it tells nothing about the content to someone without them. Prawn writes no identifier, and gives every document with the same passwords the same key.
+
+### Lighter files
+
+The pages are the same; the bytes are not. Gamba writes at least PDF 1.5, with compressed streams, one compressed object stream and a cross-reference stream, where Prawn writes plain objects and an xref table. The oracle checks that each Gamba file passes `qpdf --check` and weighs no more than Prawn’s. Tools that read PDF files byte for byte, rather than through a PDF parser, see a different file.
+
+### Off unless asked for
+
+What would move pixels away from Prawn’s stays off unless asked for:
+
+- OpenType ligatures and GPOS pair kerning, per font: `font "Inter.ttf", features: %i[liga kern]`;
+- PDF/A-3b and Factur-X: `Prawn::Document.new(pdf_a: true)`, then `factur_x`.
+
+[OpenType features](https://levups.github.io/gamba/guide.html#features) · [PDF/A and Factur-X](https://levups.github.io/gamba/guide.html#pdf-a)
+
+### Loading and versions
+
+- Gamba raises a `LoadError` when the prawn gem is in the bundle too: remove prawn, prawn-table and prawn-svg from the Gemfile.
+- `Prawn::VERSION` is `"2.5.0"`, the API Gamba mirrors, since Prawn extensions check it; `Gamba::VERSION` is Gamba’s own.
+- The public methods of Prawn 2.5 are listed in `test/contract/prawn-2.5.0.yml`, generated by `script/contract_extract.rb`. Gamba accepts every call Prawn accepts on those of its contract; `test/contract/decisions.yml` settles each method outside the Stable API, with the reason when it is left out.
+
+### How it is tested
+
+1. **An oracle.** It renders every example of Prawn’s and prawn-table’s manuals and every sample SVG of prawn-svg with Prawn 2.5, prawn-table 0.2.2 and prawn-svg 0.40.4 and with Gamba, each in its own process, and compares their pages, their text and its positions to 0.01 pt, their pixels at 150 dpi in two renderers that share no code (MuPDF and Poppler), their validity (`qpdf --check`) and their weight. Examples listed in `test/oracle_passing.txt` must stay identical; one that becomes identical must join the list. `test/oracle_examples` holds documents of our own for what the manuals do not show.
+2. **The oracle against itself.** `ORACLE_CANDIDATE=prawn bundle exec rake test` runs Prawn as the candidate, which proves the comparison reports nothing when nothing differs.
+3. **A document fuzzer.** Seeded, it writes random documents (text in all its options, boxes, columns, tables, shapes, pages) and compares them the same way. CI adds 300 from a fresh seed on every run; `script/fuzz_minimize.rb` shrinks a failing one.
+4. **An input fuzzer.** It corrupts sample PNGs, JPEGs and fonts (flipped bytes, truncations, forged lengths): each must render or raise an error Gamba names, never crash inside a parser, hang or exhaust memory.
+5. **veraPDF.** PDF/A documents are checked by veraPDF when it is installed.
+
+```sh
+FUZZ_SEED=42 FUZZ_CASES=500 bundle exec ruby -Itest test/fuzz_test.rb
+ruby -Itest script/fuzz_minimize.rb tmp/fuzz/documents/fuzz_0042.rb
+```
+
+## Gamba Guide
+
+<https://levups.github.io/gamba/guide.html>
+
+Gamba has an API of its own, and answers to Prawn’s: installing it is swapping gems. This page covers both, and the [migration page](https://levups.github.io/gamba/migration.html) takes existing Prawn code to the native API one block at a time.
+
+### Installation
+
+```ruby
+# Gemfile
+gem "gamba" # instead of prawn, prawn-table and prawn-svg
+```
+
+Gamba needs Ruby 3.3 or later. It depends on `addressable`, `css_parser`, `matrix` and `rexml`, which only its SVG support loads.
+
+Remove `prawn`, `prawn-table` and `prawn-svg` from the Gemfile: Gamba refuses to load next to the prawn gem, with a `LoadError` saying so, rather than mixing two engines in one process.
+
+### Drop-in usage
+
+Code written for Prawn runs as it is. Gamba provides `require "prawn"`, `require "prawn/table"`, `require "prawn-svg"` and `require "prawn/measurement_extensions"`, and the `Prawn` namespace: `Prawn::Document`, `Prawn::Table`, `Prawn::Errors`, `Prawn::SVG`.
+
+```ruby
+require "prawn"
+
+Prawn::Document.generate("invoice.pdf", page_size: "A4", info: {Title: "Invoice"}) do
+  font "DejaVuSans.ttf"
+  text "Invoice INV-2026-0001", size: 14, style: :bold
+  table [%w[SKU Qty Price], %w[A-1 2 $10.00]], header: true
+  number_pages "<page>/<total>", at: [bounds.right - 50, 0], width: 50, align: :right
+end
+```
+
+`Prawn::VERSION` answers `"2.5.0"`, the version of the API Gamba mirrors, because Prawn extensions check it. Gamba’s own version is `Gamba::VERSION`.
+
+The contract is Prawn 2.5’s public methods, listed in `test/contract/prawn-2.5.0.yml`: Gamba accepts every call Prawn accepts on those, and `test/contract/decisions.yml` records, method by method, what is in and why the rest is left out.
+
+### Gamba’s own API
+
+`Gamba.document` writes a document without Prawn’s conventions. The block receives the document instead of running inside it, so your own methods and instance variables stay in reach. Options are keywords, and a mistyped one raises an `ArgumentError` that lists the accepted ones, where Prawn ignores it.
+
+```ruby
+require "gamba"
+
+document = Gamba.document(page_size: "A4", margin: 36, lang: "en") do |document|
+  document.register_font "Inter", normal: "Inter.ttf", bold: "Inter-Bold.ttf"
+  document.style :default, font: "Inter", size: 10
+  document.style :title, size: 18, weight: :bold
+
+  document.text "Invoice INV-2026-0001", style: :title
+  document.text "Due on 1 December 2026", color: "666666"
+  document.draw InvoiceLines.new(invoice)
+end
+document.write("invoice.pdf") # or an IO; document.to_s gives the bytes
+```
+
+A style names text attributes (`font`, `size`, `weight`, `italic`, `color`, `align`, `leading`); the `:default` style applies to every text, and what a call passes wins over its style. `draw` takes any object that answers `call(document)`, so a document is made of small classes you can test one by one. Fonts registered here use their ligatures and kerning: there is no Prawn page to match. Pass `features: []` to `register_font` to turn them off.
+
+Layout is described, not computed. A `stack` puts its children one under the other, a `row` side by side; each box is measured before anything is drawn, so a row is as high as its tallest child and what follows starts below it, without a `bounding_box`, a `float` or a `move_down`.
+
+```ruby
+document.row(gap: 24, padding: 12, background: "f5f5f5", border_color: "cccccc") do |row|
+  row.stack(gap: 4) do |stack|
+    stack.text "Alice Martin", style: :title
+    stack.text "1 Example Street, 75001 Paris"
+  end
+  row.text "Due on 1 December 2026", width: 150, align: :right
+end
+
+document.stack(gap: 8) do |stack|
+  paragraphs.each { |paragraph| stack.text paragraph }
+  stack.stack(keep_together: true, padding: [6, 10], border_width: 1) do |total|
+    total.text "Total", weight: :bold
+    total.text "1 234,00 €"
+  end
+end
+```
+
+In a row, a child given a `width` takes it and the others share what is left, in proportion to their `grow` (1 unless told). A `grid` puts its cells side by side, `columns` to a line, all as wide, the last line’s included; a line is as high as its tallest cell, and a cell with a background or a border is drawn as high as its line; `gap` is one number or `[between lines, between columns]`:
+
+```ruby
+document.grid(columns: 3, gap: [16, 12]) do |grid|
+  products.each do |product|
+    grid.stack(padding: 8, border_color: "cccccc") do |card|
+      card.text product.name, weight: :bold
+      card.text product.price
+    end
+  end
+end
+```
+
+Every container takes `gap`, `padding` (one number, `[vertical, horizontal]` or `[top, right, bottom, left]`), `background`, `border_width` and `border_color`.
+
+A stack breaks pages between its children, and a text between its lines. A grid breaks them between its lines. A stack or a grid with a background or a border is drawn around each page’s part of it, its padding kept clear at the top and the bottom of every page. A row, a line of a grid, and a stack or a grid with `keep_together: true` move whole to the next page when the rest of this one is too short; one that is higher than a page raises `Prawn::Errors::CannotFit`, saying which box and by how much.
+
+Pages break where a reader expects them. A paragraph never leaves fewer than `orphans` lines at the bottom of a page, nor fewer than `widows` at the top of the next: 2 each unless told, 1 to break anywhere. A paragraph too short to keep both moves whole to the next page; one that starts a page fills it whatever its rules.
+
+A box with `keep_with_next: true` goes to the next page together with the start of the box after it: the first lines of a paragraph, the header and first row of a table, all of a box that cannot be split. Headings are the usual case, so the three can sit in a style:
+
+```ruby
+document.style :heading, size: 16, weight: :bold, keep_with_next: true
+document.style :body, widows: 3, orphans: 3
+
+document.text "Payment terms", style: :heading
+document.text terms, style: :body
+document.text "Lines", style: :heading
+document.table(lines, columns: columns)
+```
+
+`document.page_break` starts what follows on a new page. This works in stacks and on the document, where a kept box waits for the next one to be placed with it; anything drawn through `document.prawn`, or the end of a `gamba` block, places it first. Boxes kept together that would not fit on one page break as if they were not kept.
+
+Tables and images are boxes too, on the document, in a stack or in a row. A table has named columns: its rows are hashes, or objects answering the columns’ names, so nothing is counted by position. Each column takes a `title` (its name, spelled out, unless told), a `width`, an `align` and the text attributes `weight`, `italic`, `size` and `color`. Without `columns`, a table of hashes has those of its first row.
+
+```ruby
+lines = [{sku: "A-1", description: "Gadget", quantity: 2, total: "20,00"}]
+
+document.table(lines,
+  columns: {
+    sku: {title: "SKU", width: 60},
+    description: {},
+    quantity: {title: "Qty", align: :right},
+    total: {align: :right, weight: :bold}
+  },
+  header: {background: "333333", color: "ffffff"},
+  stripes: %w[ffffff f6f6f6],
+  cell: {size: 9, padding: 4, border_color: "cccccc"})
+```
+
+A table’s cells start from the `:default` style’s font, size and colour. A table takes the width of its box, unless every column has its own, and in a stack it runs over pages with its header repeated. The header row is made of the titles, in bold; `header:` takes its style (`align`, `weight`, `italic`, `size`, `color`, `background`) or `false` to leave it out. `stripes` alternates row backgrounds, and `cell` styles every cell: `padding`, `size`, `font`, `color`, `background`, `borders`, `border_width`, `border_color`. For what these do not cover, such as a span or the style of one cell, the block receives the `Prawn::Table` before it is laid out; Prawn’s table of arrays itself stays at `document.prawn.table`.
+
+```ruby
+document.table(lines, columns: columns) do |table|
+  table.row(-1).borders = [:top]
+  table.cells[3, 2].background_color = "ffeeee"
+end
+```
+
+An image keeps its own size unless told a `width` or a `height`, is never wider than its box, and keeps its proportions; `align` puts it on the left, the centre or the right of its box. The same file placed twice is embedded once. SVG is not a box yet: draw it through `document.prawn`.
+
+A header and a footer are declared once, before the body. Each block receives a stack to fill and the page, which answers `number` and `total`; it is run for every page when the document is rendered, once the pages are counted, in place of Prawn’s `repeat` and `number_pages`.
+
+```ruby
+document.header(gap: 16) do |header, page|
+  header.row do |row|
+    row.text "Example SAS", weight: :bold
+    row.text "Invoice INV-2026-0001", align: :right
+  end
+end
+
+document.footer(gap: 12) do |footer, page|
+  footer.text "Page #{page.number} of #{page.total}", align: :center, size: 8
+end
+```
+
+Their room is taken from the page: the body, native or drawn with Prawn’s own calls, starts below the header and its `gap` and breaks pages above the footer and its `gap`. The room kept is the height each has on the page it is declared on, and it applies from that page on, so a cover page declared before them has neither. A header that comes out higher on a later page raises `Prawn::Errors::CannotFit` when the document is rendered, naming the page, instead of running over the body.
+
+Each box can say what it is to a reader with `role`: a text is a paragraph (`:p`, unless told), a heading from `:h1` to `:h6`, a `:list_item` or an `:artifact`; a container groups its children, or is a `:list`, a `:list_item` or a `:figure`; images and codes are figures, with their alternative text in `alt`; tables are tables. An `:artifact` only decorates the page, and `lang` gives the language of a box that differs from the document’s. Roles draw nothing: a [tagged PDF](https://levups.github.io/gamba/guide.html#tagged-pdf) reads them. Headings already make the PDF’s bookmarks, nested by level, each pointing at the top of its first line; those of a header or a footer make none.
+
+```ruby
+document.style :chapter, size: 18, weight: :bold, role: :h1, keep_with_next: true
+
+document.text "Payment terms", style: :chapter
+document.text "Late payment", role: :h2
+document.image "chart.png", alt: "Sales by month, 2026"
+document.stack(role: :list) do |list|
+  list.text "Bank transfer", role: :list_item
+  list.text "Card", role: :list_item
+end
+```
+
+You don’t have to rewrite anything to start. In code written for Prawn, `gamba` opens a native block at the cursor, and leaves the cursor below what it drew:
+
+```ruby
+Prawn::Document.generate("report.pdf") do
+  text "Existing code, unchanged"
+  gamba { |document| document.text "A first native block", size: 18, weight: :bold }
+  text "More existing code"
+end
+```
+
+The other way round, `document.prawn` is the `Prawn::Document` underneath, with all of Prawn’s API: tables, images, SVG and graphics go through it until the native API covers them. This API is guarded like Prawn’s: `test/contract/gamba.yml` lists every public method with its signature.
+
+### Tables
+
+The API of prawn-table 0.2.2, built in: `table`, `make_table`, `cell`, `make_cell`, with their cell styles, headers repeated across pages, column widths, row and column spans, and subtables. No other gem and no `require` are needed.
+
+```ruby
+table [%w[SKU Description Qty], *lines], header: true, width: bounds.width, cell_style: {padding: 3} do
+  row(0).font_style = :bold
+  column(2).align = :right
+end
+```
+
+### SVG
+
+The API of prawn-svg 0.40.4, built in: `svg data, options` loads SVG support on first use.
+
+```ruby
+svg File.read("logo.svg"), width: 120, position: :right
+```
+
+| Option | What it does |
+| --- | --- |
+| `at`, `position`, `vposition` | Where the image goes, as in Prawn’s `image` |
+| `width`, `height` | Its size; the other dimension follows the aspect ratio |
+| `enable_web_requests` | Lets the SVG fetch images from `http` and `https` URLs. **Off by default**, where prawn-svg 0.40 has it on: see [Compatibility](https://levups.github.io/gamba/compatibility.html#svg) |
+| `enable_file_requests_with_root` | Lets the SVG read local files under this directory |
+| `cache_images` | Keeps fetched images between calls |
+| `fallback_font_name` | The font used when the SVG names one the document does not know |
+| `color_mode` | `:rgb` or `:cmyk` |
+| `language` | The language `<switch>` elements match against |
+| `log_warnings` | Prints the warnings collected while reading the SVG |
+
+### Fonts
+
+Prawn’s fonts, unchanged in use: the 14 standard PDF fonts, TrueType files (`.ttf`), collections (`.ttc`) and `.dfont`, `font_families.update`, and `fallback_fonts`. OpenType fonts with CFF outlines (`.otf`) embed like TrueType ones, and render like the font itself.
+
+A parsed font is shared by every document of the process, and every thread, until its file changes: a server reads `Inter.ttf` once, not once per PDF.
+
+#### OpenType features
+
+Ligatures and GPOS pair kerning move glyphs away from where Prawn puts them, so they stay off unless asked for, per font:
+
+```ruby
+font "Inter.ttf", features: %i[liga kern]
+font_families.update("Inter" => {normal: {file: "Inter.ttf", features: %i[liga kern]}})
+```
+
+`liga` applies the font’s standard ligatures (GSUB); `kern` applies its GPOS pair kerning.
+
+### Images
+
+JPEG images are embedded as they are; PNG images in every variant Prawn reads, alpha included, are decoded. The same image placed twice in a document is embedded once.
+
+A corrupt or hostile file raises `Prawn::Errors::UnsupportedImageType` or a named font error, never a crash inside a parser: PNG data inflates no further than its header announces. An input fuzzer checks it on flipped bytes, truncations and forged lengths.
+
+#### Pages of other PDFs
+
+A page of an existing PDF, such as a designer’s letterhead or a pre-printed form, is drawn like an image: `pdf_page` takes a path, an IO or the bytes of a PDF, a `page` counted from 1, and the options `image` takes for position and size. `background_pdf` puts one under every page, at its own size from the top left corner; `start_new_page` takes another one, or `false` for none.
+
+```ruby
+Prawn::Document.new(page_size: "A4", top_margin: 120, background_pdf: "letterhead.pdf") do
+  text "Invoice INV-2026-0001"
+  pdf_page "terms.pdf", page: 2, width: 200
+  start_new_page(background_pdf: false)
+end
+```
+
+The page appears as a viewer shows it, its crop box turned by its `/Rotate`. It is written once however many pages draw it, and pages of one file share their fonts and images. The reader is the one behind `Gamba.combine`, with its limits and errors; under `pdf_a: true`, a page whose fonts are not embedded raises `Prawn::Errors::PdfAViolation`. Gamba’s own API takes `background_pdf` and `background_pdf_page` as document options, and `pdf_page` as a box sized like an image.
+
+### QR codes, DataMatrix and barcodes
+
+A QR code is drawn as vector rectangles, one path and one fill, so it stays sharp at any size and a sheet of labels stays small. The encoder is pure Ruby, with no dependency: every version and level of error correction, numeric, alphanumeric and byte modes, and UTF-8 text announced to scanners.
+
+```ruby
+qr_code "https://example.com/pay/INV-2026-0001", at: [400, 700], size: 80, level: :m
+```
+
+`size` is the width of the whole symbol, its quiet zone of four modules included; `module_size` gives the width of one module instead (2 points unless told). `level` is `:l`, `:m` (the default), `:q` or `:h`, and the smallest version that holds the text at that level is chosen; text too long for any raises `ArgumentError`. Without `at`, the code is placed as an image is, with `position` and `vposition`. `quiet_zone: false` leaves the margin to the layout, and `color` sets the colour of the modules. In Gamba’s own API, `qr_code` is a box, with `size` or `module_size`, `level`, `quiet_zone`, `color` and `align`.
+
+A DataMatrix, which carriers ask for on parcel labels, takes the same options but `level`: `data_matrix "alice@example.com", size: 40` draws a square ECC 200 symbol, the smallest of its 24 sizes that holds the data, digits two to a codeword, with a quiet zone of one module.
+
+Linear barcodes are drawn the same way, one fill per symbol: Code 128, with its sets A, B and C chosen as the text goes, EAN-13, EAN-8, Code 39 and ITF-14. A check digit left out is added, and one given is checked.
+
+```ruby
+barcode "0123456789012", type: :ean13, width: 120, height: 40, text: true
+```
+
+`width` counts the quiet zones, or `module_size` sets the narrowest bar (2 points unless told); `height` is the bars’, 50 modules unless told. `text: true` writes the encoded text under the bars, check digit included, at `text_size` (8 modules unless told). `at`, `position`, `vposition`, `quiet_zone` and `color` work as for QR codes, and in Gamba’s own API `barcode` is a box too.
+
+### PDF/A, PDF/UA and Factur-X
+
+```ruby
+Prawn::Document.new(pdf_a: true, info: {Title: "Invoice INV-2026-0001"}) do
+  font "Inter.ttf"
+  # …
+  factur_x File.read("factur-x.xml"), profile: :en16931
+end
+```
+
+`pdf_a: true` writes a PDF/A-3b document (ISO 19005-3): XMP metadata matching the `info` hash, an sRGB output intent, a file identifier, and annotations flagged for printing. What PDF/A forbids raises `Prawn::Errors::PdfAViolation`: a standard PDF font, which cannot be embedded, and encryption.
+
+`factur_x(invoice, profile:, filename:, description:)` embeds the CII XML of a Factur-X invoice into a PDF/A-3 document, with the relationship the specification gives each profile. The invoice is a `Gamba::Invoice`, whose XML Gamba writes, or the XML your invoicing system produced, as a String. ZUGFeRD 2 is the same format under its German name.
+
+| Argument | Values |
+| --- | --- |
+| `profile` | `:minimum`, `:basic_wl`, `:basic`, `:en16931` (default), `:extended` |
+| `filename` | `"factur-x.xml"` by default |
+| `description` | `"Factur-X invoice"` by default |
+
+The test suite checks PDF/A documents with veraPDF when it is installed (`brew install verapdf`); CI installs it.
+
+#### Invoices as data
+
+A `Gamba::Invoice` holds what an invoice says, and computes what follows from it. The same object draws the pages and writes the XML, so the two always agree.
+
+```ruby
+invoice = Gamba::Invoice.new(
+  number: "INV-2026-0001", issued_on: Date.new(2026, 11, 12), delivered_on: Date.new(2026, 11, 10), due_on: Date.new(2026, 12, 12),
+  seller: {name: "Example SAS", legal_id: {id: "123456789", scheme: "0002"}, vat: "FR32123456789",
+           address: {lines: "1 Example Street", postcode: "75001", city: "Paris", country: "FR"},
+           electronic_address: {id: "123456789", scheme: "0225"}},
+  buyer: {name: "Alice Martin", address: {lines: "2 Example Avenue", postcode: "69001", city: "Lyon", country: "FR"},
+          electronic_address: {id: "alice@example.com", scheme: "EM"}},
+  lines: [{name: "Post", quantity: 2, unit_price: "50.00", vat_rate: 20},
+          {name: "Book", quantity: 1, unit_price: "12.00", vat_rate: "5.5"}],
+  charges: [{amount: "4.90", reason: "Delivery", vat_rate: 20}],
+  payment: {iban: "FR76 3000 6000 0112 3456 7890 189", bic: "AGRIFRPP"},
+  notes: [{text: "Late payment: a fixed compensation of 40 € for recovery costs.", subject: "PMT"},
+          {text: "Late payment penalties: three times the legal interest rate.", subject: "PMD"},
+          {text: "No discount for early payment.", subject: "AAB"}]
+)
+euros = ->(amount) { format("%.2f €", amount) }
+
+Gamba.document(pdf_a: true, info: {Title: "Invoice #{invoice.number}"}) do |document|
+  document.style :default, font: "Inter.ttf"
+  rows = invoice.lines.map { |line| {item: line.name, quantity: format("%g", line.quantity), net: euros.(line.net_amount)} }
+  document.table(rows, columns: {item: {}, quantity: {title: "Qty"}, net: {align: :right}}, header: {weight: :normal})
+  document.text "Total due: #{euros.(invoice.due)}"
+  document.factur_x invoice, rules: :fr
+end.write("invoice.pdf")
+
+```
+
+Amounts are exact Rationals: give them as Strings such as `"12.50"`, Integers, Rationals or BigDecimals, and a Float raises; format them to show them. Each line’s net amount, the totals and the VAT breakdown by category and rate (`line_total`, `allowance_total`, `charge_total`, `tax_basis_total`, `tax_breakdown`, `tax_total`, `grand_total`, `due`) are computed as EN 16931 sets, each rounded to the cent, half up. Lines and the invoice take allowances and charges; a line’s `vat_category` is `:standard` unless told, or `:zero_rated`, `:exempt`, `:reverse_charge`, `:intra_community`, `:export` or `:outside_scope`, whose reason goes in `exemptions` (`{exempt: {reason: "TVA non applicable, art. 293 B du CGI", code: "VATEX-FR-FRANCHISE"}}`). `type: :credit_note` with `preceding_invoice: {number:, issued_on:}` writes a credit note. An unknown or malformed field raises `ArgumentError` naming it.
+
+Before writing, the invoice is checked against the EN 16931 business rules its data can break, such as a due date or payment terms when an amount is due, the VAT identifiers each VAT category asks for, the reason of an exemption, or the delivery address of an intra-community supply. `rules: :fr` adds those of France’s e-invoicing reform: the three notes on late and early payment (subjects `PMT`, `PMD` and `AAB`), the seller’s SIREN as its `legal_id` with scheme `"0002"`, both parties’ electronic addresses, French VAT rates, the invoice a credit note corrects with its date, and more. A broken rule raises `Gamba::Invoice::RuleViolation`, which lists each one by its identifier, as validators name it; `invoice.violations(rules: :fr)` returns them without raising, and `rules: nil` writes the XML unchecked.
+
+```ruby
+document.factur_x invoice, rules: :fr
+# Gamba::Invoice::RuleViolation: BR-FR-13: the seller needs an electronic_address
+```
+
+Gamba writes the EN 16931 profile so far, which French and EU rules use for invoices between businesses; the other profiles still take their XML as a String. The test suite checks the invoices it writes with Mustang, against the EN 16931 rules and France’s, and that Mustang reports each rule Gamba checks.
+
+#### Tagged PDF and PDF/UA
+
+A screen reader reads an untagged PDF glyph by glyph, in drawing order. `pdf: :ua` writes a PDF/UA-1 document (ISO 14289-1), and `pdf_a: :a` a PDF/A-3a one; they combine. Both tag the boxes of Gamba’s own API from their [roles](https://levups.github.io/gamba/guide.html#native): headings, paragraphs, lists, figures with their alternative text, and tables with their header cells, in the order the boxes are placed. A paragraph or a table across pages stays one; the copy of a table’s header atop each later page, headers and footers, backgrounds and borders are artifacts, which readers skip. Pages look the same as untagged ones with the same default font.
+
+```ruby
+Gamba.document(pdf: :ua, pdf_a: :a, lang: "en", info: {Title: "Quarterly report"}) do |document|
+  document.register_font "Inter", normal: "Inter.ttf", bold: "Inter-Bold.ttf"
+  document.style :default, font: "Inter"
+  document.text "Quarterly report", role: :h1
+  document.image "chart.png", alt: "Sales by month, 2026"
+  document.text "Merci", lang: "fr"
+end
+```
+
+What PDF/UA asks for raises `Prawn::Errors::PdfUaViolation` where it is missing: a document without `lang` or a title, a font that is not embedded, a figure without `alt`, a list item outside a list or other boxes in one, a heading that skips a level, and anything drawn through `document.prawn`, which no reader would see. Under `pdf_a: :a` alone, which asks for no language, title or heading order, the others raise `Prawn::Errors::PdfAViolation`. In both, the default style’s font is also the document’s, looked up when first used. Drawing with Prawn’s own calls in a tagged document, and `ActualText` for ligatures, are still to come.
+
+### Output
+
+Whatever does not move a pixel is on by default. Every document is written as PDF 1.5: streams compressed, every other object packed into one compressed object stream, and a compressed cross-reference stream instead of the xref table (ISO 32000-1 §7.5.7, §7.5.8).
+
+### Rails
+
+In a Rails application, 8.0 or later, Gamba needs no configuration. A controller renders a document, an object of the application answering `to_pdf`, or a PDF’s bytes; the response is `application/pdf`, shown in the browser unless `disposition: :attachment`, and the filename is encoded for any language:
+
+```ruby
+def show
+  render pdf: InvoiceDocument.new(@invoice), filename: "Facture #{@invoice.number}.pdf"
+end
+```
+
+Teams that prefer views write `show.pdf.rb` templates. The code runs in the view, with helpers and translations at hand, and draws on `document`, a `Gamba::Document`; Prawn’s API is at `document.prawn`. A template that ends with a document of its own, Gamba’s or Prawn’s, renders that one.
+
+```ruby
+# app/views/invoices/show.pdf.rb
+document.text t(".title", number: @invoice.number), size: 18
+document.table @invoice.lines, columns: {description: {}, amount: {align: :right}}
+document.text number_to_currency(@invoice.total)
+```
+
+Active Storage attachments go straight to `image` and `pdf_page`, without a temporary file: anything that answers `download` is read that way. When the application eager loads, as in production, Gamba loads with it, before the server forks its workers.
+
+### Servers that fork
+
+TrueType and SVG support load on first use, so a document of standard fonts never pays for them. Before a server forks its workers, load them once, so every worker shares that memory instead of loading its own copy:
+
+```ruby
+# outside Rails: config/puma.rb, before_fork, or an initializer
+Gamba.eager_load!
+```
+
+### Comparing an app’s PDFs
+
+The checks Gamba’s oracle compares it with Prawn by come as assertions for Minitest and matchers for RSpec, loaded only on request. A PDF is given as its bytes or a file’s path. A tool that is missing fails with its install command, or skips the check with `Gamba::Testing.missing_tools = :skip`; a check never passes unchecked.
+
+```ruby
+require "gamba/minitest" # or "gamba/rspec": have_pdf_text, have_same_pages_as, be_a_valid_pdf, be_pdf_a
+
+assert_pdf_text pdf, "Invoice INV-2026-0001", page: 1, at: [36, 52] # at: a baseline, from the top left
+assert_same_pages expected_pdf, pdf
+assert_valid_pdf pdf
+assert_pdf_a pdf
+```
+
+A failure says what the page reads instead, or names the page and the glyph that moved, or the pixel rows that differ in MuPDF or Poppler. `script/capture_pdfs.rb` writes every PDF an app’s test suite renders, named after its test. Run the suite under Prawn, then under Gamba, and compare both directories with the same checks:
+
+```sh
+GAMBA_CAPTURE_DIRECTORY=tmp/prawn RUBYOPT=-r/path/to/gamba/script/capture_pdfs.rb bin/rails test
+ruby /path/to/gamba/script/capture_pdfs.rb tmp/prawn tmp/gamba
+```
+
+## Gamba Migration
+
+<https://levups.github.io/gamba/migration.html>
+
+From Prawn to Gamba’s own API in three stages. Each one is worth doing alone, and you can stop after any of them: an application with fifty Prawn documents moves one block, then one document, at a time.
+
+### 1. Switch the gem
+
+Replace `prawn`, `prawn-table` and `prawn-svg` with `gem "gamba"` in the Gemfile, and change nothing else. Your documents draw the same pages, pixel for pixel, in less time and in lighter files. This page follows one document through the three stages, the invoice of the benchmarks; here it is as Prawn code, which Gamba runs unchanged:
+
+```ruby
+Prawn::Document.generate("invoice.pdf") do
+  font_families.update("DejaVuSans" => {normal: "DejaVuSans.ttf", bold: "DejaVuSans-Bold.ttf"})
+  font "DejaVuSans", size: 9
+  image "letterhead.jpg", width: 200
+  text "Invoice INV-2026-0001 — Alice Example", style: :bold, size: 14
+  move_down 10
+  lines = Array.new(10) { ["SKU#{_1}", "Gadget, deluxe edition, model #{_1} with spare parts toolkit", "2", "$1,299.00", "$2,598.00"] }
+  table([%w[SKU Description Qty Unit Total], *lines], header: true, width: bounds.width, cell_style: {padding: 3})
+end
+```
+
+What you gain: the [speed and weight of the benchmarks](https://levups.github.io/gamba/benchmarks.html), one gem instead of three, and [Prawn’s bugs fixed](https://levups.github.io/gamba/compatibility.html), each declared. What can break: not Prawn’s public API, which a contract guards; an extension that patches Prawn’s internals may need a look.
+
+### 2. Native blocks in existing documents
+
+In any Prawn document, `gamba` opens a block of the native API at the cursor, and leaves the cursor below what it drew. Move the part of a document that costs you the most code first: usually a table counted by position, or columns placed by hand. Here the invoice’s table becomes a table with named columns, over rows that are hashes:
+
+```ruby
+Prawn::Document.generate("invoice.pdf") do
+  font_families.update("DejaVuSans" => {normal: "DejaVuSans.ttf", bold: "DejaVuSans-Bold.ttf"})
+  font "DejaVuSans", size: 9
+  image "letterhead.jpg", width: 200
+  text "Invoice INV-2026-0001 — Alice Example", style: :bold, size: 14
+  move_down 10
+  lines = Array.new(10) { {sku: "SKU#{_1}", description: "Gadget, deluxe edition, model #{_1} with spare parts toolkit", quantity: "2", unit: "$1,299.00", total: "$2,598.00"} }
+  gamba do |document|
+    document.table(lines, columns: {sku: {title: "SKU"}, description: {}, quantity: {title: "Qty"}, unit: {}, total: {}}, header: {weight: :normal}, cell: {padding: 3})
+  end
+end
+```
+
+The PDF is the same, byte for byte: the native table starts from the font Prawn’s code set, at the cursor Prawn’s code left. Nothing else in the document changes, so each block can be reviewed and released on its own. What you gain: rows taken from your models as they are, options that raise when mistyped instead of being ignored, and boxes measured before they are drawn.
+
+Inside the block, `document.prawn` is the Prawn document itself, for what the native API does not cover yet.
+
+### 3. New documents in the native API
+
+Write new documents with `Gamba.document`, and move an existing one when you next rework it. The block receives the document instead of running inside it, so your own methods and instance variables stay in reach, and the document can be split into small classes that `draw` takes:
+
+```ruby
+Gamba.document do |document|
+  document.register_font "DejaVuSans", normal: "DejaVuSans.ttf", bold: "DejaVuSans-Bold.ttf"
+  document.style :default, font: "DejaVuSans", size: 9
+  document.image "letterhead.jpg", width: 200, alt: "Example Inc. letterhead"
+  document.text "Invoice INV-2026-0001 — Alice Example", weight: :bold, size: 14
+  lines = Array.new(10) { {sku: "SKU#{_1}", description: "Gadget, deluxe edition, model #{_1} with spare parts toolkit", quantity: "2", unit: "$1,299.00", total: "$2,598.00"} }
+  document.stack(padding: [10, 0, 0, 0]) do |stack|
+    stack.table(lines, columns: {sku: {title: "SKU"}, description: {}, quantity: {title: "Qty"}, unit: {}, total: {}}, header: {weight: :normal}, cell: {padding: 3})
+  end
+end.write("invoice.pdf")
+```
+
+The pages are no longer Prawn’s: fonts use their ligatures and kerning, and paragraphs keep their widows and orphans, as a typesetter would. What you gain on top of stage 2: headers and footers that know their page number, headings that make the PDF’s bookmarks, and a [tagged PDF](https://levups.github.io/gamba/guide.html#tagged-pdf) for screen readers from one option, since every box already says what it is:
+
+```ruby
+Gamba.document(pdf: :ua, lang: "en", info: {Title: "Invoice INV-2026-0001"}) do |document|
+  # the same body: the letterhead's alt text is all PDF/UA asks of this invoice
+end
+```
+
+### The invoice at each stage
+
+The latest numbers are in [benchmarks.json](https://levups.github.io/gamba/benchmarks.json).
+
+The code of each stage is `bench/documents/invoice.rb`, `bench/mixed/invoice.rb` and `bench/native/invoice.rb`, which `rake bench` measures before each release; a test checks that this page shows that code, and that each stage draws the same text.
+
+### Prawn idioms, side by side
+
+What Prawn code computes by hand, the native API describes. Each pair draws the same text; a test runs both.
+
+#### Columns placed with `bounding_box`
+
+A row is as high as its tallest child, and what follows starts below it.
+
+Prawn
+
+```ruby
+Prawn::Document.generate("address.pdf") do
+  top = cursor
+  bounding_box([0, top], width: 250) do
+    text "Alice Martin", size: 14, style: :bold
+    text "1 Example Street, 75001 Paris"
+  end
+  left_bottom = cursor
+  bounding_box([bounds.width - 150, top], width: 150) do
+    text "Due on 1 December 2026", align: :right
+  end
+  move_cursor_to [left_bottom, cursor].min
+  move_down 20
+  text "This starts below the taller column."
+end
+```
+
+Gamba
+
+```ruby
+Gamba.document do |document|
+  document.stack(gap: 20) do |page|
+    page.row(gap: 24) do |row|
+      row.stack do |address|
+        address.text "Alice Martin", size: 14, weight: :bold
+        address.text "1 Example Street, 75001 Paris"
+      end
+      row.text "Due on 1 December 2026", width: 150, align: :right
+    end
+    page.text "This starts below the taller column."
+  end
+end.write("address.pdf")
+```
+
+#### Fonts and colours set, then reset, with `move_down` between
+
+Styles name text attributes once; a call passes only what differs. Space is a container’s `gap` or `padding`, not a cursor moved by hand.
+
+Prawn
+
+```ruby
+Prawn::Document.generate("terms.pdf") do
+  font_families.update("DejaVuSans" => {normal: "DejaVuSans.ttf", bold: "DejaVuSans-Bold.ttf"})
+  font "DejaVuSans", size: 10
+  font_size(16) { text "Payment terms", style: :bold }
+  move_down 6
+  text "Payment is due within 30 days."
+  fill_color "666666"
+  text "Late payments bear interest at three times the legal rate."
+  fill_color "000000"
+end
+```
+
+Gamba
+
+```ruby
+Gamba.document do |document|
+  document.register_font "DejaVuSans", normal: "DejaVuSans.ttf", bold: "DejaVuSans-Bold.ttf"
+  document.style :default, font: "DejaVuSans", size: 10
+  document.style :heading, size: 16, weight: :bold
+  document.stack(gap: 6) do |terms|
+    terms.text "Payment terms", style: :heading
+    terms.stack do |body|
+      body.text "Payment is due within 30 days."
+      body.text "Late payments bear interest at three times the legal rate.", color: "666666"
+    end
+  end
+end.write("terms.pdf")
+```
+
+#### Tables counted by position
+
+Columns are named, rows are hashes or objects answering those names, and a column’s alignment sits with its title.
+
+Prawn
+
+```ruby
+lines = [{sku: "A-1", description: "Gadget", quantity: 2}, {sku: "B-2", description: "Gizmo", quantity: 1}]
+
+Prawn::Document.generate("lines.pdf") do
+  rows = lines.map { |line| [line[:sku], line[:description], line[:quantity]] }
+  table([%w[SKU Description Qty], *rows], header: true) do
+    row(0).font_style = :bold
+    column(2).align = :right
+  end
+end
+```
+
+Gamba
+
+```ruby
+lines = [{sku: "A-1", description: "Gadget", quantity: 2}, {sku: "B-2", description: "Gizmo", quantity: 1}]
+
+Gamba.document do |document|
+  document.table(lines, columns: {
+    sku: {title: "SKU"},
+    description: {},
+    quantity: {title: "Qty", align: :right}
+  })
+end.write("lines.pdf")
+```
+
+#### `repeat` and `number_pages`
+
+A header and a footer are declared once and run for every page once the pages are counted; the body breaks pages around them without a bounding box of its own.
+
+Prawn
+
+```ruby
+Prawn::Document.generate("report.pdf") do
+  repeat(:all) do
+    bounding_box([0, bounds.top], width: bounds.width, height: 20) { text "Example SAS", style: :bold }
+  end
+  bounding_box([0, bounds.top - 30], width: bounds.width, height: bounds.height - 60) do
+    60.times { |index| text "Paragraph #{index + 1} of the report." }
+  end
+  number_pages "Page <page> of <total>", at: [0, 10], width: bounds.width, align: :center, size: 8
+end
+```
+
+Gamba
+
+```ruby
+Gamba.document do |document|
+  document.header(gap: 10) { |header, _page| header.text "Example SAS", weight: :bold }
+  document.footer(gap: 10) do |footer, page|
+    footer.text "Page #{page.number} of #{page.total}", align: :center, size: 8
+  end
+  60.times { |index| document.text "Paragraph #{index + 1} of the report." }
+end.write("report.pdf")
+```
+
+#### Room left on the page, measured by hand
+
+A heading with `keep_with_next` moves to the next page with the start of what follows it, whatever their size.
+
+Prawn
+
+```ruby
+Prawn::Document.generate("totals.pdf") do
+  50.times { |index| text "Line #{index + 1} of the invoice" }
+  # Room for the heading and the lines under it, measured by hand.
+  start_new_page if cursor < 50
+  text "Totals", size: 16, style: :bold
+  text "Subtotal: $2,598.00"
+  text "Total: $3,117.60"
+end
+```
+
+Gamba
+
+```ruby
+Gamba.document do |document|
+  document.style :heading, size: 16, weight: :bold, keep_with_next: true
+  50.times { |index| document.text "Line #{index + 1} of the invoice" }
+  document.text "Totals", style: :heading
+  document.stack do |totals|
+    totals.text "Subtotal: $2,598.00"
+    totals.text "Total: $3,117.60"
+  end
+end.write("totals.pdf")
+```
+
+### What still goes through Prawn
+
+SVG, vector graphics, text boxes at fixed positions, links and encryption have no native call yet: `document.prawn` gives a native document all of Prawn’s API, and what it draws takes its place in the flow. Prawn’s table of arrays stays at `document.prawn.table`, and a native table’s block receives the `Prawn::Table` for spans and single cells.
+
+The [guide](https://levups.github.io/gamba/guide.html#native) describes every native call, and `test/contract/gamba.yml` lists each public method with its signature: a change there is a decision, never an accident.
+
+## Gamba Benchmarks
+
+<https://levups.github.io/gamba/benchmarks.html>
+
+Regenerated by `rake bench` before each release. Every chart has its table.
+
+### Three documents, two engines, two APIs, tagged or not
+
+The latest numbers are in [benchmarks.json](https://levups.github.io/gamba/benchmarks.json).
+
+“Gamba, one native block” is the invoice’s Prawn code with its table moved to a `gamba` block, in `bench/mixed/`: the middle stage of the [migration](https://levups.github.io/gamba/migration.html), byte for byte the same PDF. “Gamba, own API” is the same document written with Gamba’s own API, in `bench/native/`: boxes measured then placed, ligatures and kerning on, widows and orphans kept. It draws a page as a typesetter would rather than as Prawn does, so its file weight differs a little; Prawn and Gamba draw the same pages. “Gamba, own API, PDF/UA” is that same document with `pdf: :ua`: what tagging costs, the structure tree and its marked content, the language, the title and the XMP metadata. Prawn compresses its streams only when asked: it is measured with `compress: true`, at its lightest. Peak memory is the whole process’s maximum resident set size, Ruby included.
+
+### Why it is faster
+
+**Line breaking.** Prawn rebuilds its regular expressions for every line it wraps. Gamba compiles them once per text encoding, and keeps Prawn’s greedy algorithm, so lines break at the same places.
+
+**Numbers.** Prawn formats every number it writes, then patches the string with a regular expression. Gamba trims the formatted digits byte by byte.
+
+**Fonts.** Prawn reads a TrueType file again for each document. Gamba parses it once per process, freezes it, and shares it between documents and threads.
+
+**Weight.** An object stream and a cross-reference stream pack what Prawn writes as plain objects and an xref table.
+
+### Reproduce
+
+```sh
+bundle install && BUNDLE_GEMFILE=oracle/Gemfile bundle install
+bundle exec rake corpus:fetch  # Prawn's fonts and images, into corpus/cache
+bundle exec rake bench         # BENCH_ITERATIONS=20 by default
+```
+
+`bench/compare.rb` renders each document of `bench/documents/` with Prawn, from its own bundle in `oracle/Gemfile`, and with Gamba, each document of `bench/mixed/` with Gamba, and each document of `bench/native/` with Gamba, untagged then tagged for PDF/UA, in fresh YJIT processes per column that take turns, 8 by default so that each order of the four columns comes back as often, and the invoice’s fifth column takes each place at least once. Each process measures the median of 20 renders, the objects one render allocates, the file’s weight and its peak memory; the site shows the median of those processes, as `docs/benchmarks.json` records it. Peak memory varies by about 20% from one process to the next, which one process cannot show. It writes `docs/benchmarks.json`, which every page of this site reads.

@@ -1,0 +1,20 @@
+# Gamba
+
+> PDFs from layout you describe, tagged for screen readers; runs Prawn code unchanged, faster
+
+Install with `gem "gamba"` in the Gemfile.
+
+## Docs
+
+- [Everything in one file](https://levups.github.io/gamba/llms-full.txt): the README, then every page below but the home page, in Markdown
+- [Gamba: PDF files from Ruby, laid out and tagged for you](https://levups.github.io/gamba/): Gamba is a Ruby library that writes PDF files from layout you describe: stacks, rows, tables, headers, tagged for screen readers. It also runs code written for Prawn unchanged, faster and in lighter files.
+- [Gamba Compatibility](https://levups.github.io/gamba/compatibility.html): Where Gamba differs from Prawn, prawn-table and prawn-svg: the Prawn bugs it fixes, its safer SVG default, its lighter files, and how the oracle proves the rest identical.
+- [Gamba Guide](https://levups.github.io/gamba/guide.html): Write PDFs with Gamba’s own API, stacks, rows, grids, tables, headers and footers, or run Prawn code on it unchanged; with SVG, fonts, barcodes, pages of other PDFs, PDF/UA, PDF/A-3, Factur-X and Rails.
+- [Gamba Migration](https://levups.github.io/gamba/migration.html): Move Prawn code to Gamba’s own API in three stages, each worth doing alone: switch the gem, adopt native blocks inside existing documents, write new documents natively.
+
+## Optional
+
+- [Gamba Benchmarks](https://levups.github.io/gamba/benchmarks.html): Gamba against Prawn 2.5 and prawn-table on an invoice, a report and a catalog, through Prawn’s API and its own, tagged or not: render time, allocations, file weight and peak memory.
+- [Benchmark numbers](https://levups.github.io/gamba/benchmarks.json): the latest measurements, as JSON
+- [Changelog](https://github.com/levups/gamba/blob/main/CHANGELOG.md): what changed in each version
+- [Source code](https://github.com/levups/gamba)

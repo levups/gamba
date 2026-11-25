@@ -37,4 +37,14 @@ namespace :docs do
   task "highlight:check" do
     ruby "script/highlight_docs.rb", "--check"
   end
+
+  desc "Write docs/llms.txt and docs/llms-full.txt from docs/*.html and the README"
+  task :llms do
+    ruby "script/llms_docs.rb"
+  end
+
+  desc "Fail if docs/llms.txt or docs/llms-full.txt is out of date"
+  task "llms:check" do
+    ruby "script/llms_docs.rb", "--check"
+  end
 end

@@ -11,6 +11,9 @@ from one API to the other one block at a time ([the migration guide](https://lev
 
 Website and guide: https://levups.github.io/gamba/
 
+Coding agents can start from <https://levups.github.io/gamba/llms.txt>, or read this README and the
+website's pages as one Markdown file: <https://levups.github.io/gamba/llms-full.txt>.
+
 ## Installation
 
 Gamba needs Ruby 3.3 or later. In your Gemfile, replace `prawn`, `prawn-table` and `prawn-svg` with one line:

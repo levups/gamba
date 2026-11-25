@@ -51,6 +51,9 @@ promise to its users; everything behind it is yours to reshape when that serves 
 - Measure performance without JIT and with YJIT. A Performance cop the numbers contradict is disabled on its line,
   with the reason. A pure performance change pins no internals in tests.
 - Test and bench data are anonymized: `alice`, `Post`, `example.com`.
+- `docs/llms.txt` (an index for coding agents) and `docs/llms-full.txt` (the README and
+  the pages of `docs/`, in Markdown) come from `bundle exec rake docs:llms`: run it after changing the README or a page of
+  `docs/`. CI checks them.
 - Everything in the repository is in English (code, comments, commits, pull requests, issues, reviews, replies),
   whatever the conversation's language.
 - No AI attribution in anything people read; commits flag AI help with `Assisted-by`, never `Co-Authored-By`.
