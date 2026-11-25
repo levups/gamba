@@ -13,7 +13,9 @@ SPEC = Gem::Specification.load(Dir[File.join(ROOT, "*.gemspec")].first)
 SITE = SPEC.metadata.fetch("documentation_uri").chomp("/") + "/"
 REPOSITORY = SPEC.metadata.fetch("source_code_uri")
 README = File.read(File.join(ROOT, "README.md"), encoding: "UTF-8")
-NAME = README[/\A# (.+)$/, 1]&.gsub(/<[^>]+>/, "")&.strip || abort("README.md must open with a # title")
+# The README's title as text: a logo in it (<img …>) is left out.
+NAME = Nokogiri::HTML.fragment(README[/\A# (.+)$/, 1].to_s).text.strip
+abort "README.md must open with a # title" if NAME.empty?
 # Numbers some pages fill in from it with JavaScript: the Markdown points to it instead.
 NUMBERS = File.exist?(File.join(ROOT, "docs", "benchmarks.json")) && "#{SITE}benchmarks.json"
 
