@@ -686,8 +686,6 @@ end
 
 The page appears as a viewer shows it, its crop box turned by its `/Rotate`. It is written once however many pages draw it, and pages of one file share their fonts and images. The reader is the one behind `Gamba.combine`, with its limits and errors; under `pdf_a: true`, a page whose fonts are not embedded raises `Prawn::Errors::PdfAViolation`. Gamba’s own API takes `background_pdf` and `background_pdf_page` as document options, and `pdf_page` as a box sized like an image.
 
-<<<<<<< HEAD
-
 #### Encryption
 
 `encrypt_document` takes Prawn’s options, and `algorithm: :aes_256` for the standard security handler’s revision 6 (ISO 32000-2 §7.6.4) in place of Prawn’s 40-bit RC4, which anyone can break and which Gamba keeps as the default only because Prawn wrote it. Every reader made since Acrobat X opens it, Preview, Safari, Chrome and Firefox included. Without an owner password, the user password stands for it, and anyone who opens the file may lift its restrictions.

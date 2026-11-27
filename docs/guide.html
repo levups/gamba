@@ -243,7 +243,6 @@
   <span class="n">start_new_page</span><span class="p">(</span><span class="ss">background_pdf: </span><span class="kp">false</span><span class="p">)</span>
 <span class="k">end</span></code></pre>
         <p>The page appears as a viewer shows it, its crop box turned by its <code>/Rotate</code>. It is written once however many pages draw it, and pages of one file share their fonts and images. The reader is the one behind <code>Gamba.combine</code>, with its limits and errors; under <code>pdf_a: true</code>, a page whose fonts are not embedded raises <code>Prawn::Errors::PdfAViolation</code>. Gamba’s own API takes <code>background_pdf</code> and <code>background_pdf_page</code> as document options, and <code>pdf_page</code> as a box sized like an image.</p>
-<<<<<<< HEAD
         <h3 id="encryption">Encryption</h3>
         <p><code>encrypt_document</code> takes Prawn’s options, and <code>algorithm: :aes_256</code> for the standard security handler’s revision 6 (ISO 32000-2 §7.6.4) in place of Prawn’s 40-bit RC4, which anyone can break and which Gamba keeps as the default only because Prawn wrote it. Every reader made since Acrobat X opens it, Preview, Safari, Chrome and Firefox included. Without an owner password, the user password stands for it, and anyone who opens the file may lift its restrictions.</p>
 <pre><code class="language-ruby"><span class="no">Prawn</span><span class="o">::</span><span class="no">Document</span><span class="p">.</span><span class="nf">new</span> <span class="k">do</span>
