@@ -133,41 +133,39 @@ module Prawn
     end
 
     # Revision 6 of the standard security handler: AES-256 with the file key itself (ISO 32000-2 §7.6.4). The key,
-    # salts and initialization vectors come from an HMAC of the passwords and the file identifier, so the same
-    # document gives the same bytes, and nobody without a password can tell them from random ones.
+    # salts and initialization vectors are random, as the standard asks: derived from the passwords, the public salts
+    # would let anyone test a guess far faster than algorithm 2.B allows. Two renders give different bytes.
     class Aes256Encryption
       # Bits 1 and 2 are reserved and must be 0 (ISO 32000-2 table 22).
       RESERVED_PERMISSIONS = 0b11
       ZERO_IV = ("\x00" * 16).b.freeze
 
+      attr_reader :identifier_secret
+
       def initialize(user_password:, owner_password:, permissions:)
         @user_password = password_bytes(user_password)
         @owner_password = password_bytes(owner_password)
         @permissions = permissions & ~RESERVED_PERMISSIONS
-        @secret = "#{@user_password}\0#{@owner_password}"
+        @file_key = SecureRandom.bytes(32)
+        @identifier_secret = SecureRandom.bytes(32)
       end
 
-      def identifier_secret
-        Digest::SHA256.digest(@secret)
+      def key(_file_identifier)
+        @file_key
       end
 
-      def key(file_identifier)
-        derived(file_identifier, "key")
-      end
-
-      def dictionary(file_identifier)
-        file_key = key(file_identifier)
-        user_entry = password_entry(@user_password, file_identifier, "user")
-        owner_entry = password_entry(@owner_password, file_identifier, "owner", user_entry)
+      def dictionary(_file_identifier)
+        user_entry = password_entry(@user_password)
+        owner_entry = password_entry(@owner_password, user_entry)
         {Filter: :Standard, V: 5, R: 6, Length: 256, CF: {StdCF: {AuthEvent: :DocOpen, CFM: :AESV3, Length: 32}}, StmF: :StdCF, StrF: :StdCF,
-         U: byte_string(user_entry), UE: byte_string(wrapped_key(@user_password, user_entry, file_key)),
-         O: byte_string(owner_entry), OE: byte_string(wrapped_key(@owner_password, owner_entry, file_key, user_entry)),
-         P: [@permissions].pack("L").unpack1("l"), Perms: byte_string(permissions_entry(file_key, file_identifier)), EncryptMetadata: true}
+         U: byte_string(user_entry), UE: byte_string(wrapped_key(@user_password, user_entry)),
+         O: byte_string(owner_entry), OE: byte_string(wrapped_key(@owner_password, owner_entry, user_entry)),
+         P: [@permissions].pack("L").unpack1("l"), Perms: byte_string(permissions_entry), EncryptMetadata: true}
       end
 
       # Each string and stream: its initialization vector, then its bytes in AES-256-CBC with PKCS#7 padding.
-      def encrypt(bytes, key, identifier)
-        iv = (OpenSSL::HMAC.new(key, "SHA256") << [identifier].pack("N") << bytes).digest.byteslice(0, 16)
+      def encrypt(bytes, key, _identifier)
+        iv = SecureRandom.bytes(16)
         cipher = OpenSSL::Cipher.new("aes-256-cbc").encrypt
         cipher.key = key
         cipher.iv = iv
@@ -183,30 +181,26 @@ module Prawn
         password.to_s.b.byteslice(0, 127)
       end
 
-      def derived(file_identifier, purpose)
-        OpenSSL::HMAC.digest("SHA256", @secret, file_identifier + purpose)
-      end
-
       # Algorithm 8 (user) or 9 (owner): the password's hash, its validation salt and its key salt.
-      def password_entry(password, file_identifier, purpose, user_entry = "".b)
-        salts = derived(file_identifier, "#{purpose} salts").byteslice(0, 16)
-        Security.hash_2b(password, salts.byteslice(0, 8), user_entry) + salts
+      def password_entry(password, user_entry = "".b)
+        validation_salt = SecureRandom.bytes(8)
+        Security.hash_2b(password, validation_salt, user_entry) + validation_salt + SecureRandom.bytes(8)
       end
 
       # The file key encrypted with the hash of the password and its key salt, /UE or /OE.
-      def wrapped_key(password, entry, file_key, user_entry = "".b)
+      def wrapped_key(password, entry, user_entry = "".b)
         cipher = OpenSSL::Cipher.new("aes-256-cbc").encrypt
         cipher.key = Security.hash_2b(password, entry.byteslice(40, 8), user_entry)
         cipher.iv = ZERO_IV
         cipher.padding = 0
-        cipher.update(file_key) + cipher.final
+        cipher.update(@file_key) + cipher.final
       end
 
       # Algorithm 10: the permissions, encrypted so that a reader can check nobody changed /P; ECB, as it asks, on one block.
-      def permissions_entry(file_key, file_identifier)
-        block = [@permissions].pack("l<") + "\xFF\xFF\xFF\xFFTadb".b + derived(file_identifier, "perms").byteslice(0, 4)
+      def permissions_entry
+        block = [@permissions].pack("l<") + "\xFF\xFF\xFF\xFFTadb".b + SecureRandom.bytes(4)
         cipher = OpenSSL::Cipher.new("aes-256-ecb").encrypt
-        cipher.key = file_key
+        cipher.key = @file_key
         cipher.padding = 0
         cipher.update(block) + cipher.final
       end

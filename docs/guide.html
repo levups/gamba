@@ -249,7 +249,7 @@
   <span class="n">text</span> <span class="s2">"Payslip for alice"</span>
   <span class="n">encrypt_document</span><span class="p">(</span><span class="ss">user_password: </span><span class="s2">"alice"</span><span class="p">,</span> <span class="ss">owner_password: :random</span><span class="p">,</span> <span class="ss">algorithm: :aes_256</span><span class="p">,</span> <span class="ss">permissions: </span><span class="p">{</span><span class="ss">modify_contents: </span><span class="kp">false</span><span class="p">})</span>
 <span class="k">end</span></code></pre>
-        <p>The same document gives the same bytes: the key, salts and initialization vectors come from an HMAC of the passwords and the file identifier, which someone without a password cannot tell from random ones. Passwords are hashed as UTF-8, their first 127 bytes, without SASLprep. Gamba’s own API reaches it through <code>document.prawn.encrypt_document</code>.</p>
+        <p>Its key, salts and initialization vectors are random, as the standard asks, so two renders of the same document give different bytes; RC4 documents stay the same from one render to the next. Passwords are hashed as UTF-8, their first 127 bytes, without SASLprep. Gamba’s own API reaches it through <code>document.prawn.encrypt_document</code>.</p>
       </div>
     </section>
 

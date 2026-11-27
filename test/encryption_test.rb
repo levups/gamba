@@ -89,8 +89,13 @@ class EncryptionTest < Minitest::Test
     assert_equal [["Hello, alice"]], Gamba::PdfCheck.text_lines(combined)
   end
 
-  def test_aes_256_gives_the_same_bytes_for_the_same_document
-    assert_equal encrypted_document(algorithm: :aes_256), encrypted_document(algorithm: :aes_256)
+  # Salts and keys derived from the passwords would let anyone test a guess against the public salts with one HMAC,
+  # bypassing algorithm 2.B: they are drawn at random, so two renders differ.
+  def test_aes_256_draws_its_key_and_salts_at_random
+    first, second = Array.new(2) { encrypted_document(algorithm: :aes_256) }
+
+    refute_equal first, second
+    assert_equal Gamba::PdfCheck.text_lines(Gamba.combine([first])), Gamba::PdfCheck.text_lines(Gamba.combine([second]))
   end
 
   def test_an_unknown_algorithm_raises
