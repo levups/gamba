@@ -67,8 +67,35 @@ class EncryptionTest < Minitest::Test
     end
   end
 
+  def test_aes_256_refuses_assembly_and_forms_with_modification_and_annotations_as_rc4_does
+    skip "qpdf is not installed" unless qpdf?
+
+    ALGORITHMS.each do |algorithm|
+      pdf = Prawn::Document.new
+      pdf.encrypt_document(owner_password: "owner", permissions: {modify_contents: false, modify_annotations: false}, algorithm:)
+
+      with_file(pdf.render) do |path|
+        encryption = qpdf("--show-encryption", path)
+
+        assert_includes encryption, "modify document assembly: not allowed", algorithm
+        assert_includes encryption, "modify forms: not allowed", algorithm
+      end
+    end
+  end
+
+  def test_an_aes_256_password_of_bytes_that_are_no_text_is_hashed_as_bytes
+    skip "qpdf is not installed" unless qpdf?
+
+    pdf = Prawn::Document.new
+    pdf.text "Hello, alice"
+    pdf.encrypt_document(user_password: (+"\xFFab").force_encoding(Encoding::US_ASCII), owner_password: "owner", algorithm: :aes_256)
+
+    with_file(pdf.render) { |path| assert system("qpdf", "--check", "--password=owner", path, out: File::NULL) }
+  end
+
   def test_an_aes_256_user_password_opens_the_document_as_the_owner_password_does
     skip "qpdf is not installed" unless qpdf?
+    skip "Poppler is not installed" unless system("pdftotext", "-v", out: File::NULL, err: File::NULL)
 
     pdf = Prawn::Document.new
     pdf.text "Hello, alice"
@@ -94,7 +121,7 @@ class EncryptionTest < Minitest::Test
   def test_aes_256_draws_its_key_and_salts_at_random
     first, second = Array.new(2) { encrypted_document(algorithm: :aes_256) }
 
-    refute_equal first, second
+    %w[U O UE OE].each { |entry| refute_equal first[%r{/#{entry} <(\h+)>}, 1], second[%r{/#{entry} <(\h+)>}, 1], entry }
     assert_equal Gamba::PdfCheck.text_lines(Gamba.combine([first])), Gamba::PdfCheck.text_lines(Gamba.combine([second]))
   end
 

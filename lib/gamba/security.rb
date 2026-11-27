@@ -19,9 +19,10 @@ module Prawn
         raise Errors::PdfAViolation, "PDF/A forbids encryption" if pdf_a?
 
         Prawn.verify_options(%i[user_password owner_password permissions algorithm], options)
+        options = options.dup
         algorithm = options.delete(:algorithm) || :rc4_40
         encryption_class = case algorithm
-        when :rc4_40 then Encryption
+        when :rc4_40 then Rc4Encryption
         when :aes_256 then Aes256Encryption
         else raise ArgumentError, "algorithm is #{algorithm.inspect}: encrypt_document takes :rc4_40 or :aes_256"
         end
@@ -77,7 +78,7 @@ module Prawn
       # Revision 6 came as Adobe's extension level 8 to PDF 1.7, before ISO 32000-2 made it part of PDF 2.0.
       def declare_extension_level_8
         min_version(1.7)
-        @root.data[:Extensions] = {ADBE: {BaseVersion: :"1.7", ExtensionLevel: 8}}
+        (@root.data[:Extensions] ||= {})[:ADBE] = {BaseVersion: :"1.7", ExtensionLevel: 8}
       end
 
       def permissions=(permissions = {})
@@ -95,8 +96,8 @@ module Prawn
       end
     end
 
-    # The keys and dictionary of an encrypted document, which depend on its file identifier.
-    class Encryption
+    # Revision 2, 40-bit RC4: the keys and dictionary of an encrypted document, which depend on its file identifier.
+    class Rc4Encryption
       def initialize(user_password:, owner_password:, permissions:)
         @user_password = user_password
         @owner_password = owner_password
@@ -138,6 +139,9 @@ module Prawn
     class Aes256Encryption
       # Bits 1 and 2 are reserved and must be 0 (ISO 32000-2 table 22).
       RESERVED_PERMISSIONS = 0b11
+      # Revision 3 on, bit 11 (assemble) and bit 9 (fill forms) grant on their own what bit 4 (modify) and bit 6
+      # (annotate) cover in revision 2: refused with them, as Prawn's permissions mean.
+      IMPLIED_PERMISSION_BY_BIT = {1 << 3 => 1 << 10, 1 << 5 => 1 << 8}.freeze
       ZERO_IV = ("\x00" * 16).b.freeze
 
       attr_reader :identifier_secret
@@ -145,7 +149,9 @@ module Prawn
       def initialize(user_password:, owner_password:, permissions:)
         @user_password = password_bytes(user_password)
         @owner_password = password_bytes(owner_password)
-        @permissions = permissions & ~RESERVED_PERMISSIONS
+        @permissions = IMPLIED_PERMISSION_BY_BIT.reduce(permissions & ~RESERVED_PERMISSIONS) do |value, (bit, implied)|
+          value.anybits?(bit) ? value : value & ~implied
+        end
         @file_key = SecureRandom.bytes(32)
         @identifier_secret = SecureRandom.bytes(32)
       end
@@ -174,10 +180,10 @@ module Prawn
 
       private
 
-      # SASLprep leaves ASCII as it is, and is left out; 127 bytes is the limit revision 6 hashes.
+      # SASLprep comes down to NFKC for the passwords people type; 127 bytes is the limit revision 6 hashes.
       def password_bytes(password)
-        password.to_s.encode(::Encoding::UTF_8).b.byteslice(0, 127)
-      rescue ::Encoding::UndefinedConversionError # a binary password, owner_password: :random's among them
+        password.to_s.encode(::Encoding::UTF_8).unicode_normalize(:nfkc).b.byteslice(0, 127)
+      rescue ::EncodingError # bytes that are no text, owner_password: :random's among them
         password.to_s.b.byteslice(0, 127)
       end
 

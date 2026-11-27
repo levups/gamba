@@ -67,7 +67,7 @@ module PDF
       attr_reader :objects, :root, :info, :version, :trailer
 
       # A file identifier derived from the document's content, so the same document always gets the same one; an
-      # encrypted document's mixes in its passwords.
+      # encrypted document's mixes in a secret: its passwords under RC4, a random one under AES-256.
       def document_digest(secret)
         digest = Digest::MD5.new
         digest << secret if secret
@@ -78,7 +78,7 @@ module PDF
         digest.digest
       end
 
-      # Outside an object stream, each string is encrypted with its object's key (ISO 32000-1 §7.6.2).
+      # Outside an object stream, each string is encrypted on its own (ISO 32000-1 §7.6.2).
       def encrypted_strings(value, identifier)
         case value
         when Hash then value.transform_values { encrypted_strings(_1, identifier) }

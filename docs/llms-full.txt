@@ -224,8 +224,8 @@ Any of it can be built to attack the server that renders it.
   ignores references that lead back to themselves, so a crafted PDF can't send it into a loop or fill
   memory.
 - Text with inline formatting (`inline_format: true`) is parsed in linear time, whatever the markup.
-- The `/ID` of an encrypted PDF depends on its passwords, so it reveals nothing about the content to someone
-  without them.
+- The `/ID` of an encrypted PDF mixes in a secret, its passwords or a random one under AES-256, so it reveals
+  nothing about the content to someone without them.
 
 Inline formatting still turns `<link href="...">` into a clickable link. Escape user text before you put it inside
 markup. A word with no space to break at, thousands of characters long, takes time that grows with the square of its
@@ -395,7 +395,7 @@ A font, an image or a PDF a user sends can be built to make a parser loop, crash
 - **Inline formatting.** Markup with tags that never close is read in linear time, where Prawn takes minutes on a few hundred kilobytes, and a style opened again and again stays one style.
 - **Combined PDFs.** A number too large for a float, in a page's boxes, no longer writes NaN into the combined page.
 - **PDF/A metadata.** A title or author holding a control character, or bytes that are not text, raises `Prawn::Errors::PdfAViolation`: XML cannot hold them, and the XMP would not parse.
-- **Encryption.** The file identifier of an encrypted document mixes in its passwords, so it tells nothing about the content to someone without them. Prawn writes no identifier, and gives every document with the same passwords the same key.
+- **Encryption.** The file identifier of an encrypted document mixes in a secret, its passwords or a random one under AES-256, so it tells nothing about the content to someone without them. Prawn writes no identifier, and gives every document with the same passwords the same key.
 - **Dates.** A date in a time zone with minutes keeps them: `+05:30` is written `+05'30'`, where Prawn writes `+05'00'`, half an hour off. Whole-hour offsets are written as Prawn writes them.
 
 ### Lighter files
@@ -681,7 +681,7 @@ The page appears as a viewer shows it, its crop box turned by its `/Rotate`. It 
 
 #### Encryption
 
-`encrypt_document` takes Prawn’s options, and `algorithm: :aes_256` for the standard security handler’s revision 6 (ISO 32000-2 §7.6.4) in place of Prawn’s 40-bit RC4, which anyone can break and which Gamba keeps as the default only because Prawn wrote it. Every reader made since Acrobat 9 opens it, Preview, Safari, Chrome and Firefox included.
+`encrypt_document` takes Prawn’s options, and `algorithm: :aes_256` for the standard security handler’s revision 6 (ISO 32000-2 §7.6.4) in place of Prawn’s 40-bit RC4, which anyone can break and which Gamba keeps as the default only because Prawn wrote it. Every reader made since Acrobat X opens it, Preview, Safari, Chrome and Firefox included. Without an owner password, the user password stands for it, and anyone who opens the file may lift its restrictions.
 
 ```ruby
 Prawn::Document.new do
@@ -690,7 +690,7 @@ Prawn::Document.new do
 end
 ```
 
-Its key, salts and initialization vectors are random, as the standard asks, so two renders of the same document give different bytes; RC4 documents stay the same from one render to the next. Passwords are hashed as UTF-8, their first 127 bytes, without SASLprep. Gamba’s own API reaches it through `document.prawn.encrypt_document`.
+Its key, salts and initialization vectors are random, as the standard asks, so two renders of the same document give different bytes; RC4 documents stay the same from one render to the next. Passwords are hashed as UTF-8 in NFKC, the part of SASLprep that changes what people type, their first 127 bytes. Gamba’s own API reaches it through `document.prawn.encrypt_document`.
 
 ### QR codes, DataMatrix and barcodes
 
