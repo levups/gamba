@@ -690,7 +690,7 @@ Prawn::Document.new do
 end
 ```
 
-Its key, salts and initialization vectors are random, as the standard asks, so two renders of the same document give different bytes; RC4 documents stay the same from one render to the next. Passwords are hashed as UTF-8 in NFKC, the part of SASLprep that changes what people type, their first 127 bytes. Gamba’s own API reaches it through `document.prawn.encrypt_document`.
+Its key, salts and initialization vectors are random, as the standard asks, so two renders of the same document give different bytes; RC4 documents stay the same from one render to the next. Passwords are hashed as UTF-8, their first 127 bytes, without SASLprep, as qpdf, Poppler and MuPDF take a typed one. Gamba’s own API reaches it through `document.prawn.encrypt_document`.
 
 ### QR codes, DataMatrix and barcodes
 

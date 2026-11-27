@@ -180,9 +180,10 @@ module Prawn
 
       private
 
-      # SASLprep comes down to NFKC for the passwords people type; 127 bytes is the limit revision 6 hashes.
+      # Without SASLprep, as qpdf, Poppler and MuPDF take a typed password: normalized, "ﬁ" would no longer open in
+      # them. 127 bytes is the limit revision 6 hashes.
       def password_bytes(password)
-        password.to_s.encode(::Encoding::UTF_8).unicode_normalize(:nfkc).b.byteslice(0, 127)
+        password.to_s.encode(::Encoding::UTF_8).b.byteslice(0, 127)
       rescue ::EncodingError # bytes that are no text, owner_password: :random's among them
         password.to_s.b.byteslice(0, 127)
       end

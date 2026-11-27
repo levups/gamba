@@ -86,11 +86,13 @@ class EncryptionTest < Minitest::Test
   def test_an_aes_256_password_of_bytes_that_are_no_text_is_hashed_as_bytes
     skip "qpdf is not installed" unless qpdf?
 
-    pdf = Prawn::Document.new
-    pdf.text "Hello, alice"
-    pdf.encrypt_document(user_password: (+"\xFFab").force_encoding(Encoding::US_ASCII), owner_password: "owner", algorithm: :aes_256)
+    [Encoding::US_ASCII, Encoding::UTF_8].each do |encoding|
+      pdf = Prawn::Document.new
+      pdf.text "Hello, alice"
+      pdf.encrypt_document(user_password: (+"\xFFab").force_encoding(encoding), owner_password: "owner", algorithm: :aes_256)
 
-    with_file(pdf.render) { |path| assert system("qpdf", "--check", "--password=owner", path, out: File::NULL) }
+      with_file(pdf.render) { |path| assert system("qpdf", "--check", "--password=owner", path, out: File::NULL), encoding }
+    end
   end
 
   def test_an_aes_256_user_password_opens_the_document_as_the_owner_password_does
