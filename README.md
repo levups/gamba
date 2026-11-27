@@ -231,8 +231,8 @@ Any of it can be built to attack the server that renders it.
   ignores references that lead back to themselves, so a crafted PDF can't send it into a loop or fill
   memory.
 - Text with inline formatting (`inline_format: true`) is parsed in linear time, whatever the markup.
-- The `/ID` of an encrypted PDF depends on its passwords, so it reveals nothing about the content to someone
-  without them.
+- The `/ID` of an encrypted PDF mixes in a secret, its passwords or a random one under AES-256, so it reveals
+  nothing about the content to someone without them.
 
 Inline formatting still turns `<link href="...">` into a clickable link. Escape user text before you put it inside
 markup. A word with no space to break at, thousands of characters long, takes time that grows with the square of its

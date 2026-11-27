@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 require "digest/md5"
+require "openssl"
 require "securerandom"
 
 module Prawn
   class Document
-    # The standard security handler, revision 2: 40-bit RC4 (ISO 32000-1 §7.6.3).
+    # The standard security handler: 40-bit RC4 by default (revision 2, ISO 32000-1 §7.6.3), or AES-256
+    # (revision 6, ISO 32000-2 §7.6.4) with algorithm: :aes_256.
     module Security
       PERMISSIONS_BITS = {print_document: 3, modify_contents: 4, copy_contents: 5, modify_annotations: 6}.freeze
       FULL_PERMISSIONS = 0xFFFFFFFF
@@ -16,16 +18,46 @@ module Prawn
       def encrypt_document(options = {})
         raise Errors::PdfAViolation, "PDF/A forbids encryption" if pdf_a?
 
-        Prawn.verify_options(%i[user_password owner_password permissions], options)
+        Prawn.verify_options(%i[user_password owner_password permissions algorithm], options)
+        options = options.dup
+        algorithm = options.delete(:algorithm) || :rc4_40
+        encryption_class = case algorithm
+        when :rc4_40 then Rc4Encryption
+        when :aes_256 then Aes256Encryption
+        else raise ArgumentError, "algorithm is #{algorithm.inspect}: encrypt_document takes :rc4_40 or :aes_256"
+        end
         @user_password = options.delete(:user_password) || ""
         @owner_password = options.delete(:owner_password) || @user_password
         @owner_password = SecureRandom.bytes(32) if @owner_password == :random
         self.permissions = options.delete(:permissions) || {}
-        @encryption = Encryption.new(user_password: @user_password, owner_password: @owner_password, permissions: permissions_value)
+        @encryption = encryption_class.new(user_password: @user_password, owner_password: @owner_password, permissions: permissions_value)
+        declare_extension_level_8 if algorithm == :aes_256
       end
 
       def self.encrypt_string(string, key, identifier, generation)
         Arcfour.new(object_key(key, identifier, generation)).encrypt(string)
+      end
+
+      # Algorithm 2.B (ISO 32000-2 §7.6.4.3.4): the hash of a password for revision 6, salted, and for the owner
+      # password also keyed by the user entry.
+      def self.hash_2b(password, salt, user_entry = "".b)
+        digest = Digest::SHA256.digest(password + salt + user_entry)
+        round = 0
+        loop do
+          cipher = OpenSSL::Cipher.new("aes-128-cbc").encrypt
+          cipher.key = digest.byteslice(0, 16)
+          cipher.iv = digest.byteslice(16, 16)
+          cipher.padding = 0
+          encrypted = cipher.update((password + digest + user_entry) * 64) + cipher.final
+          digest = case encrypted.byteslice(0, 16).bytes.sum % 3
+          when 0 then Digest::SHA256.digest(encrypted)
+          when 1 then Digest::SHA384.digest(encrypted)
+          else Digest::SHA512.digest(encrypted)
+          end
+          round += 1
+          break if round >= 64 && encrypted.getbyte(-1) <= round - 32
+        end
+        digest.byteslice(0, 32)
       end
 
       # The key of one object: the document key extended with its number and generation (algorithm 1), and with
@@ -43,6 +75,12 @@ module Prawn
 
       private
 
+      # Revision 6 came as Adobe's extension level 8 to PDF 1.7, before ISO 32000-2 made it part of PDF 2.0.
+      def declare_extension_level_8
+        min_version(1.7)
+        (@root.data[:Extensions] ||= {})[:ADBE] = {BaseVersion: :"1.7", ExtensionLevel: 8}
+      end
+
       def permissions=(permissions = {})
         @permissions ||= FULL_PERMISSIONS
         permissions.each do |key, value|
@@ -58,8 +96,8 @@ module Prawn
       end
     end
 
-    # The keys and dictionary of an encrypted document, which depend on its file identifier.
-    class Encryption
+    # Revision 2, 40-bit RC4: the keys and dictionary of an encrypted document, which depend on its file identifier.
+    class Rc4Encryption
       def initialize(user_password:, owner_password:, permissions:)
         @user_password = user_password
         @owner_password = owner_password
@@ -88,6 +126,96 @@ module Prawn
         user_password_hash = Arcfour.new(key(file_identifier)).encrypt(Security::PASSWORD_PADDING)
         {Filter: :Standard, V: 1, R: 2, O: PDF::Core::ByteString.new(owner_password_hash), U: PDF::Core::ByteString.new(user_password_hash),
          P: [@permissions].pack("L").unpack1("l")}
+      end
+
+      def encrypt(bytes, key, identifier)
+        Security.encrypt_string(bytes, key, identifier, 0)
+      end
+    end
+
+    # Revision 6 of the standard security handler: AES-256 with the file key itself (ISO 32000-2 §7.6.4). The key,
+    # salts and initialization vectors are random, as the standard asks: derived from the passwords, the public salts
+    # would let anyone test a guess far faster than algorithm 2.B allows. Two renders give different bytes.
+    class Aes256Encryption
+      # Bits 1 and 2 are reserved and must be 0 (ISO 32000-2 table 22).
+      RESERVED_PERMISSIONS = 0b11
+      # Revision 3 on, bit 11 (assemble) and bit 9 (fill forms) grant on their own what bit 4 (modify) and bit 6
+      # (annotate) cover in revision 2: refused with them, as Prawn's permissions mean.
+      IMPLIED_PERMISSION_BY_BIT = {1 << 3 => 1 << 10, 1 << 5 => 1 << 8}.freeze
+      ZERO_IV = ("\x00" * 16).b.freeze
+
+      attr_reader :identifier_secret
+
+      def initialize(user_password:, owner_password:, permissions:)
+        @user_password = password_bytes(user_password)
+        @owner_password = password_bytes(owner_password)
+        @permissions = IMPLIED_PERMISSION_BY_BIT.reduce(permissions & ~RESERVED_PERMISSIONS) do |value, (bit, implied)|
+          value.anybits?(bit) ? value : value & ~implied
+        end
+        @file_key = SecureRandom.bytes(32)
+        @identifier_secret = SecureRandom.bytes(32)
+      end
+
+      def key(_file_identifier)
+        @file_key
+      end
+
+      def dictionary(_file_identifier)
+        user_entry = password_entry(@user_password)
+        owner_entry = password_entry(@owner_password, user_entry)
+        {Filter: :Standard, V: 5, R: 6, Length: 256, CF: {StdCF: {AuthEvent: :DocOpen, CFM: :AESV3, Length: 32}}, StmF: :StdCF, StrF: :StdCF,
+         U: byte_string(user_entry), UE: byte_string(wrapped_key(@user_password, user_entry)),
+         O: byte_string(owner_entry), OE: byte_string(wrapped_key(@owner_password, owner_entry, user_entry)),
+         P: [@permissions].pack("L").unpack1("l"), Perms: byte_string(permissions_entry), EncryptMetadata: true}
+      end
+
+      # Each string and stream: its initialization vector, then its bytes in AES-256-CBC with PKCS#7 padding.
+      def encrypt(bytes, key, _identifier)
+        iv = SecureRandom.bytes(16)
+        cipher = OpenSSL::Cipher.new("aes-256-cbc").encrypt
+        cipher.key = key
+        cipher.iv = iv
+        iv << cipher.update(bytes) << cipher.final
+      end
+
+      private
+
+      # Without SASLprep, as qpdf, Poppler and MuPDF take a typed password: normalized, "ﬁ" would no longer open in
+      # them. 127 bytes is the limit revision 6 hashes.
+      def password_bytes(password)
+        password.to_s.encode(::Encoding::UTF_8).b.byteslice(0, 127)
+      rescue ::EncodingError # bytes that are no text, owner_password: :random's among them
+        password.to_s.b.byteslice(0, 127)
+      end
+
+      # Algorithm 8 (user) or 9 (owner): the password's hash, its validation salt and its key salt.
+      def password_entry(password, user_entry = "".b)
+        validation_salt = SecureRandom.bytes(8)
+        Security.hash_2b(password, validation_salt, user_entry) + validation_salt + SecureRandom.bytes(8)
+      end
+
+      # The file key encrypted with the hash of the password and its key salt, /UE or /OE.
+      def wrapped_key(password, entry, user_entry = "".b)
+        cipher = OpenSSL::Cipher.new("aes-256-cbc").encrypt
+        cipher.key = Security.hash_2b(password, entry.byteslice(40, 8), user_entry)
+        cipher.iv = ZERO_IV
+        cipher.padding = 0
+        cipher.update(@file_key) + cipher.final
+      end
+
+      # Algorithm 10: the permissions, encrypted so that a reader can check nobody changed /P. It asks for ECB on one
+      # block, which CBC with a zero IV gives byte for byte.
+      def permissions_entry
+        block = [@permissions].pack("l<") + "\xFF\xFF\xFF\xFFTadb".b + SecureRandom.bytes(4)
+        cipher = OpenSSL::Cipher.new("aes-256-cbc").encrypt
+        cipher.key = @file_key
+        cipher.iv = ZERO_IV
+        cipher.padding = 0
+        cipher.update(block) + cipher.final
+      end
+
+      def byte_string(bytes)
+        PDF::Core::ByteString.new(bytes)
       end
     end
 

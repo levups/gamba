@@ -139,26 +139,7 @@ module PDF
       end
 
       def hash_2b(salt)
-        digest = Digest::SHA256.digest(salt)
-        return digest if @revision == 5
-
-        round = 0
-        loop do
-          block = digest * 64
-          cipher = OpenSSL::Cipher.new("aes-128-cbc").encrypt
-          cipher.key = digest.byteslice(0, 16)
-          cipher.iv = digest.byteslice(16, 16)
-          cipher.padding = 0
-          encrypted = cipher.update(block) + cipher.final
-          digest = case encrypted.byteslice(0, 16).bytes.sum % 3
-          when 0 then Digest::SHA256.digest(encrypted)
-          when 1 then Digest::SHA384.digest(encrypted)
-          else Digest::SHA512.digest(encrypted)
-          end
-          round += 1
-          break if round >= 64 && encrypted.getbyte(-1) <= round - 32
-        end
-        digest.byteslice(0, 32)
+        (@revision == 5) ? Digest::SHA256.digest(salt) : Prawn::Document::Security.hash_2b("".b, salt)
       end
     end
   end
