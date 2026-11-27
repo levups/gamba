@@ -101,6 +101,12 @@ class WatermarkTest < Minitest::Test
     assert_equal ["DejaVuSans"], Oracle.text_layout(without_bold.render).first.glyphs.map { _1[1] }.uniq
   end
 
+  def test_under_pdf_a_without_a_font_it_says_it_needs_one
+    raised = assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true, watermark: "Draft").render }
+
+    assert_includes raised.message, "watermark needs font:"
+  end
+
   def test_its_text_is_an_artifact_outside_the_structure_tree
     skip CORPUS_MISSING_MESSAGE unless File.exist?(font_file("DejaVuSans.ttf"))
 
@@ -118,10 +124,13 @@ class WatermarkTest < Minitest::Test
   end
 
   def test_its_options_are_checked_when_the_document_is_made
-    ["", "​", "Draft\nCopy"].each do |text|
+    ["", "​", "Draft\nCopy", "Draft Copy", true].each do |text|
       assert_raises(ArgumentError, text.inspect) { Prawn::Document.new(watermark: text) }
     end
-    [{colour: "ff0000"}, {color: "red"}, {color: [0, 0, 0]}, {angle: "45"}, {size: -1}, {size: "40"}, {opacity: 2}].each do |option|
+    [
+      {colour: "ff0000"}, {color: "red"}, {color: [0, 0, 0]}, {angle: "45"}, {angle: Float::NAN}, {size: -1}, {size: "40"},
+      {size: Float::INFINITY}, {opacity: 2}, {style: :heavy}
+    ].each do |option|
       assert_raises(ArgumentError, option.inspect) { Prawn::Document.new(watermark: {text: "Draft", **option}) }
     end
     assert_raises(ArgumentError) { Prawn::Document.new(watermark: {color: "ff0000"}) }

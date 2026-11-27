@@ -7,6 +7,7 @@ module Gamba
   # fonts are registered.
   class Watermark
     OPTIONS = %i[text font style size angle color opacity].freeze
+    STYLES = %i[normal bold italic bold_italic].freeze
     # Without a size, the rotated text spans at most this share of the page's width and height.
     FILL_RATIO = 0.8
     ARTIFACT = %i[Pagination Watermark].freeze
@@ -15,8 +16,9 @@ module Gamba
 
     def self.from_option(option)
       return unless option
+      raise ArgumentError, "watermark is #{option.inspect}: give its text, or a hash with the text and its options" unless option.is_a?(String) || option.is_a?(Hash)
 
-      option = {text: option} unless option.is_a?(Hash)
+      option = {text: option} if option.is_a?(String)
       unknown = option.keys - OPTIONS
       raise ArgumentError, "unknown watermark option#{"s" if unknown.size > 1} #{unknown.map(&:inspect).join(", ")}: accepted options are #{OPTIONS.map(&:inspect).join(", ")}" if unknown.any?
 
@@ -26,9 +28,10 @@ module Gamba
     def initialize(text:, font: nil, style: nil, size: nil, angle: nil, color: "808080", opacity: 0.2)
       @text = text.to_s
       raise ArgumentError, "the watermark text #{text.inspect} shows nothing" unless Tagging.visible_text?(@text)
-      raise ArgumentError, "the watermark text #{text.inspect} holds a line break or a control character: it is one line" if @text.match?(/[[:cntrl:]]/)
-      raise ArgumentError, "the watermark size is #{size.inspect}: give a positive number of points" if size && !(size.is_a?(Numeric) && size.positive?)
-      raise ArgumentError, "the watermark angle is #{angle.inspect}: give a number of degrees" unless angle.nil? || angle.is_a?(Numeric)
+      raise ArgumentError, "the watermark text #{text.inspect} holds a line break or a control character: it is one line" if @text.match?(/[[:cntrl:]  ]/)
+      raise ArgumentError, "the watermark style is #{style.inspect}: give one of #{STYLES.map(&:inspect).join(", ")}" unless style.nil? || STYLES.include?(style)
+      raise ArgumentError, "the watermark size is #{size.inspect}: give a positive number of points" if size && !(size.is_a?(Numeric) && size.finite? && size.positive?)
+      raise ArgumentError, "the watermark angle is #{angle.inspect}: give a number of degrees" if angle && !(angle.is_a?(Numeric) && angle.finite?)
       raise ArgumentError, "the watermark opacity is #{opacity.inspect}: give a number from 0 to 1" unless opacity.is_a?(Numeric) && opacity.between?(0, 1)
       raise ArgumentError, "the watermark color is #{color.inspect}: give RGB as \"808080\" or CMYK as [0, 0, 0, 50]" unless color?(color)
 
@@ -57,13 +60,21 @@ module Gamba
 
     private
 
+    def standard_font(document)
+      message = "the watermark needs font: a registered TrueType or OpenType family, as PDF/A and PDF/UA embed every font"
+      raise Prawn::Errors::PdfAViolation, message if document.pdf_a?
+      raise Prawn::Errors::PdfUaViolation, message if document.pdf_ua?
+
+      "Helvetica"
+    end
+
     def color?(color)
       (color.is_a?(String) && color.match?(/\A\h{6}\z/)) || (color.is_a?(Array) && color.size == 4 && color.all?(Numeric))
     end
 
     # By default it runs along the page's diagonal, from the bottom left corner to the top right one.
     def draw(document, width, height)
-      family = @font || document.default_font_family || "Helvetica"
+      family = @font || document.default_font_family || standard_font(document)
       style = @style || (document.font_families.fetch(family, {}).key?(:bold) ? :bold : :normal)
       angle = @angle || (Math.atan2(height, width) * 180 / Math::PI)
       center_x = width / 2.0
