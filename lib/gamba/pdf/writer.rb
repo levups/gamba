@@ -28,6 +28,7 @@ module PDF
         @trailer = trailer.merge(ID: [file_identifier, file_identifier])
         return unless encryption
 
+        @encryption = encryption
         @encryption_key = encryption.key(file_identifier)
         @trailer[:Encrypt] = encryption.dictionary(file_identifier)
       end
@@ -89,7 +90,7 @@ module PDF
       end
 
       def encrypt(bytes, identifier)
-        Prawn::Document::Security.encrypt_string(bytes, @encryption_key, identifier, 0)
+        @encryption.encrypt(bytes, @encryption_key, identifier)
       end
 
       # Streams and the strings of their dictionary are encrypted, the stream once compressed; the cross-reference

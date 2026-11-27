@@ -6,35 +6,39 @@ require "open3"
 require "tempfile"
 
 class EncryptionTest < Minitest::Test
+  ALGORITHMS = %i[rc4_40 aes_256].freeze
+
   def test_the_catalog_of_an_encrypted_document_is_outside_the_object_stream
-    skip "qpdf is not installed" unless system("qpdf", "--version", out: File::NULL)
+    skip "qpdf is not installed" unless qpdf?
 
-    with_file(encrypted_document) do |path|
-      root_identifier = qpdf("--show-object=trailer", path)[%r{/Root (\d+) 0 R}, 1]
-
-      assert_match(/^#{root_identifier}\/0: uncompressed/, qpdf("--show-xref", path))
+    ALGORITHMS.each do |algorithm|
+      with_file(encrypted_document(algorithm:)) do |path|
+        assert_match(/^#{root_identifier(path)}\/0: uncompressed/, qpdf("--show-xref", path), algorithm)
+      end
     end
   end
 
   def test_the_strings_of_an_encrypted_catalog_read_back_in_clear
-    skip "qpdf is not installed" unless system("qpdf", "--version", out: File::NULL)
+    skip "qpdf is not installed" unless qpdf?
 
-    with_file(encrypted_document) do |path|
-      root_identifier = qpdf("--show-object=trailer", path)[%r{/Root (\d+) 0 R}, 1]
-
-      assert_includes qpdf("--show-object=#{root_identifier}", path), "/Lang (en-US)"
+    ALGORITHMS.each do |algorithm|
+      with_file(encrypted_document(algorithm:)) do |path|
+        assert_includes qpdf("--show-object=#{root_identifier(path)}", path), "/Lang (en-US)", algorithm
+      end
     end
   end
 
   def test_the_strings_of_an_encrypted_stream_dictionary_read_back_in_clear
-    skip "qpdf is not installed" unless system("qpdf", "--version", out: File::NULL)
+    skip "qpdf is not installed" unless qpdf?
 
-    pdf = Prawn::Document.new
-    form = pdf.ref!({Type: :XObject, Subtype: :Form, BBox: [0, 0, 10, 10], PieceInfo: {Private: PDF::Core::LiteralString.new("alice")}}, "0 0 m")
-    pdf.encrypt_document(user_password: "", owner_password: "owner")
+    ALGORITHMS.each do |algorithm|
+      pdf = Prawn::Document.new
+      form = pdf.ref!({Type: :XObject, Subtype: :Form, BBox: [0, 0, 10, 10], PieceInfo: {Private: PDF::Core::LiteralString.new("alice")}}, "0 0 m")
+      pdf.encrypt_document(user_password: "", owner_password: "owner", algorithm:)
 
-    with_file(pdf.render) do |path|
-      assert_includes qpdf("--show-object=#{form.identifier}", path), "/Private (alice)"
+      with_file(pdf.render) do |path|
+        assert_includes qpdf("--show-object=#{form.identifier}", path), "/Private (alice)", algorithm
+      end
     end
   end
 
@@ -43,18 +47,71 @@ class EncryptionTest < Minitest::Test
   def test_core_graphics_opens_an_encrypted_document
     skip "Core Graphics runs on macOS only" unless RUBY_PLATFORM.include?("darwin")
 
-    with_file(encrypted_document) do |path|
-      assert_equal "612.000", Open3.capture2("sips", "-g", "pixelWidth", path).first[/pixelWidth: (\S+)/, 1]
+    ALGORITHMS.each do |algorithm|
+      with_file(encrypted_document(algorithm:)) do |path|
+        assert_equal "612.000", Open3.capture2("sips", "-g", "pixelWidth", path).first[/pixelWidth: (\S+)/, 1], algorithm
+      end
     end
+  end
+
+  def test_aes_256_writes_revision_6_with_its_permissions
+    skip "qpdf is not installed" unless qpdf?
+
+    with_file(encrypted_document(algorithm: :aes_256)) do |path|
+      encryption = qpdf("--show-encryption", path)
+
+      assert_includes encryption, "R = 6"
+      assert_includes encryption, "extract for any purpose: not allowed"
+      assert_includes encryption, "print high resolution: allowed"
+      assert_includes qpdf("--show-object=#{root_identifier(path)}", path), "/ExtensionLevel 8"
+    end
+  end
+
+  def test_an_aes_256_user_password_opens_the_document_as_the_owner_password_does
+    skip "qpdf is not installed" unless qpdf?
+
+    pdf = Prawn::Document.new
+    pdf.text "Hello, alice"
+    pdf.encrypt_document(user_password: "alice", owner_password: "owner", algorithm: :aes_256)
+
+    with_file(pdf.render) do |path|
+      refute system("qpdf", "--check", path, out: File::NULL, err: File::NULL)
+      refute system("qpdf", "--check", "--password=bob", path, out: File::NULL, err: File::NULL)
+      {"-upw" => "alice", "-opw" => "owner"}.each do |option, password|
+        assert_includes Open3.capture2("pdftotext", "-q", option, password, path, "-").first, "Hello, alice", password
+      end
+    end
+  end
+
+  def test_gamba_reads_back_what_it_encrypted_with_aes_256
+    combined = Gamba.combine([encrypted_document(algorithm: :aes_256)])
+
+    assert_equal [["Hello, alice"]], Gamba::PdfCheck.text_lines(combined)
+  end
+
+  def test_aes_256_gives_the_same_bytes_for_the_same_document
+    assert_equal encrypted_document(algorithm: :aes_256), encrypted_document(algorithm: :aes_256)
+  end
+
+  def test_an_unknown_algorithm_raises
+    assert_raises(ArgumentError) { Prawn::Document.new.encrypt_document(algorithm: :aes_128) }
   end
 
   private
 
-  def encrypted_document
+  def encrypted_document(algorithm:)
     pdf = Prawn::Document.new(lang: "en-US")
     pdf.text "Hello, alice"
-    pdf.encrypt_document(user_password: "", owner_password: "owner", permissions: {copy_contents: false})
+    pdf.encrypt_document(user_password: "", owner_password: "owner", permissions: {copy_contents: false}, algorithm:)
     pdf.render
+  end
+
+  def root_identifier(path)
+    qpdf("--show-object=trailer", path)[%r{/Root (\d+) 0 R}, 1]
+  end
+
+  def qpdf?
+    system("qpdf", "--version", out: File::NULL)
   end
 
   def with_file(bytes)

@@ -679,6 +679,19 @@ end
 
 The page appears as a viewer shows it, its crop box turned by its `/Rotate`. It is written once however many pages draw it, and pages of one file share their fonts and images. The reader is the one behind `Gamba.combine`, with its limits and errors; under `pdf_a: true`, a page whose fonts are not embedded raises `Prawn::Errors::PdfAViolation`. Gamba’s own API takes `background_pdf` and `background_pdf_page` as document options, and `pdf_page` as a box sized like an image.
 
+#### Encryption
+
+`encrypt_document` takes Prawn’s options, and `algorithm: :aes_256` for the standard security handler’s revision 6 (ISO 32000-2 §7.6.4) in place of Prawn’s 40-bit RC4, which anyone can break and which Gamba keeps as the default only because Prawn wrote it. Every reader made since Acrobat 9 opens it, Preview, Safari, Chrome and Firefox included.
+
+```ruby
+Prawn::Document.new do
+  text "Payslip for alice"
+  encrypt_document(user_password: "alice", owner_password: :random, algorithm: :aes_256, permissions: {modify_contents: false})
+end
+```
+
+The same document gives the same bytes: the key, salts and initialization vectors come from an HMAC of the passwords and the file identifier, which someone without a password cannot tell from random ones. Passwords are hashed as UTF-8, their first 127 bytes, without SASLprep. Gamba’s own API reaches it through `document.prawn.encrypt_document`.
+
 ### QR codes, DataMatrix and barcodes
 
 A QR code is drawn as vector rectangles, one path and one fill, so it stays sharp at any size and a sheet of labels stays small. The encoder is pure Ruby, with no dependency: every version and level of error correction, numeric, alphanumeric and byte modes, and UTF-8 text announced to scanners.
