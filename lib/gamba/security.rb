@@ -203,11 +203,13 @@ module Prawn
         cipher.update(@file_key) + cipher.final
       end
 
-      # Algorithm 10: the permissions, encrypted so that a reader can check nobody changed /P; ECB, as it asks, on one block.
+      # Algorithm 10: the permissions, encrypted so that a reader can check nobody changed /P. It asks for ECB on one
+      # block, which CBC with a zero IV gives byte for byte.
       def permissions_entry
         block = [@permissions].pack("l<") + "\xFF\xFF\xFF\xFFTadb".b + SecureRandom.bytes(4)
-        cipher = OpenSSL::Cipher.new("aes-256-ecb").encrypt
+        cipher = OpenSSL::Cipher.new("aes-256-cbc").encrypt
         cipher.key = @file_key
+        cipher.iv = ZERO_IV
         cipher.padding = 0
         cipher.update(block) + cipher.final
       end
