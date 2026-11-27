@@ -30,7 +30,7 @@ module Prawn
         @owner_password = SecureRandom.bytes(32) if @owner_password == :random
         self.permissions = options.delete(:permissions) || {}
         @encryption = encryption_class.new(user_password: @user_password, owner_password: @owner_password, permissions: permissions_value)
-        declare_extension_level_8 if encryption_class == Aes256Encryption
+        declare_extension_level_8 if algorithm == :aes_256
       end
 
       def self.encrypt_string(string, key, identifier, generation)
@@ -144,10 +144,11 @@ module Prawn
         @user_password = password_bytes(user_password)
         @owner_password = password_bytes(owner_password)
         @permissions = permissions & ~RESERVED_PERMISSIONS
+        @secret = "#{@user_password}\0#{@owner_password}"
       end
 
       def identifier_secret
-        Digest::SHA256.digest("#{@user_password}\0#{@owner_password}")
+        Digest::SHA256.digest(@secret)
       end
 
       def key(file_identifier)
@@ -166,11 +167,11 @@ module Prawn
 
       # Each string and stream: its initialization vector, then its bytes in AES-256-CBC with PKCS#7 padding.
       def encrypt(bytes, key, identifier)
-        iv = OpenSSL::HMAC.digest("SHA256", key, [identifier].pack("N") + bytes).byteslice(0, 16)
+        iv = (OpenSSL::HMAC.new(key, "SHA256") << [identifier].pack("N") << bytes).digest.byteslice(0, 16)
         cipher = OpenSSL::Cipher.new("aes-256-cbc").encrypt
         cipher.key = key
         cipher.iv = iv
-        iv + cipher.update(bytes) + cipher.final
+        iv << cipher.update(bytes) << cipher.final
       end
 
       private
@@ -178,12 +179,12 @@ module Prawn
       # SASLprep leaves ASCII as it is, and is left out; 127 bytes is the limit revision 6 hashes.
       def password_bytes(password)
         password.to_s.encode(::Encoding::UTF_8).b.byteslice(0, 127)
-      rescue ::Encoding::UndefinedConversionError
+      rescue ::Encoding::UndefinedConversionError # a binary password, owner_password: :random's among them
         password.to_s.b.byteslice(0, 127)
       end
 
       def derived(file_identifier, purpose)
-        OpenSSL::HMAC.digest("SHA256", "#{@user_password}\0#{@owner_password}", file_identifier + purpose)
+        OpenSSL::HMAC.digest("SHA256", @secret, file_identifier + purpose)
       end
 
       # Algorithm 8 (user) or 9 (owner): the password's hash, its validation salt and its key salt.
