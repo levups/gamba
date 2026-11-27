@@ -17,9 +17,9 @@ module Gamba
       watermark = {text: watermark} unless watermark.is_a?(Hash)
       unknown = watermark.keys - OPTIONS
       raise ArgumentError, "unknown watermark option#{"s" if unknown.size > 1} #{unknown.map(&:inspect).join(", ")}: accepted options are #{OPTIONS.map(&:inspect).join(", ")}" if unknown.any?
-      raise ArgumentError, "the watermark has no text" if watermark[:text].to_s.empty?
+      @watermark = DEFAULTS.merge(watermark, text: watermark[:text].to_s)
+      raise ArgumentError, "the watermark has no text" if @watermark[:text].empty?
 
-      @watermark = DEFAULTS.merge(watermark)
       @unfilled_watermark_page_by_stamp = {}
     end
 
@@ -30,42 +30,39 @@ module Gamba
 
       _left, _bottom, width, height = page.dimensions
       name = "Gamba watermark #{width}x#{height}"
-      unless stamp_dictionary_registry.key?(name)
-        create_stamp_dictionary(name)
-        @unfilled_watermark_page_by_stamp[name] = page_number
-      end
+      @unfilled_watermark_page_by_stamp[create_stamp_dictionary(name)] = page_number unless stamp_dictionary_registry.key?(name)
       tag_artifact(:Pagination, :Watermark) { stamp(name) }
     end
 
     def fill_watermark_stamps
       return unless @watermark
 
-      @unfilled_watermark_page_by_stamp.each do |name, page_number|
+      @unfilled_watermark_page_by_stamp.each do |dictionary, page_number|
         go_to_page(page_number)
-        page.stamp_stream(stamp_dictionary_registry.fetch(name)[:stamp_dictionary]) { tag_artifact(:Pagination, :Watermark) { draw_watermark_text } }
+        page.stamp_stream(dictionary) { tag_artifact(:Pagination, :Watermark) { draw_watermark_text } }
       end
       @unfilled_watermark_page_by_stamp.clear
     end
 
-    # By default it runs along the page's diagonal, from the bottom left corner to the top right one.
     def draw_watermark_text
       _left, _bottom, width, height = page.dimensions
-      text = @watermark[:text].to_s
+      text = @watermark[:text]
       angle = @watermark[:angle] || (Math.atan2(height, width) * 180 / Math::PI)
-      center = [width / 2.0, height / 2.0]
+      center_x = width / 2.0
+      center_y = height / 2.0
       canvas do
         font(@watermark[:font] || @default_font_family || font.family, style: @watermark[:style]) do
           font_size(@watermark[:size] || fitted_watermark_size(text, angle, width, height)) do
-            baseline = [center[0] - (width_of(text) / 2), center[1] - ((font.ascender + font.descender) / 2)]
+            baseline = [center_x - (width_of(text) / 2), center_y - ((font.ascender + font.descender) / 2)]
             fill_color @watermark[:color]
-            transparent(@watermark[:opacity]) { rotate(angle, origin: center) { draw_text(text, at: baseline) } }
+            transparent(@watermark[:opacity]) { rotate(angle, origin: [center_x, center_y]) { draw_text(text, at: baseline) } }
           end
         end
       end
     end
 
     def fitted_watermark_size(text, angle, width, height)
-      radians = angle * Math::PI / 180
+      radians = degree_to_rad(angle)
       half_line = [(width / 2.0) / Math.cos(radians).abs, (height / 2.0) / Math.sin(radians).abs].min
       2 * half_line * SPAN_RATIO / width_of(text, size: 1)
     end

@@ -2,7 +2,6 @@
 
 require_relative "test_helper"
 require "open3"
-require "tmpdir"
 require "prawn"
 
 class WatermarkTest < Minitest::Test
@@ -27,17 +26,11 @@ class WatermarkTest < Minitest::Test
   end
 
   def test_it_lies_beneath_what_the_page_draws
-    whited_out = lambda do |options|
-      Prawn::Document.new(**options, margin: 0) do
-        fill_color "ffffff"
-        fill_rectangle [0, bounds.top], bounds.width, bounds.height
-      end.render
-    end
-
     Dir.mktmpdir do |directory|
-      plain, watermarked = [{}, {watermark: {text: "Draft", opacity: 1}}].each_with_index.map do |options, index|
-        File.join(directory, "#{index}.pdf").tap { File.binwrite(_1, whited_out.call(options)) }
-      end
+      plain = File.join(directory, "plain.pdf")
+      watermarked = File.join(directory, "watermarked.pdf")
+      File.binwrite(plain, whited_out)
+      File.binwrite(watermarked, whited_out(watermark: {text: "Draft", opacity: 1}))
 
       assert_empty Oracle.rendered_pixel_differences(plain, watermarked)
     end
@@ -69,6 +62,13 @@ class WatermarkTest < Minitest::Test
   end
 
   private
+
+  def whited_out(**options)
+    Prawn::Document.new(**options, margin: 0) do
+      fill_color "ffffff"
+      fill_rectangle [0, bounds.top], bounds.width, bounds.height
+    end.render
+  end
 
   def font_file(name)
     File.join(Oracle::ROOT, "corpus/cache/prawn/data/fonts", name)
