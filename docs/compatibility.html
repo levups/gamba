@@ -90,6 +90,7 @@
           <li><strong>Combined PDFs.</strong> A number too large for a float, in a page's boxes, no longer writes NaN into the combined page.</li>
           <li><strong>PDF/A metadata.</strong> A title or author holding a control character, or bytes that are not text, raises <code>Prawn::Errors::PdfAViolation</code>: XML cannot hold them, and the XMP would not parse.</li>
           <li><strong>Encryption.</strong> The file identifier of an encrypted document mixes in its passwords, so it tells nothing about the content to someone without them. Prawn writes no identifier, and gives every document with the same passwords the same key.</li>
+          <li><strong>Dates.</strong> A date in a time zone with minutes keeps them: <code>+05:30</code> is written <code>+05'30'</code>, where Prawn writes <code>+05'00'</code>, half an hour off. Whole-hour offsets are written as Prawn writes them.</li>
         </ul>
       </div>
     </section>

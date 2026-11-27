@@ -396,6 +396,7 @@ A font, an image or a PDF a user sends can be built to make a parser loop, crash
 - **Combined PDFs.** A number too large for a float, in a page's boxes, no longer writes NaN into the combined page.
 - **PDF/A metadata.** A title or author holding a control character, or bytes that are not text, raises `Prawn::Errors::PdfAViolation`: XML cannot hold them, and the XMP would not parse.
 - **Encryption.** The file identifier of an encrypted document mixes in its passwords, so it tells nothing about the content to someone without them. Prawn writes no identifier, and gives every document with the same passwords the same key.
+- **Dates.** A date in a time zone with minutes keeps them: `+05:30` is written `+05'30'`, where Prawn writes `+05'00'`, half an hour off. Whole-hour offsets are written as Prawn writes them.
 
 ### Lighter files
 
