@@ -162,6 +162,13 @@ Prawn::Document.new(background_pdf: "letterhead.pdf") do
 end
 ```
 
+A watermark across every page, beneath its content, along the page's diagonal unless told otherwise. It is written
+once per page size, and tagged documents mark it as an artifact:
+
+```ruby
+Prawn::Document.new(watermark: {text: "Courtesy translation", opacity: 0.2})
+```
+
 QR codes, DataMatrix and barcodes (Code 128, EAN-13, EAN-8, Code 39, ITF-14) in pure Ruby, drawn as vectors: one
 fill per code, read back by zbar and libdmtx in CI:
 
@@ -678,6 +685,19 @@ end
 ```
 
 The page appears as a viewer shows it, its crop box turned by its `/Rotate`. It is written once however many pages draw it, and pages of one file share their fonts and images. The reader is the one behind `Gamba.combine`, with its limits and errors; under `pdf_a: true`, a page whose fonts are not embedded raises `Prawn::Errors::PdfAViolation`. Gamba’s own API takes `background_pdf` and `background_pdf_page` as document options, and `pdf_page` as a box sized like an image.
+
+#### Watermarks
+
+`watermark` draws a text across every page, beneath its content and above a `background_pdf`. It takes one line of text, or a hash with the `text` and any of `font`, `style`, `size`, `angle` in degrees, `color` (`"808080"`, or CMYK as an array) and `opacity` (`0.2`), checked when the document is made. The font is the document’s default family unless told: Helvetica, or the `:default` style’s font under PDF/A and PDF/UA; its bold face when the family has one. Without an angle it runs along the page’s diagonal, from the bottom left corner to the top right one; without a size it is as large as the page allows, the turned text taking at most four fifths of its width and of its height.
+
+```ruby
+Prawn::Document.new(page_size: "A4", watermark: {text: "Courtesy translation", font: "Inter", color: "787878"}) do
+  font_families.update("Inter" => {normal: "Inter-Regular.ttf", bold: "Inter-Bold.ttf"})
+  text "General conditions"
+end
+```
+
+It is drawn when the document renders, so its font may be registered after the document is created, and written once per page size however many pages show it. Tagged documents mark it as a watermark artifact, outside the structure tree. Gamba’s own API takes it as a document option.
 
 ### QR codes, DataMatrix and barcodes
 
