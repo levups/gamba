@@ -81,7 +81,8 @@ module PDF
     end
 
     def date(time)
-      "#{time.strftime("D:%Y%m%d%H%M%S%z").chop.chop}'00'"
+      offset = time.strftime("%z")
+      "#{time.strftime("D:%Y%m%d%H%M%S")}#{offset[0, 3]}'#{offset[3, 2]}'"
     end
 
     # What serialize writes between a string's delimiters.

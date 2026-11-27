@@ -116,3 +116,7 @@
   prawn_raises: NoMethodError
   examples:
     - table_without_cells
+- bug: A date in a time zone with minutes, such as India's +05:30, is written with :00 minutes, half an hour off
+  proof: 'ISO 32000-1 §7.9.4: a date string ends with the offset from UT as O HH '' mm, "mm shall be the absolute value of the offset from UT in minutes"; Prawn chops the minutes of %z and writes ''00'''
+  prawn_issue:
+  examples: []
