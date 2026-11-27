@@ -65,7 +65,7 @@ module PDF
       when Real then value.source
       when LiteralString then "(#{value.gsub(/[\\\r()]/, LITERAL_STRING_ESCAPES)})"
       when ByteString then "<#{value.unpack1("H*")}>"
-      when Time then "(#{value.strftime("D:%Y%m%d%H%M%S%z").chop.chop}'00')"
+      when Time then "(#{date(value)})"
       when String then "<#{(in_content_stream ? value : utf16be(value)).unpack1("H*")}>"
       when Array then "[#{value.map { serialize(_1, in_content_stream) }.join(" ")}]"
       when Hash then "<<#{value.map { |key, entry| "#{serialize(key.to_sym)} #{serialize(entry, in_content_stream)}" }.join("\n")}>>"
@@ -78,6 +78,19 @@ module PDF
     # PDF::Core's name for serialize, which code written for Prawn calls, prawn-svg among it.
     def pdf_object(object, in_content_stream = false)
       serialize(object, in_content_stream)
+    end
+
+    def date(time)
+      "#{time.strftime("D:%Y%m%d%H%M%S%z").chop.chop}'00'"
+    end
+
+    # What serialize writes between a string's delimiters.
+    def string_bytes(value)
+      case value
+      when Time then date(value)
+      when LiteralString, ByteString then value.b
+      else utf16be(value)
+      end
     end
 
     def utf16be(string)

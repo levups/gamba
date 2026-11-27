@@ -5,8 +5,9 @@ require "zlib"
 
 module PDF
   module Core
-    # Writes a PDF 1.5 file: streams compressed, every other object packed into one compressed object stream, and
-    # a compressed cross-reference stream instead of the xref table (ISO 32000-1 §7.5.7, §7.5.8).
+    # Writes a PDF 1.5 file: streams compressed, every other object but an encrypted document's catalog packed into
+    # one compressed object stream, and a compressed cross-reference stream instead of the xref table (ISO 32000-1
+    # §7.5.7, §7.5.8).
     class Writer
       MINIMUM_VERSION = 1.5
       BINARY_MARKER = "%\xE2\xE3\xCF\xD3\n".b
@@ -41,6 +42,14 @@ module PDF
           output << indirect_stream(reference.identifier, reference.data, reference.stream, compressed: !reference.uncompressed)
         end
 
+        # 2026-11, macOS 27.2: Apple's PDFKit and Core Graphics (Preview, Safari, Quick Look) open no encrypted file
+        # whose catalog is in an object stream.
+        if @encryption_key
+          packed_objects.delete(root)
+          location_by_identifier[root.identifier] = [1, output.bytesize]
+          output << "#{root.identifier} 0 obj\n#{PDF::Core.serialize(encrypted_strings(root.data, root.identifier))}\nendobj\n"
+        end
+
         object_stream_identifier = objects.size + 1
         unless packed_objects.empty?
           location_by_identifier[object_stream_identifier] = [1, output.bytesize]
@@ -68,11 +77,30 @@ module PDF
         digest.digest
       end
 
-      # Streams are encrypted once compressed; the cross-reference stream never is (ISO 32000-1 §7.5.8.4).
+      # Outside an object stream, each string is encrypted with its object's key (ISO 32000-1 §7.6.2).
+      def encrypted_strings(value, identifier)
+        case value
+        when Hash then value.transform_values { encrypted_strings(_1, identifier) }
+        when Array then value.map { encrypted_strings(_1, identifier) }
+        when PDF::Core::Serializable then encrypted_strings(value.to_hash, identifier)
+        when Time, String then PDF::Core::ByteString.new(encrypt(PDF::Core.string_bytes(value), identifier))
+        else value
+        end
+      end
+
+      def encrypt(bytes, identifier)
+        Prawn::Document::Security.encrypt_string(bytes, @encryption_key, identifier, 0)
+      end
+
+      # Streams and the strings of their dictionary are encrypted, the stream once compressed; the cross-reference
+      # stream never is (ISO 32000-1 §7.5.8.4).
       def indirect_stream(identifier, dictionary, bytes, encrypted: true, compressed: true)
         compressed &&= dictionary[:Filter].nil?
         bytes = Zlib::Deflate.deflate(bytes) if compressed
-        bytes = Prawn::Document::Arcfour.new(Prawn::Document::Security.object_key(@encryption_key, identifier, 0)).encrypt(bytes) if @encryption_key && encrypted
+        if @encryption_key && encrypted
+          bytes = encrypt(bytes, identifier)
+          dictionary = encrypted_strings(dictionary, identifier)
+        end
         dictionary = dictionary.merge(Length: bytes.bytesize)
         dictionary[:Filter] = :FlateDecode if compressed
         "#{identifier} 0 obj\n#{PDF::Core.serialize(dictionary)}\nstream\n".b << bytes.b << "\nendstream\nendobj\n"

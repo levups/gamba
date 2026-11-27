@@ -781,7 +781,7 @@ What PDF/UA asks for raises `Prawn::Errors::PdfUaViolation` where it is missing:
 
 ### Output
 
-Whatever does not move a pixel is on by default. Every document is written as PDF 1.5: streams compressed, every other object packed into one compressed object stream, and a compressed cross-reference stream instead of the xref table (ISO 32000-1 §7.5.7, §7.5.8).
+Whatever does not move a pixel is on by default. Every document is written as PDF 1.5: streams compressed, every other object but an encrypted document's catalog packed into one compressed object stream, and a compressed cross-reference stream instead of the xref table (ISO 32000-1 §7.5.7, §7.5.8).
 
 ### Rails
 
