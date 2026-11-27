@@ -15,11 +15,12 @@ module Prawn
     include Gamba::Tagging
     include Table::Interface
     include Stamp
+    include Gamba::Watermark
     include SoftMask
 
     VALID_OPTIONS = %i[
       page_size page_layout margin left_margin right_margin top_margin bottom_margin skip_page_creation compress
-      background info text_formatter print_scaling pdf_a pdf lang background_pdf background_pdf_page
+      background info text_formatter print_scaling pdf_a pdf lang background_pdf background_pdf_page watermark
     ].freeze
 
     attr_accessor :margin_box, :page_number, :text_formatter
@@ -54,6 +55,7 @@ module Prawn
       @background_scale = options[:background_scale] || 1
       @background_pdf = options[:background_pdf]
       @background_pdf_page = options[:background_pdf_page] || 1
+      initialize_watermark(options[:watermark])
       @font_size = 12
       @bounding_box = nil
       @margin_box = nil
@@ -95,6 +97,7 @@ module Prawn
       @page_number += 1
       tag_artifact { canvas { image(@background, scale: @background_scale, at: bounds.top_left) } } if @background
       draw_background_pdf(options)
+      draw_watermark
       @y = @bounding_box.absolute_top
       float { tag_artifact { @on_page_create&.call(self) } }
       header_blend_mode = page.stack.last&.blend_mode
@@ -154,6 +157,7 @@ module Prawn
 
     def render(*arguments)
       output = arguments.first
+      fill_watermark_stamps
       (1..page_count).each do |page_number|
         go_to_page(page_number)
         repeaters.each { _1.run(page_number) }

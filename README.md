@@ -162,6 +162,13 @@ Prawn::Document.new(background_pdf: "letterhead.pdf") do
 end
 ```
 
+A watermark across every page, beneath its content, along the page's diagonal unless told otherwise. It is written
+once per page size, and tagged documents mark it as an artifact:
+
+```ruby
+Prawn::Document.new(watermark: {text: "Courtesy translation", font: "Inter", opacity: 0.2})
+```
+
 QR codes, DataMatrix and barcodes (Code 128, EAN-13, EAN-8, Code 39, ITF-14) in pure Ruby, drawn as vectors: one
 fill per code, read back by zbar and libdmtx in CI:
 
