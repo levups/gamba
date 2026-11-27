@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [2.2.0] — 2026-11-27
+
+Encrypted documents open in Preview and Safari, and can use AES-256; a watermark takes one option; invoices write their own Factur-X XML.
+
+**New**
+- `watermark: "Draft"`, or a hash with its `text`, `font`, `style`, `size`, `angle`, `color` and `opacity`, draws a text along each page's diagonal, beneath its content, on `Prawn::Document` and `Gamba.document`. It is drawn when the document renders, so a font registered later is used, written once per page size, and tagged as a watermark artifact.
+- `encrypt_document(algorithm: :aes_256)` writes the standard security handler's revision 6 in place of 40-bit RC4, which stays the default. Its key, salts and initialization vectors are random, so two renders differ; modification and annotations refused also refuse assembly and form filling, as under RC4.
+- `Gamba::Invoice` holds an invoice as data with exact amounts, computes its totals and VAT breakdown as EN 16931 sets, and writes its EN 16931 XML; `factur_x invoice` embeds it.
+- Writing an invoice's XML checks the EN 16931 business rules its data can break, and with `rules: :fr` the French e-invoicing rules, raising `Gamba::Invoice::RuleViolation` with every broken rule by its id.
+- Released gems carry a Sigstore attestation.
+- The site publishes `llms.txt` and `llms-full.txt`, the guide and API for coding agents.
+
+**Fixed**
+- Encrypted documents open in Apple's PDF engine (Preview, Safari on macOS and iOS, Quick Look): their catalog is no longer packed in the object stream, which Core Graphics cannot read once encrypted.
+- Strings in the dictionary of a stream, such as an imported image's indexed palette, are encrypted with the rest of an encrypted document, where they read back as garbage.
+- A date in a time zone with minutes, such as +05:30, keeps them, where Prawn writes +05'00'.
+
 ## [2.1.0] — 2026-11-21
 
 Gamba gets an API of its own next to Prawn's, `Gamba.document`: layout described in boxes instead of computed, tables with named columns, barcodes, PDF templates, Rails rendering, test assertions and tagged PDF/UA.
@@ -131,7 +148,8 @@ speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
   place of combine_pdf.
 - `Gamba::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
 
-[Unreleased]: https://github.com/levups/gamba/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/levups/gamba/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/levups/gamba/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/levups/gamba/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/levups/gamba/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/levups/gamba/compare/v2.0.0...v2.0.1
