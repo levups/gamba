@@ -51,9 +51,12 @@ module Prawn
       end
       [entry[:obj], entry[:info]]
     rescue Prawn::Errors::PdfAViolation => exception
-      # The image only knows its bytes: its path, when it has one, tells which of a document's images it is.
-      path = file.is_a?(String) ? file : (file.to_path if file.respond_to?(:to_path))
-      raise exception.class, "the image #{path || "given without a path"} #{exception.message}"
+      # The image only knows its bytes: its path or file name, when it has one, tells which of a document's images it is.
+      name = if file.is_a?(String) then file
+      elsif file.respond_to?(:to_path) then file.to_path
+      elsif file.respond_to?(:filename) then file.filename.to_s # an Active Storage attachment
+      end
+      raise exception.class, "the image #{name || "given without a path"} #{exception.message}"
     end
 
     # A page of another PDF, placed and sized as an image is, written once however many times it is drawn: a
