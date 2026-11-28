@@ -12,6 +12,7 @@ Gamba::Document:
   "#data_matrix": [req data, keyrest options]
   "#draw": [req component]
   "#factur_x": [req invoice, key profile, key rules, key filename, key description]
+  "#sign": [keyreq certificate, keyreq key, key chain, key reason, key location, key contact, key signed_at]
   "#page_break": []
   "#prawn": []
   "#row": [keyrest options]
@@ -48,6 +49,7 @@ Prawn::Document:
   "#factur_x": [req invoice, key profile, key rules, key filename, key description]
   "#radio_buttons": [req name, keyreq buttons, key size, key selected]
   "#text_field": [req name, keyreq at, keyreq width, keyreq height, key value, key size, key multiline, key password, key comb, key max_length]
+  "#sign": [keyreq certificate, keyreq key, key chain, key reason, key location, key contact, key signed_at]
 # An invoice as data, for Factur-X: what it computes, and its XML.
 Gamba::Invoice:
   ".from_xml": [req xml]

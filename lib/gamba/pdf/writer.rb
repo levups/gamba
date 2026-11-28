@@ -16,8 +16,11 @@ module PDF
         new(...).call
       end
 
-      def initialize(objects:, root:, info:, version:, trailer: {}, encryption: nil, identified: false)
+      # unpacked: objects written in clear, outside the object stream, such as a signature whose bytes are patched
+      # once the file is written.
+      def initialize(objects:, root:, info:, version:, trailer: {}, encryption: nil, identified: false, unpacked: [])
         @objects = objects
+        @unpacked = unpacked
         @root = root
         @info = info
         @version = [version, MINIMUM_VERSION].max
@@ -54,6 +57,12 @@ module PDF
           output << "#{root.identifier} 0 obj\n#{PDF::Core.serialize(encrypted_strings(root.data, root.identifier))}\nendobj\n"
           location_by_identifier[@encryption_reference.identifier] = [1, output.bytesize]
           output << "#{@encryption_reference.identifier} 0 obj\n#{PDF::Core.serialize(@encryption_reference.data)}\nendobj\n"
+        end
+
+        @unpacked.each do |reference|
+          packed_objects.delete(reference)
+          location_by_identifier[reference.identifier] = [1, output.bytesize]
+          output << "#{reference.identifier} 0 obj\n#{PDF::Core.serialize(reference.data)}\nendobj\n"
         end
 
         object_stream_identifier = objects.size + (@encryption_reference ? 2 : 1)
