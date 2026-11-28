@@ -43,7 +43,11 @@ Gamba::Layout::Container:
   "#text": [req string, key style, key width, key grow, keyrest attributes]
 Prawn::Document:
   "#gamba": []
+  "#check_box": [req name, keyreq at, key size, key checked]
+  "#choice_field": [req name, keyreq at, keyreq width, keyreq height, keyreq options, key value, key size, key list]
   "#factur_x": [req invoice, key profile, key rules, key filename, key description]
+  "#radio_buttons": [req name, keyreq buttons, key size, key selected]
+  "#text_field": [req name, keyreq at, keyreq width, keyreq height, key value, key size, key multiline, key password, key comb, key max_length]
 # An invoice as data, for Factur-X: what it computes, and its XML.
 Gamba::Invoice:
   ".from_xml": [req xml]
