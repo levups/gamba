@@ -18,7 +18,10 @@ module PDF
       NUMBER = /[+-]?(?:\d+\.?\d*|\.\d+)/n
       REFERENCE_TAIL = /[\x00\t\n\f\r ]+(\d+)[\x00\t\n\f\r ]+R(?![^\x00\t\n\f\r ()<>\[\]{}\/%])/n
       OBJECT_HEADER = /[\x00\t\n\f\r ]*(\d+)[\x00\t\n\f\r ]+(\d+)[\x00\t\n\f\r ]+obj/n
-      OBJECT_HEADER_ANYWHERE = /(?<![0-9])(\d+)[\x00\t\n\f\r ]+(\d+)[\x00\t\n\f\r ]+obj(?![^\x00\t\n\f\r ()<>\[\]{}\/%])/n
+      # Bytes a keyword ends before (ISO 32000-1 §7.2.2): whitespace and delimiters.
+      WHITESPACE_BYTES = "\x00\t\n\f\r ".bytes.freeze
+      KEYWORD_END_BYTES = (WHITESPACE_BYTES + "()<>[]{}/%".bytes).freeze
+      DIGIT_BYTES = (48..57)
       STREAM_KEYWORD = /stream(?:\r\n|\n|\r)?/n
       KEYWORD = /[^\x00\t\n\f\r ()<>\[\]{}\/%]+/n
       LITERAL_ESCAPES = {"n" => "\n", "r" => "\r", "t" => "\t", "b" => "\b", "f" => "\f"}.freeze
@@ -236,6 +239,44 @@ module PDF
         dictionary
       end
 
+      # Each "N G obj" of the file, with the number and where it starts: every "obj" keyword found by index, then its
+      # generation and number read backwards, so that no byte is read twice whatever the file holds.
+      def each_object_header
+        position = 0
+        while (keyword = @bytes.index("obj", position))
+          position = keyword + 3
+          following = @bytes.getbyte(position)
+          next unless following.nil? || KEYWORD_END_BYTES.include?(following)
+
+          start = number_before(keyword)
+          yield(*start) if start
+        end
+      end
+
+      # [number, its offset] when whitespace, digits, whitespace and digits come just before the keyword at index,
+      # and no digit before those.
+      def number_before(index)
+        generation_end = skip_back(index, WHITESPACE_BYTES)
+        return if generation_end == index
+
+        generation_start = skip_back(generation_end, DIGIT_BYTES)
+        return if generation_start == generation_end
+
+        number_end = skip_back(generation_start, WHITESPACE_BYTES)
+        return if number_end == generation_start
+
+        number_start = skip_back(number_end, DIGIT_BYTES)
+        return if number_start == number_end
+
+        [@bytes.byteslice(number_start, number_end - number_start).to_i, number_start]
+      end
+
+      # The index where the run of these bytes ending at index starts.
+      def skip_back(index, bytes)
+        index -= 1 while index.positive? && bytes.include?(@bytes.getbyte(index - 1))
+        index
+      end
+
       def field(bytes, position, width)
         value = 0
         width.times { |index| value = (value << 8) | bytes.getbyte(position + index) }
@@ -250,11 +291,7 @@ module PDF
         @objects.clear
         @object_streams.clear
         @trailer = {}
-        position = 0
-        while (match = OBJECT_HEADER_ANYWHERE.match(@bytes, position))
-          @locations[match[1].to_i] = [:offset, match.begin(0)]
-          position = match.end(0)
-        end
+        each_object_header { |number, offset| @locations[number] = [:offset, offset] }
         position = 0
         while (start = @bytes.index("trailer", position))
           @scanner.pos = start + 7
