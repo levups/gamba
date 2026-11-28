@@ -3,6 +3,7 @@
 require_relative "test_helper"
 require "prawn"
 require "timeout"
+require_relative "support/pdf_objects"
 
 # Gamba.combine reads PDFs written by others: the pages must come out as they were drawn, whatever the file's
 # structure, and a damaged file must fail with an error Gamba names. COMBINE_FUZZ_SEED and COMBINE_FUZZ_CASES choose
@@ -193,6 +194,64 @@ d) Tj"
     assert_raises(Prawn::Errors::MalformedPDF) { Gamba.combine(["alice"]) }
   end
 
+  def test_a_source_gives_the_pages_chosen_in_their_order_turned_as_asked
+    bob = document("bob", pages: 3)
+
+    combined = Gamba.combine([document("alice"), {pdf: bob, pages: [3, 1]}, {pdf: bob, pages: 2..2, rotate: 90}])
+
+    assert_equal rasterized(document("alice")) + rasterized(bob).values_at(2, 0), rasterized(combined).first(3)
+    assert_equal [nil, nil, nil, 90], PdfObjects.new(combined).pages.map { PdfObjects.new(combined).value(_1)["/Rotate"] }
+    assert_equal 4, Gamba.page_count(combined)
+  end
+
+  def test_bookmarks_and_named_link_destinations_land_on_the_copies
+    alice = Prawn::Document.new do
+      text "alice 1"
+      start_new_page
+      text "alice 2"
+      add_dest("second", dest_fit(state.page))
+      go_to_page(1)
+      link_annotation([0, 0, 100, 100], Subtype: :Link, Dest: PDF::Core::LiteralString.new("second"))
+      outline.define { section("Alice", destination: 1) { page(title: "Second", destination: 2) } }
+    end.render
+    bob = Prawn::Document.new do
+      text "bob 1"
+      start_new_page
+      text "bob 2"
+      outline.define do
+        page(title: "Bob 2", destination: 2)
+        page(title: "Bob 1", destination: 1)
+      end
+    end.render
+
+    combined = Gamba.combine([{pdf: alice, outline: "Alice’s file"}, {pdf: bob, pages: [2]}])
+
+    outline = mutool(combined, "outline").lines.map { _1.strip.split("\t").reject(&:empty?).last(2) }
+    assert_equal [["\"Alice’s file\"", "#page=1&view=Fit"], ["\"Alice\"", "#page=1&view=Fit"], ["\"Second\"", "#page=2&view=Fit"],
+      ["\"Bob 2\"", "#page=3&view=Fit"]], outline
+    objects = PdfObjects.new(combined)
+    link = objects.value(objects.value(objects.pages.first)["/Annots"].first)
+    assert_equal objects.pages[1], link["/Dest"].first
+  end
+
+  def test_split_gives_parts_of_every_pages
+    parts = Gamba.split(document("alice", pages: 5), every: 2)
+
+    assert_equal [2, 2, 1], parts.map { Gamba.page_count(_1) }
+    assert_equal rasterized(document("alice", pages: 5)), parts.flat_map { rasterized(_1) }
+    assert_raises(ArgumentError) { Gamba.split(document("alice"), every: 0) }
+  end
+
+  def test_unknown_source_options_and_pages_outside_the_file_are_refused
+    alice = document("alice", pages: 2)
+
+    assert_raises(ArgumentError) { Gamba.combine([{pdf: alice, pages: [3]}]) }
+    assert_raises(ArgumentError) { Gamba.combine([{pdf: alice, pages: 0..1}]) }
+    assert_raises(ArgumentError) { Gamba.combine([{pdf: alice, rotate: 45}]) }
+    assert_raises(ArgumentError) { Gamba.combine([{pdf: alice, colour: :red}]) }
+    assert_raises(ArgumentError) { Gamba.combine([{pages: [1]}]) }
+  end
+
   def test_unknown_options_are_refused
     assert_raises(ArgumentError) { Gamba.combine([], orientation: :sideways) }
     assert_raises(ArgumentError) { Gamba.combine([], page_size: "B42") }
@@ -371,6 +430,14 @@ d) Tj"
         text "#{name} #{index + 1}", size: 24
       end
     end.render
+  end
+
+  def mutool(pdf, *arguments)
+    Dir.mktmpdir do |directory|
+      path = File.join(directory, "document.pdf")
+      File.binwrite(path, pdf)
+      Open3.capture2("mutool", "show", path, *arguments).first.force_encoding(Encoding::UTF_8)
+    end
   end
 
   def qpdf(pdf, arguments)
