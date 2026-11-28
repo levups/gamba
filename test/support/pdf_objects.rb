@@ -27,6 +27,11 @@ class PdfObjects
     Base64.decode64(@objects.fetch("obj:#{reference}").dig("stream", "data"))
   end
 
+  # Every object of this type, whether or not anything refers to it.
+  def of_type(type)
+    @objects.each_value.filter_map { _1["value"] || _1.dig("stream", "dict") }.grep(Hash).select { _1["/Type"] == type }
+  end
+
   def catalog
     value(value(@objects.fetch("trailer")["value"]["/Root"]))
   end

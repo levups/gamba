@@ -59,17 +59,18 @@ module Gamba
 
     def finalize_pdf_a
       min_version(1.7)
-      icc_profile = ref!({N: 3}, PdfA::SrgbProfile.bytes)
+      icc_profile = (@icc_profile ||= ref!({N: 3}, PdfA::SrgbProfile.bytes))
       @root.data[:OutputIntents] = [{
         Type: :OutputIntent, S: :GTS_PDFA1, OutputConditionIdentifier: PDF::Core::LiteralString.new(SrgbProfile::DESCRIPTION),
         Info: PDF::Core::LiteralString.new(SrgbProfile::DESCRIPTION), DestOutputProfile: icc_profile
       }]
-      embed_factur_x if @factur_x
+      embed_factur_x if @factur_x && !@root.data[:AF]
     end
 
-    # The XMP metadata PDF/A and PDF/UA both ask for, written last.
+    # The XMP metadata PDF/A and PDF/UA both ask for, written last; a document rendered again rewrites it in place.
     def finalize_metadata
-      metadata = ref!({Type: :Metadata, Subtype: :XML}, xmp_packet)
+      metadata = (@metadata ||= ref!({Type: :Metadata, Subtype: :XML}))
+      metadata.stream = xmp_packet
       metadata.uncompressed = true
       @root.data[:Metadata] = metadata
     end

@@ -73,16 +73,25 @@ module Gamba
     end
 
     # An element of the structure tree under the current one, which the block's elements and content go into.
-    # Nothing is made untagged, or within an artifact.
+    # Nothing is made untagged, or within an artifact. A block left by an error before drawing anything, a box that
+    # cannot fit and is rescued, leaves no empty element behind, nor a heading level the next heading must follow.
     def tag_structure(type, **attributes, &)
       return yield unless tagging_structure? && !@tagging.last.whole?
 
       attributes.compact!
       check_text_attributes(type, attributes)
       check_list_nesting(type)
+      heading_level = @heading_level
       check_heading_level(type) if pdf_ua?
 
-      within_element(Tagging::Element.new(type, @tagging.last, attributes), &)
+      parent = @tagging.last
+      element = Tagging::Element.new(type, parent, attributes)
+      within_element(element, &).tap { element = nil }
+    ensure
+      if element&.kids&.empty?
+        parent.kids.delete(element)
+        @heading_level = heading_level
+      end
     end
 
     # A cell of the table element being drawn, in the row element of its row index: a header cell for a column,
@@ -264,14 +273,16 @@ module Gamba
     end
 
     # The structure tree, the parent tree that maps each page's marked content back to its elements, and the
-    # catalog entries a tagged PDF and PDF/UA ask for.
+    # catalog entries a tagged PDF and PDF/UA ask for. A document rendered again rewrites the same objects. Content
+    # on a deleted page is left out: its page is no longer written.
     def finalize_tagging
       raise ArgumentError, "a marked-content sequence is still open" unless @marks.empty?
 
       min_version(1.7)
-      references = {}.compare_by_identity
-      tree = ref!(Type: :StructTreeRoot)
-      tree.data[:K] = [structure_reference(@tagging.first, tree, references)]
+      references = (@structure_references ||= {}.compare_by_identity)
+      kept_pages = pages.to_h { [_1, true] }.compare_by_identity
+      tree = (@structure_tree ||= ref!({}))
+      tree.data.replace(Type: :StructTreeRoot, K: [structure_reference(@tagging.first, tree, references, kept_pages)])
       nums = []
       pages.each do |page|
         elements = @elements_by_page[page]
@@ -280,21 +291,21 @@ module Gamba
         page.dictionary.data[:StructParents] = nums.size / 2
         nums << (nums.size / 2) << elements.map { references.fetch(_1) }
       end
-      tree.data[:ParentTree] = ref!(Nums: nums)
+      tree.data[:ParentTree] = (@parent_tree ||= ref!({})).tap { _1.data.replace(Nums: nums) }
       tree.data[:ParentTreeNextKey] = nums.size / 2
       @root.data[:StructTreeRoot] = tree
       @root.data[:MarkInfo] = {Marked: true}
       @root.data[:ViewerPreferences] = {**(@root.data[:ViewerPreferences] || {}), DisplayDocTitle: true}
     end
 
-    def structure_reference(element, parent, references)
-      reference = ref!(Type: :StructElem, S: element.type, P: parent, **element.attributes)
-      references[element] = reference
-      reference.data[:K] = element.kids.map do |kid|
-        next structure_reference(kid, reference, references) if kid.is_a?(Tagging::Element)
+    def structure_reference(element, parent, references, kept_pages)
+      reference = (references[element] ||= ref!({}))
+      reference.data.replace(Type: :StructElem, S: element.type, P: parent, **element.attributes)
+      reference.data[:K] = element.kids.filter_map do |kid|
+        next structure_reference(kid, reference, references, kept_pages) if kid.is_a?(Tagging::Element)
 
         page, mcid = kid
-        {Type: :MCR, Pg: page.dictionary, MCID: mcid}
+        {Type: :MCR, Pg: page.dictionary, MCID: mcid} if kept_pages[page]
       end
       reference
     end

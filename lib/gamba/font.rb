@@ -59,13 +59,15 @@ module Prawn
       @font_size = size if size
     end
 
+    # Without a font set yet, the default family is loaded only if something asks for it: text naming its own font
+    # never does, so a default family registered later is found.
     def save_font
-      @font ||= find_font(@default_font_family || "Helvetica")
       original_font = @font
       original_size = @font_size
       yield
     ensure
-      set_font(original_font, original_size) if original_font
+      @font = original_font
+      @font_size = original_size if original_size
     end
 
     def find_font(name, options = {})
