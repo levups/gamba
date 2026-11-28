@@ -137,6 +137,36 @@ class InvoiceTest < Minitest::Test
     assert_equal [xml.b, xml.b], attachments.map(&:b)
   end
 
+  def test_an_invoice_read_back_from_its_xml_writes_the_same_xml
+    [simple_invoice, mixed_invoice, exempt_invoice, reverse_charge_invoice, credit_note, full_invoice].product(%i[basic en16931 extended]).each do |invoice, profile|
+      xml = invoice.to_xml(profile:)
+
+      assert_equal xml, Gamba::Invoice.from_xml(xml).to_xml(profile:), "#{invoice.number} in #{profile}"
+    end
+  end
+
+  def test_an_invoice_read_from_xml_takes_a_price_per_basis_quantity_and_must_owe_what_the_xml_states
+    xml = simple_invoice.to_xml
+    per_ten = xml.sub("<ram:ChargeAmount>1000.00</ram:ChargeAmount>", %(<ram:ChargeAmount>10000.00</ram:ChargeAmount>\n<ram:BasisQuantity unitCode="C62">10</ram:BasisQuantity>))
+
+    assert_equal 1000, Gamba::Invoice.from_xml(per_ten).lines.first.unit_price
+    error = assert_raises(ArgumentError) { Gamba::Invoice.from_xml(xml.sub("<ram:GrandTotalAmount>2400.00", "<ram:GrandTotalAmount>2400.01")) }
+    assert_match(/GrandTotalAmount is 2400.01, and Gamba computes 2400.0/, error.message)
+  end
+
+  def test_xml_gamba_cannot_read_raises
+    {
+      simple_invoice.to_xml(profile: :minimum) => /no lines, as in the minimum and basic WL profiles/,
+      simple_invoice.to_xml.sub("<ram:TypeCode>380", "<ram:TypeCode>384") => /type code "384"/,
+      mixed_invoice.to_xml.sub("<ram:TypeCode>58", "<ram:TypeCode>31") => /payment means code "31"/,
+      "<Invoice/>" => /not a Cross Industry Invoice/,
+      "<rsm:CrossIndustryInvoice" => /cannot be read/
+    }.each do |xml, message|
+      error = assert_raises(ArgumentError) { Gamba::Invoice.from_xml(xml) }
+      assert_match message, error.message
+    end
+  end
+
   def test_an_unknown_profile_raises
     error = assert_raises(ArgumentError) { simple_invoice.to_xml(profile: :comfort) }
 

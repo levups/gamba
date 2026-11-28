@@ -113,7 +113,7 @@ font "Inter.ttf", features: %i[liga kern]
 PDF/A-3b archival files, and Factur-X electronic invoices (the French and German standard that embeds the invoice
 data as XML inside the PDF). Gamba writes the XML of every profile, from minimum to extended, from a `Gamba::Invoice`,
 which computes the totals and the VAT breakdown with EN 16931's rounding, in exact decimals; or it embeds the XML your
-invoicing system produced.
+invoicing system produced. `Gamba::Invoice.from_xml` reads such XML back.
 
 ```ruby
 invoice = Gamba::Invoice.new(number: "INV-2026-0001", issued_on: Date.new(2026, 11, 12), due_on: Date.new(2026, 12, 12),
@@ -796,6 +796,8 @@ document.factur_x invoice, rules: :fr
 ```
 
 Each profile writes the part of the invoice its schema holds: `:minimum` the parties and the totals, `:basic_wl` everything but the lines, `:basic` the lines without their description, `:en16931` what French and EU rules use for invoices between businesses, and `:extended` the same with each exemption repeated where it applies. The invoice is checked against the same rules whatever the profile. The test suite checks the invoices it writes in each profile with Mustang, against the profile’s schema and rules, EN 16931’s and France’s, and that Mustang reports each rule Gamba checks.
+
+`Gamba::Invoice.from_xml(xml)` reads the XML of a Factur-X or ZUGFeRD invoice back into an invoice, from the basic, EN 16931 or extended profile: the minimum and basic WL profiles have no lines to compute its totals from. What a `Gamba::Invoice` does not hold is left out, unless it changes what the invoice owes: the totals Gamba computes must be those the XML states, or it raises `ArgumentError`.
 
 #### Tagged PDF and PDF/UA
 

@@ -44,6 +44,7 @@ Prawn::Document:
   "#factur_x": [req invoice, key profile, key rules, key filename, key description]
 # An invoice as data, for Factur-X: what it computes, and its XML.
 Gamba::Invoice:
+  ".from_xml": [req xml]
   "#allowance_total": []
   "#charge_total": []
   "#due": []
