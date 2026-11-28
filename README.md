@@ -171,6 +171,14 @@ once per page size, and tagged documents mark it as an artifact:
 Prawn::Document.new(watermark: {text: "Courtesy translation", opacity: 0.2})
 ```
 
+Form fields a reader fills in: text, check boxes, radio buttons and choices, each drawn by an appearance of its own,
+so every viewer shows it the same way:
+
+```ruby
+text_field "name", at: [0, 700], width: 200, height: 20, value: "Alice Martin"
+check_box "terms", at: [0, 670], checked: true
+```
+
 QR codes, DataMatrix and barcodes (Code 128, EAN-13, EAN-8, Code 39, ITF-14) in pure Ruby, drawn as vectors: one
 fill per code, read back by zbar and libdmtx in CI:
 
