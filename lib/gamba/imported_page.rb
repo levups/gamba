@@ -12,7 +12,18 @@ module Gamba
     FONT_PROGRAMS = %i[FontFile FontFile2 FontFile3].freeze
     TYPE3 = PDF::Core::Name.new(value: "Type3")
     FORM = PDF::Core::Name.new(value: "Form")
-    MARKED_CONTENT_OPERATOR = %r{(?:\A|[\x00\t\n\f\r >])(?:BDC|BMC)(?:\z|[\x00\t\n\f\r ()<>\[\]{}/%])}
+    # What a content stream holds between operators, read as viewers read it: whitespace and comments, strings,
+    # names, numbers and delimiters; anything else is an operator. An inline image's data, from ID to EI, is binary.
+    SKIPPED = /(?:[\x00\t\n\f\r ]+|%[^\r\n]*)+/n
+    DELIMITER_OR_NUMBER = %r{<<|>>|[\[\]{}]|<[^>]*>|[+-]?(?:\d+\.?\d*|\.\d+)}n
+    NAME = %r{/([^\x00\t\n\f\r ()<>\[\]{}/%]*)}n
+    OPERATOR = %r{[^\x00\t\n\f\r ()<>\[\]{}/%]+}n
+    INLINE_IMAGE_DATA = /.*?[\x00\t\n\f\r ]EI(?=[\x00\t\n\f\r ]|\z)/mn
+    # Operands that are not operators, though spelled as keywords.
+    CONSTANTS = %w[true false null].freeze
+    # Optional content marks a layer, not structure: /OC /Layer1 BDC is allowed in a figure.
+    OPTIONAL_CONTENT = "OC"
+    MARKED_CONTENT_OPERATORS = %w[BDC BMC].freeze
 
     attr_reader :width, :height, :form
 
@@ -53,7 +64,8 @@ module Gamba
         @embedding_violation = document.pdf_ua? ? [Prawn::Errors::PdfUaViolation, "PDF/UA"] : [Prawn::Errors::PdfAViolation, "PDF/A"]
         check_fonts_embedded(page[:Resources], {})
       end
-      check_no_marked_content(page[:Contents], document) if document.tagged?
+      @decoded = {}.compare_by_identity
+      check_no_marked_content(page, document) if document.tagged?
       @form = document.ref!(form_dictionary(page, source.copier))
       @form.stream, filters = content(page[:Contents], source.copier)
       @form.data.merge!(filters)
@@ -84,22 +96,82 @@ module Gamba
     # A form holds one stream: a page's only content stream keeps its bytes and filters, several are decoded and
     # joined, as their division may fall between an operator and its operands.
     def content(value, copier)
-      streams = Array(@reader.resolve(value)).map { @reader.resolve(_1) }.grep(PDF::Core::Reader::Stream)
+      streams = content_streams(value)
       return [+" ", {}] if streams.empty?
       return [+streams.first.data, copier.copy(streams.first.dictionary.slice(:Filter, :DecodeParms))] if streams.one?
 
-      [streams.map { @reader.decoded(_1) }.join("\n"), {}]
+      [streams.map { decoded(_1) }.join("\n"), {}]
     end
 
-    # The page is drawn as one figure or artifact: marked content of its own would nest in it, which tagged PDF
-    # forbids, and its MCIDs would point at a structure tree left behind. The operator follows whitespace or the >> of
-    # its properties, and comes before whitespace, a delimiter or the end: /P<</MCID 0>>BDC(a)Tj is written too.
-    def check_no_marked_content(contents, document)
-      streams = Array(@reader.resolve(contents)).map { @reader.resolve(_1) }.grep(PDF::Core::Reader::Stream)
-      return unless streams.any? { @reader.decoded(_1).match?(MARKED_CONTENT_OPERATOR) }
+    # The page is drawn as one figure or artifact: marked content of its own, in its content streams or in the forms
+    # they draw, would nest in it, which tagged PDF forbids, and its MCIDs would point at a structure tree left
+    # behind. Optional content (/OC … BDC) only marks a layer, and is drawn as is.
+    def check_no_marked_content(page, document)
+      return unless content_streams(page[:Contents]).any? { marked_content?(decoded(_1)) } || forms_mark_content?(page[:Resources], {})
 
       error, standard = document.pdf_ua? ? [Prawn::Errors::PdfUaViolation, "PDF/UA"] : [Prawn::Errors::PdfAViolation, "PDF/A-3a"]
       raise error, "#{standard} cannot import a page that has marked content of its own, a page of a tagged PDF: Gamba does not merge structure trees yet"
+    end
+
+    def forms_mark_content?(resources, visited)
+      xobjects = @reader.resolve(@reader.resolve(resources).then { _1.is_a?(Hash) ? _1[:XObject] : nil })
+      return false unless xobjects.is_a?(Hash)
+
+      xobjects.each_value.any? do |reference|
+        next false if !reference.is_a?(PDF::Core::Reader::Ref) || visited[reference.number]
+
+        visited[reference.number] = true
+        form = @reader.resolve(reference)
+        next false unless form.is_a?(PDF::Core::Reader::Stream) && form.dictionary[:Subtype] == FORM
+
+        marked_content?(decoded(form)) || forms_mark_content?(form.dictionary[:Resources], visited)
+      end
+    end
+
+    # Whether a content stream has a BDC or BMC operator other than optional content's, its tag being the first name
+    # among its operands; strings, comments and inline images, which may spell them too, are skipped.
+    def marked_content?(data)
+      scanner = StringScanner.new(data)
+      tag = nil
+      until scanner.eos?
+        next if scanner.skip(SKIPPED) || scanner.skip(DELIMITER_OR_NUMBER)
+
+        if scanner.match?(/\(/n)
+          skip_literal_string(scanner)
+        elsif scanner.skip(NAME)
+          tag ||= scanner[1]
+        elsif (operator = scanner.scan(OPERATOR))
+          next if CONSTANTS.include?(operator)
+          return true if MARKED_CONTENT_OPERATORS.include?(operator) && tag != OPTIONAL_CONTENT
+
+          scanner.skip(INLINE_IMAGE_DATA) || scanner.terminate if operator == "ID"
+          tag = nil
+        else
+          scanner.getch # a stray ) or >
+        end
+      end
+      false
+    end
+
+    def skip_literal_string(scanner)
+      depth = 0
+      until scanner.eos?
+        scanner.skip(/[^\\()]*/n)
+        case scanner.getch
+        when "(" then depth += 1
+        when ")" then return if (depth -= 1).zero?
+        when "\\" then scanner.getch
+        end
+      end
+    end
+
+    def content_streams(contents)
+      Array(@reader.resolve(contents)).map { @reader.resolve(_1) }.grep(PDF::Core::Reader::Stream)
+    end
+
+    # Each stream is decoded once, though both the check and the form read a page's several streams.
+    def decoded(stream)
+      @decoded[stream] ||= @reader.decoded(stream)
     end
 
     # PDF/A wants every font's program in the file: a page that leaves one to the viewer raises.

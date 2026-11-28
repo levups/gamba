@@ -232,6 +232,74 @@ class TaggingTest < Minitest::Test
     refute Prawn::Document.new(pdf: false).tagged?
   end
 
+  # Marked content is read operator by operator: in the forms a page draws too, not in strings, inline images or
+  # optional content.
+  def test_an_imported_page_is_refused_only_for_marked_content_of_its_own
+    stamped = Prawn::Document.new(compress: true) do
+      create_stamp("mark") { add_content("/P <</MCID 0>> BDC EMC") }
+      stamp "mark"
+    end.render
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /marked content of its own/) do
+      dejavu(Gamba.document(**TAGGED)).pdf_page(stamped, alt: "A stamped page")
+    end
+    ["/OC /Layer1 BDC 0 0 m 1 1 l S EMC", "BT /F1 12 Tf (BDC BMC \\) BDC) Tj ET", "% BDC\nBI /W 1 /H 1 /BPC 8 /CS /G ID BDC EI",
+      "/OC <</Type /OCMD /P /AnyOn /V true>> BDC EMC"].each do |content|
+      page = Prawn::Document.new { add_content(content) }.render
+      document = dejavu(Gamba.document(**TAGGED))
+      document.pdf_page(page, alt: "A page")
+
+      assert document.to_s.start_with?("%PDF"), content
+    end
+  end
+
+  def test_a_rescued_element_leaves_no_empty_element_nor_heading_level
+    document = dejavu(Gamba.document(**TAGGED))
+    assert_raises(Prawn::Errors::CannotFit) { document.prawn.tag_structure(:H1) { raise Prawn::Errors::CannotFit } }
+    assert_raises_with(Prawn::Errors::PdfUaViolation, /before any h1/) { document.prawn.tag_structure(:H2) {} }
+    document.text "Report", role: :h1
+    objects = PdfObjects.new(document.to_s)
+
+    assert_equal ["/H1"], objects.of_type("/StructElem").map { _1["/S"] }.grep("/H1")
+  end
+
+  def test_a_deleted_page_is_left_out_of_the_structure_tree
+    document = dejavu(Gamba.document(**TAGGED))
+    document.text "Alice"
+    document.page_break
+    document.text "Bob"
+    document.prawn.start_new_page
+    document.prawn.delete_page(1)
+    objects = PdfObjects.new(document.to_s)
+
+    pages = objects.pages
+    assert_equal 2, pages.size
+    references = objects.of_type("/StructElem").flat_map { Array(_1["/K"]) }.grep(Hash).map { _1["/Pg"] }
+    assert_equal [pages.first], references
+    assert_nil objects.marked_content_problem
+  end
+
+  def test_a_document_rendered_twice_writes_its_structure_and_metadata_once
+    document = dejavu(Gamba.document(**TAGGED))
+    document.text "Report", role: :h1
+    first = PdfObjects.new(document.to_s)
+    second = PdfObjects.new(document.to_s)
+
+    %w[/StructTreeRoot /StructElem /Metadata].each { assert_equal first.of_type(_1).size, second.of_type(_1).size, _1 }
+  end
+
+  def test_the_default_family_is_loaded_only_when_used_and_unset_by_a_default_style_without_font
+    document = Gamba.document(pdf_a: true)
+    document.register_font "DejaVu", normal: "#{DATA_DIRECTORY}/fonts/DejaVuSans.ttf"
+    document.style :default, font: "Body"
+    document.prawn.font("DejaVu") { document.prawn.text "Alice" }
+    document.register_font "Body", normal: "#{DATA_DIRECTORY}/fonts/DejaVuSans.ttf"
+    document.text "Bob"
+
+    assert document.to_s.start_with?("%PDF")
+    document.style :default, size: 9
+    assert_nil document.prawn.default_font_family
+  end
+
   # A decoration within an artifact is moved beneath what the artifact holds on each page: it is an artifact too.
   def test_a_decorated_stack_within_an_artifact_stays_an_artifact
     document = dejavu(Gamba.document(**TAGGED))

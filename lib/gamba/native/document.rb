@@ -43,7 +43,7 @@ module Gamba
     def style(name, **attributes)
       @styles.define(name, attributes)
       font = attributes[:font]
-      @prawn.default_font_family = font if font && name == Layout::Styles::DEFAULT_STYLE && (@prawn.pdf_a? || @prawn.pdf_ua?)
+      @prawn.default_font_family = font if name == Layout::Styles::DEFAULT_STYLE && (@prawn.pdf_a? || @prawn.pdf_ua?)
       self
     end
 

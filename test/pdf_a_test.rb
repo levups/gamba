@@ -4,6 +4,7 @@ require_relative "test_helper"
 require "open3"
 require "tempfile"
 require "prawn"
+require_relative "support/pdf_objects"
 
 # PDF/A-3b and Factur-X, checked by veraPDF (brew install verapdf) and by Mustang, the Factur-X validator, when
 # they are installed: MUSTANG_JAR names Mustang's CLI jar, JAVA the Java it runs on.
@@ -33,6 +34,19 @@ class PdfATest < Minitest::Test
     end.render
 
     assert_valid_pdf_a pdf
+  end
+
+  def test_a_factur_x_invoice_rendered_twice_embeds_its_xml_and_metadata_once
+    data = DATA_DIRECTORY
+    document = Prawn::Document.new(pdf_a: true) do
+      font "#{data}/fonts/DejaVuSans.ttf"
+      text "Invoice"
+    end
+    document.factur_x INVOICE_XML, profile: :en16931
+    document.render
+    second = PdfObjects.new(document.render)
+
+    %w[/EmbeddedFile /Filespec /Metadata].each { |type| assert_equal 1, second.of_type(type).size, type }
   end
 
   def test_a_factur_x_invoice_passes_mustang_with_french_rules
