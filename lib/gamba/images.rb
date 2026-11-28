@@ -50,6 +50,10 @@ module Prawn
         {obj: info.build_pdf_object(self), info:}
       end
       [entry[:obj], entry[:info]]
+    rescue Prawn::Errors::PdfAViolation => exception
+      # The image only knows its bytes: its path, when it has one, tells which of a document's images it is.
+      path = file.is_a?(String) ? file : (file.to_path if file.respond_to?(:to_path))
+      raise exception.class, "the image #{path || "given without a path"} #{exception.message}"
     end
 
     # A page of another PDF, placed and sized as an image is, written once however many times it is drawn: a

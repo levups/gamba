@@ -74,9 +74,7 @@ module Prawn
 
       def build_pdf_object(document)
         color_space = COLOR_SPACE_BY_CHANNELS.fetch(channels) { raise ArgumentError, "JPG uses an unsupported number of channels" }
-        if color_space == :DeviceCMYK && document.pdf_a?
-          raise Prawn::Errors::PdfAViolation, "this JPEG is CMYK, and PDF/A paints in the sRGB of its output intent: convert it to RGB"
-        end
+        raise Prawn::Errors::PdfAViolation, "is CMYK, and PDF/A paints in the sRGB of its output intent: convert it to RGB" if color_space == :DeviceCMYK && document.pdf_a?
 
         dictionary = {Type: :XObject, Subtype: :Image, ColorSpace: color_space, BitsPerComponent: bits, Width: width, Height: height, Filter: :DCTDecode}
         dictionary[:Decode] = INVERTED_CMYK_DECODE if color_space == :DeviceCMYK

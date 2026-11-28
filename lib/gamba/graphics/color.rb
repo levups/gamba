@@ -86,7 +86,7 @@ module Prawn
       end
 
       # DeviceCMYK needs a CMYK output intent, and Gamba's PDF/A writes an sRGB one (ISO 19005-3 §6.2.4.3).
-      def refuse_cmyk_under_pdf_a(color, description = color.inspect)
+      def refuse_cmyk_under_pdf_a(color, description = "the color #{color.inspect}")
         return unless pdf_a? && color_type(color) == :CMYK
 
         raise Errors::PdfAViolation, "#{description} is CMYK, and PDF/A paints in the sRGB of its output intent: give it as RGB"

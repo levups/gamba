@@ -46,6 +46,7 @@ module Prawn
           end
           raise ArgumentError, "position must be between 0 and 1" unless (0..1).cover?(position)
 
+          refuse_cmyk_under_pdf_a(color, "the gradient color #{color.inspect}")
           GradientStop.new(position, normalize_color(color))
         end
         raise ArgumentError, "The first stop must have a position of 0" if stops.first.position != 0
@@ -53,8 +54,6 @@ module Prawn
         color_types = stops.map { color_type(_1.color) }
         color_types.uniq!
         raise ArgumentError, "All colors must be of the same color space" if color_types.length > 1
-
-        refuse_cmyk_under_pdf_a(stops.first.color, "the gradient's colour #{stops.first.color.inspect}")
 
         Gradient.new(r1 ? :radial : :axial, apply_transformations, stops, from, to, r1, r2)
       end
