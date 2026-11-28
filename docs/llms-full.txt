@@ -742,7 +742,7 @@ Prawn::Document.new(pdf_a: true, info: {Title: "Invoice INV-2026-0001"}) do
 end
 ```
 
-`pdf_a: true` writes a PDF/A-3b document (ISO 19005-3): XMP metadata matching the `info` hash, an sRGB output intent, a file identifier, and annotations flagged for printing. What PDF/A forbids raises `Prawn::Errors::PdfAViolation`: a standard PDF font, which cannot be embedded, and encryption.
+`pdf_a: true` writes a PDF/A-3b document (ISO 19005-3): XMP metadata matching the `info` hash, an sRGB output intent, a file identifier, and annotations flagged for printing. What PDF/A forbids raises `Prawn::Errors::PdfAViolation`: a standard PDF font, which cannot be embedded, encryption, and a CMYK colour, gradient or JPEG, which the sRGB output intent cannot describe.
 
 `factur_x(invoice, profile:, filename:, description:)` embeds the CII XML of a Factur-X invoice into a PDF/A-3 document, with the relationship the specification gives each profile. The invoice is a `Gamba::Invoice`, whose XML Gamba writes, or the XML your invoicing system produced, as a String. ZUGFeRD 2 is the same format under its German name.
 

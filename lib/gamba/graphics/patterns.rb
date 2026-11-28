@@ -54,6 +54,8 @@ module Prawn
         color_types.uniq!
         raise ArgumentError, "All colors must be of the same color space" if color_types.length > 1
 
+        refuse_cmyk_under_pdf_a(stops.first.color, "the gradient's colour #{stops.first.color.inspect}")
+
         Gradient.new(r1 ? :radial : :axial, apply_transformations, stops, from, to, r1, r2)
       end
 

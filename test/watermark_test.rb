@@ -109,7 +109,9 @@ class WatermarkTest < Minitest::Test
   end
 
   def test_under_pdf_a_a_cmyk_color_is_refused_when_the_document_is_made
-    raised = assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true, watermark: {text: "Draft", color: [0, 0, 0, 50]}) }
+    raised = assert_raises(Prawn::Errors::PdfAViolation) do
+      Prawn::Document.new(pdf_a: true, skip_page_creation: true, watermark: {text: "Draft", color: [0, 0, 0, 50]})
+    end
 
     assert_includes raised.message, "watermark color"
   end

@@ -13,7 +13,9 @@ module Prawn
       def fill_color(*color)
         return current_fill_color if color.empty?
 
-        self.current_fill_color = process_color(*color)
+        color = process_color(*color)
+        refuse_cmyk_under_pdf_a(color)
+        self.current_fill_color = color
         set_fill_color
       end
       alias_method :fill_color=, :fill_color
@@ -22,6 +24,7 @@ module Prawn
         return current_stroke_color if color.empty?
 
         color = process_color(*color)
+        refuse_cmyk_under_pdf_a(color)
         self.current_stroke_color = color
         set_stroke_color(color)
       end
@@ -82,6 +85,13 @@ module Prawn
         (color_type(color) == :RGB) ? :DeviceRGB : :DeviceCMYK
       end
 
+      # DeviceCMYK needs a CMYK output intent, and Gamba's PDF/A writes an sRGB one (ISO 19005-3 §6.2.4.3).
+      def refuse_cmyk_under_pdf_a(color, description = color.inspect)
+        return unless pdf_a? && color_type(color) == :CMYK
+
+        raise Errors::PdfAViolation, "#{description} is CMYK, and PDF/A paints in the sRGB of its output intent: give it as RGB"
+      end
+
       def set_color_space(type, color_space)
         return if current_color_space(type) == color_space && !page.in_stamp_stream?
 
@@ -102,10 +112,7 @@ module Prawn
           add_content("/#{color} #{operator}")
           record_pattern(type, reference && {name: color, reference:})
         else
-          if pdf_a? && color_space(color) == :DeviceCMYK
-            raise Errors::PdfAViolation, "PDF/A paints in the sRGB of its output intent, and #{color.inspect} is CMYK: give it as RGB"
-          end
-
+          refuse_cmyk_under_pdf_a(color)
           set_color_space(type, color_space(color))
           write_color(color_to_s(color), operator)
           state = graphic_state

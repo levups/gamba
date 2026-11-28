@@ -5,9 +5,9 @@ require "zlib"
 
 module PDF
   module Core
-    # Writes a PDF 1.5 file: streams compressed, every other object but an encrypted document's catalog packed into
-    # one compressed object stream, and a compressed cross-reference stream instead of the xref table (ISO 32000-1
-    # §7.5.7, §7.5.8).
+    # Writes a PDF 1.5 file: streams compressed, every other object but an encrypted document's catalog and encryption
+    # dictionary packed into one compressed object stream, and a compressed cross-reference stream instead of the xref
+    # table (ISO 32000-1 §7.5.7, §7.5.8).
     class Writer
       MINIMUM_VERSION = 1.5
       BINARY_MARKER = "%\xE2\xE3\xCF\xD3\n".b

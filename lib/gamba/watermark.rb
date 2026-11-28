@@ -14,7 +14,7 @@ module Gamba
     # A page can open inside a block that changed the text state, which a form XObject inherits.
     TEXT_STATE_RESET = "0 Tr 0 Tc 0 Tw 100 Tz 0 Ts"
 
-    def self.from_option(option)
+    def self.from_option(option, pdf_a: false)
       return unless option
       raise ArgumentError, "watermark is #{option.inspect}: give its text, or a hash with the text and its options" unless option.is_a?(String) || option.is_a?(Hash)
 
@@ -22,7 +22,12 @@ module Gamba
       unknown = option.keys - OPTIONS
       raise ArgumentError, "unknown watermark option#{"s" if unknown.size > 1} #{unknown.map(&:inspect).join(", ")}: accepted options are #{OPTIONS.map(&:inspect).join(", ")}" if unknown.any?
 
-      new(**option.compact)
+      watermark = new(**option.compact)
+      if pdf_a && option[:color].is_a?(Array)
+        raise Prawn::Errors::PdfAViolation, "the watermark color #{option[:color].inspect} is CMYK, and PDF/A paints in the sRGB of its output intent: give it as RGB"
+      end
+
+      watermark
     end
 
     def initialize(text:, font: nil, style: nil, size: nil, angle: nil, color: "808080", opacity: 0.2)
@@ -45,10 +50,6 @@ module Gamba
     end
 
     def open_page(document)
-      if document.pdf_a? && @color.is_a?(Array)
-        raise Prawn::Errors::PdfAViolation, "the watermark color is #{@color.inspect}: PDF/A paints in the sRGB of its output intent, give it as RGB"
-      end
-
       _left, _bottom, width, height = document.page.dimensions
       name = "Gamba watermark #{width}x#{height}"
       @unfilled_stamps << [document.__send__(:create_stamp_dictionary, name), width, height] unless document.__send__(:stamp_dictionary_registry).key?(name)

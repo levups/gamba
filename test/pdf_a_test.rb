@@ -76,7 +76,28 @@ class PdfATest < Minitest::Test
   def test_cmyk_colors_are_refused
     assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true) { fill_color 0, 0, 0, 50 } }
     assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true) { stroke_color [0, 0, 0, 50] } }
-    Prawn::Document.new(pdf_a: true) { fill_color "336699" }
+    assert_raises(Prawn::Errors::PdfAViolation) do
+      Prawn::Document.new(pdf_a: true) { fill_gradient from: [0, 100], to: [100, 0], stops: [[0, [0, 0, 0, 50]], [1, [0, 50, 0, 0]]] }
+    end
+
+    assert_equal "336699", Prawn::Document.new(pdf_a: true) { fill_color "336699" }.fill_color
+  end
+
+  # Kept, the refused colour would raise again from each new page, far from the call that set it.
+  def test_a_refused_cmyk_color_is_not_kept
+    document = Prawn::Document.new(pdf_a: true)
+    assert_raises(Prawn::Errors::PdfAViolation) { document.fill_color 0, 0, 0, 50 }
+
+    document.start_new_page
+
+    assert_equal "000000", document.fill_color
+  end
+
+  def test_cmyk_jpegs_are_refused
+    image = File.expand_path("../corpus/cache/prawn/data/images/fractal.jpg", __dir__)
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(image)
+
+    assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true) { image image } }
   end
 
   def test_factur_x_needs_a_pdf_a_document
