@@ -353,6 +353,17 @@ d) Tj"
     assert_equal 20_000, annotations.count { |annotation| annotation.is_a?(Hash) && annotation[:Subtype] }
   end
 
+  # Rebuilding the cross-references finds each "N G obj" once: runs of digits, of whitespace, or of headers that
+  # never finish, the shapes a backtracking pattern would retry, are read in one pass.
+  def test_a_file_rebuilt_from_its_object_headers_is_read_in_linear_time
+    ["9" * 4_000_000, "9 " * 2_000_000, "1 0 " * 1_000_000, "1 0 objx" * 500_000].each do |body|
+      assert_raises(Prawn::Errors::MalformedPDF) { Timeout.timeout(10) { Gamba.page_count("%PDF-1.7\n#{body}") } }
+    end
+    damaged = Gamba.combine([document("alice", pages: 2)]).sub(/startxref\s+\d+/, "startxref 1")
+
+    assert_equal 2, Gamba.page_count(damaged)
+  end
+
   def test_a_cross_reference_stream_without_width_is_rebuilt_instead_of_read_forever
     source = packed_catalog_pdf(xref_widths: "[0 0 0] /Size 999999999999")
 
