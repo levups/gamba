@@ -72,6 +72,13 @@ class PdfATest < Minitest::Test
     assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true) { encrypt_document } }
   end
 
+  # veraPDF rule 6.2.4.3-3: DeviceCMYK needs a CMYK output intent, and Gamba writes an sRGB one.
+  def test_cmyk_colors_are_refused
+    assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true) { fill_color 0, 0, 0, 50 } }
+    assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true) { stroke_color [0, 0, 0, 50] } }
+    Prawn::Document.new(pdf_a: true) { fill_color "336699" }
+  end
+
   def test_factur_x_needs_a_pdf_a_document
     assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new { factur_x INVOICE_XML } }
   end

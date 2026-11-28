@@ -256,7 +256,7 @@
   <span class="n">font_families</span><span class="p">.</span><span class="nf">update</span><span class="p">(</span><span class="s2">"Inter"</span> <span class="o">=&gt;</span> <span class="p">{</span><span class="ss">normal: </span><span class="s2">"Inter-Regular.ttf"</span><span class="p">,</span> <span class="ss">bold: </span><span class="s2">"Inter-Bold.ttf"</span><span class="p">})</span>
   <span class="n">text</span> <span class="s2">"General conditions"</span>
 <span class="k">end</span></code></pre>
-        <p>It is drawn when the document renders, so its font may be registered after the document is created, and written once per page size however many pages show it. Tagged documents mark it as a watermark artifact, outside the structure tree. Gamba’s own API takes it as a document option.</p>
+        <p>It is drawn when the document renders, so its font may be registered after the document is created, and written once per page size however many pages show it; a font that cannot draw the text raises then, naming the watermark, as fallback fonts do not apply to it. PDF/A refuses a CMYK colour when the document is made, since it paints in the sRGB of its output intent. Tagged documents mark it as a watermark artifact, outside the structure tree. Gamba’s own API takes it as a document option.</p>
       </div>
     </section>
 

@@ -102,6 +102,10 @@ module Prawn
           add_content("/#{color} #{operator}")
           record_pattern(type, reference && {name: color, reference:})
         else
+          if pdf_a? && color_space(color) == :DeviceCMYK
+            raise Errors::PdfAViolation, "PDF/A paints in the sRGB of its output intent, and #{color.inspect} is CMYK: give it as RGB"
+          end
+
           set_color_space(type, color_space(color))
           write_color(color_to_s(color), operator)
           state = graphic_state

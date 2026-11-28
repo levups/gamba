@@ -30,7 +30,10 @@ module PDF
 
         @encryption = encryption
         @encryption_key = encryption.key(file_identifier)
-        @trailer[:Encrypt] = encryption.dictionary(file_identifier)
+        # An object of its own, in clear and outside the object stream (ISO 32000-1 §7.5.7): a direct dictionary in
+        # the cross-reference stream is an object veraPDF tries to decrypt, warning on each of its strings.
+        @encryption_reference = PDF::Core::Reference.new(objects.size + 1, encryption.dictionary(file_identifier))
+        @trailer[:Encrypt] = @encryption_reference
       end
 
       def call
@@ -49,9 +52,11 @@ module PDF
           packed_objects.delete(root)
           location_by_identifier[root.identifier] = [1, output.bytesize]
           output << "#{root.identifier} 0 obj\n#{PDF::Core.serialize(encrypted_strings(root.data, root.identifier))}\nendobj\n"
+          location_by_identifier[@encryption_reference.identifier] = [1, output.bytesize]
+          output << "#{@encryption_reference.identifier} 0 obj\n#{PDF::Core.serialize(@encryption_reference.data)}\nendobj\n"
         end
 
-        object_stream_identifier = objects.size + 1
+        object_stream_identifier = objects.size + (@encryption_reference ? 2 : 1)
         unless packed_objects.empty?
           location_by_identifier[object_stream_identifier] = [1, output.bytesize]
           output << object_stream(object_stream_identifier, packed_objects, location_by_identifier)

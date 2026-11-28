@@ -45,6 +45,10 @@ module Gamba
     end
 
     def open_page(document)
+      if document.pdf_a? && @color.is_a?(Array)
+        raise Prawn::Errors::PdfAViolation, "the watermark color is #{@color.inspect}: PDF/A paints in the sRGB of its output intent, give it as RGB"
+      end
+
       _left, _bottom, width, height = document.page.dimensions
       name = "Gamba watermark #{width}x#{height}"
       @unfilled_stamps << [document.__send__(:create_stamp_dictionary, name), width, height] unless document.__send__(:stamp_dictionary_registry).key?(name)
@@ -56,6 +60,9 @@ module Gamba
         document.page.stamp_stream(dictionary) { document.tag_artifact(*ARTIFACT) { draw(document, width, height) } }
       end
       @unfilled_stamps.clear
+    rescue Prawn::Errors::UnknownFont, Prawn::Errors::IncompatibleStringEncoding => exception
+      # The font is only known once the document renders, far from the option that named it.
+      raise exception.class, "the watermark #{@text.inspect} cannot be drawn: #{exception.message}"
     end
 
     private

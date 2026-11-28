@@ -710,7 +710,7 @@ Prawn::Document.new(page_size: "A4", watermark: {text: "Courtesy translation", f
 end
 ```
 
-It is drawn when the document renders, so its font may be registered after the document is created, and written once per page size however many pages show it. Tagged documents mark it as a watermark artifact, outside the structure tree. Gamba’s own API takes it as a document option.
+It is drawn when the document renders, so its font may be registered after the document is created, and written once per page size however many pages show it; a font that cannot draw the text raises then, naming the watermark, as fallback fonts do not apply to it. PDF/A refuses a CMYK colour when the document is made, since it paints in the sRGB of its output intent. Tagged documents mark it as a watermark artifact, outside the structure tree. Gamba’s own API takes it as a document option.
 
 ### QR codes, DataMatrix and barcodes
 

@@ -94,8 +94,9 @@ class WatermarkTest < Minitest::Test
     skip CORPUS_MISSING_MESSAGE unless File.exist?(font_file("DejaVuSans.ttf"))
 
     regular = font_file("DejaVuSans.ttf")
+    # The font the page uses is not the watermark's: without a default font family, it is Helvetica's bold face.
     by_path = Prawn::Document.new(watermark: {text: "Draft", angle: 0}) { font regular }
-    assert_includes Gamba::PdfCheck.text_lines(by_path.render).first, "Draft"
+    assert_equal ["Helvetica-Bold"], Oracle.text_layout(by_path.render).first.glyphs.map { _1[1] }.uniq
 
     without_bold = Prawn::Document.new(watermark: {text: "Draft", angle: 0, font: "Sans"}) { font_families.update("Sans" => {normal: regular}) }
     assert_equal ["DejaVuSans"], Oracle.text_layout(without_bold.render).first.glyphs.map { _1[1] }.uniq
@@ -105,6 +106,20 @@ class WatermarkTest < Minitest::Test
     raised = assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true, watermark: "Draft").render }
 
     assert_includes raised.message, "watermark needs font:"
+  end
+
+  def test_under_pdf_a_a_cmyk_color_is_refused_when_the_document_is_made
+    raised = assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true, watermark: {text: "Draft", color: [0, 0, 0, 50]}) }
+
+    assert_includes raised.message, "watermark color"
+  end
+
+  def test_a_font_that_cannot_draw_it_names_the_watermark
+    raised = assert_raises(Prawn::Errors::IncompatibleStringEncoding) { Prawn::Document.new(watermark: "Черновик").render }
+    assert_includes raised.message, %(the watermark "Черновик")
+
+    raised = assert_raises(Prawn::Errors::UnknownFont) { Prawn::Document.new(watermark: {text: "Draft", font: "Interr"}).render }
+    assert_includes raised.message, %(the watermark "Draft")
   end
 
   def test_its_text_is_an_artifact_outside_the_structure_tree
