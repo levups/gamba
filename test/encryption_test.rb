@@ -177,7 +177,8 @@ class EncryptionTest < Minitest::Test
     end
   end
 
+  # qpdf's output as bytes: a trailer's /ID holds any, which Ruby 4.1 refuses to match a pattern against as UTF-8.
   def qpdf(*arguments)
-    Open3.capture2("qpdf", *arguments).first
+    Open3.capture2("qpdf", *arguments).first.b
   end
 end
