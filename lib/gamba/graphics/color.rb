@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+module Gamba
+  # An ink of its own, by name, at a tint from 0 to 1, with the colour shown for it where the ink is not: made by
+  # spot_color, given to fill_color and stroke_color.
+  SpotColor = Data.define(:name, :alternate, :tint)
+end
+
 module Prawn
   module Graphics
     module Color
@@ -9,6 +15,18 @@ module Prawn
       # A document uses a handful of colours; computed ones (gradients drawn by hand) must not grow it forever.
       HEX_COLORS_CACHED = 256
       PDF_OPERANDS_BY_HEX_COLOR = {}
+
+      # A spot colour, printed with an ink of its own, at a tint from 0 to 1: give it to fill_color or stroke_color.
+      # alternate is the CMYK (or, with rgb:, the RGB hex) that screens and proofs show for the full ink.
+      def spot_color(name, cmyk: nil, rgb: nil, tint: 1)
+        raise ArgumentError, "name is #{name.inspect}: give the ink's name, such as \"PANTONE 185 C\"" unless name.is_a?(String) && !name.empty?
+        raise ArgumentError, "give the spot colour's alternate as cmyk: [c, m, y, k] or rgb: \"rrggbb\", one of them" unless cmyk.nil? ^ rgb.nil?
+        raise ArgumentError, "tint is #{tint.inspect}: give a number from 0 to 1" unless tint.is_a?(Numeric) && tint.between?(0, 1)
+
+        alternate = cmyk || rgb
+        color_type(alternate) # raises on a malformed colour
+        Gamba::SpotColor.new(name:, alternate:, tint: tint.to_f)
+      end
 
       def fill_color(*color)
         return current_fill_color if color.empty?
@@ -52,6 +70,7 @@ module Prawn
 
       def color_type(color)
         case color
+        when Gamba::SpotColor then return :Spot
         when String
           return :RGB if /\A\h{6}\z/.match?(color)
         when Array
@@ -62,6 +81,8 @@ module Prawn
       end
 
       def normalize_color(color)
+        raise ArgumentError, "a spot colour paints flat: gradients take RGB or CMYK colours" if color.is_a?(Gamba::SpotColor)
+
         case color_type(color)
         when :RGB
           r, g, b = hex2rgb(color)
@@ -72,6 +93,7 @@ module Prawn
       end
 
       def color_to_s(color)
+        return PDF::Core.real(color.tint) if color.is_a?(Gamba::SpotColor)
         return PDF::Core.real_params(normalize_color(color)) unless color.is_a?(String)
 
         PDF_OPERANDS_BY_HEX_COLOR.fetch(color) do
@@ -82,12 +104,33 @@ module Prawn
       end
 
       def color_space(color)
+        return spot_color_space(color) if color.is_a?(Gamba::SpotColor)
+
         (color_type(color) == :RGB) ? :DeviceRGB : :DeviceCMYK
+      end
+
+      # A Separation colour space per ink, written once per document and named on each page that paints with it: its
+      # tint goes linearly from none to the alternate colour. One name keeps one alternate.
+      def spot_color_space(color)
+        @spot_color_spaces ||= {}
+        space = @spot_color_spaces[color.name] ||= begin
+          rgb = color_type(color.alternate) == :RGB
+          full = rgb ? normalize_color(color.alternate) : color.alternate.map { _1 / 100.0 }
+          function = {FunctionType: 2, Domain: [0, 1], C0: [0] * full.size, C1: full, N: 1}
+          reference = ref!([:Separation, PDF::Core::Name.new(value: color.name), rgb ? :DeviceRGB : :DeviceCMYK, function])
+          {name: :"CS#{@spot_color_spaces.size}", alternate: color.alternate, reference:}
+        end
+        raise ArgumentError, "the spot colour #{color.name.inspect} was given another alternate before, #{space[:alternate].inspect}" unless space[:alternate] == color.alternate
+
+        (page.resources[:ColorSpace] ||= {})[space[:name]] ||= space[:reference]
+        space[:name]
       end
 
       # DeviceCMYK needs a CMYK output intent, and Gamba's PDF/A writes an sRGB one (ISO 19005-3 §6.2.4.3).
       def refuse_cmyk_under_pdf_a(color, description = "the color #{color.inspect}")
-        return unless pdf_a? && color_type(color) == :CMYK
+        return unless pdf_a?
+        return refuse_cmyk_under_pdf_a(color.alternate, "the spot colour #{color.name.inspect}") if color.is_a?(Gamba::SpotColor)
+        return unless color_type(color) == :CMYK
 
         raise Errors::PdfAViolation, "#{description} is CMYK, and PDF/A paints in the sRGB of its output intent: give it as RGB"
       end
@@ -96,7 +139,7 @@ module Prawn
         return if current_color_space(type) == color_space && !page.in_stamp_stream?
 
         set_current_color_space(color_space, type)
-        raise ArgumentError, "unknown color space: '#{color_space}'" unless COLOR_SPACES.include?(color_space)
+        raise ArgumentError, "unknown color space: '#{color_space}'" unless COLOR_SPACES.include?(color_space) || color_space.to_s.start_with?("CS")
 
         operator = COLOR_SPACE_OPERATOR_BY_TYPE.fetch(type) { raise ArgumentError, "unknown type '#{type}'" }
         add_content("/#{color_space} #{operator}")

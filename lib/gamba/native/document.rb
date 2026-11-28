@@ -47,6 +47,11 @@ module Gamba
       self
     end
 
+    # A spot colour for color:, background: and border colours: see Prawn::Graphics::Color#spot_color.
+    def spot_color(name, cmyk: nil, rgb: nil, tint: 1)
+      @prawn.spot_color(name, cmyk:, rgb:, tint:)
+    end
+
     def text(string, style: nil, **attributes)
       add(Layout::Text.new(string, **@styles.text_arguments(style, attributes)))
     end
