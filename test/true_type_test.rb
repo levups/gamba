@@ -122,6 +122,19 @@ class TrueTypeTest < Minitest::Test
     assert_equal [0x00030000, 32], [post.unpack1("N"), post.bytesize]
   end
 
+  def test_a_subset_under_128_kib_of_glyphs_writes_a_short_loca_its_reader_follows
+    font = Gamba::TrueType::File.new(File.binread(FONT))
+    subset = Gamba::TrueType::Subset.new(font)
+    [36, 37, 38].each { subset.glyph_for(_1) }
+    bytes = subset.bytes
+
+    assert_equal [0, 10], [sfnt_table(bytes, "head").unpack1("@50 n"), sfnt_table(bytes, "loca").bytesize]
+    offsets = sfnt_table(bytes, "loca").unpack("n*").map { _1 * 2 }
+    glyf = sfnt_table(bytes, "glyf")
+    assert_equal glyf.bytesize, offsets.last
+    assert_equal [36, 37, 38].map { font.glyph_data(_1) }, (1..3).map { glyf.byteslice(offsets[_1], font.glyph_data([36, 37, 38][_1 - 1]).bytesize) }
+  end
+
   def test_a_short_post_table_subsets_padded_to_its_header
     font = Gamba::TrueType::File.new(font_with_table("post", Gamba::TrueType::File.new(File.binread(FONT)).table("post").byteslice(0, 16)))
     subset = Gamba::TrueType::Subset.new(font)
