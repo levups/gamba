@@ -183,6 +183,14 @@ Signatures over the whole file, with a certificate and key from OpenSSL, which A
 document.sign(certificate:, key:, reason: "Approval", location: "Paris")
 ```
 
+Print-ready files: spot colours, a brand's ink at any tint, and a bleed with crop marks around the trimmed page:
+
+```ruby
+Prawn::Document.new(page_size: [255, 156], bleed: 9, crop_marks: true) do
+  fill_color spot_color("PANTONE 185 C", cmyk: [0, 91, 76, 0], tint: 0.4)
+end
+```
+
 QR codes, DataMatrix and barcodes (Code 128, EAN-13, EAN-8, Code 39, ITF-14) in pure Ruby, drawn as vectors: one
 fill per code, read back by zbar and libdmtx in CI:
 
@@ -793,6 +801,25 @@ Each field draws its value with an appearance of its own, in Helvetica, its chec
 key = OpenSSL::PKey.read(File.read("alice.key"))
 certificate = OpenSSL::X509::Certificate.new(File.read("alice.crt"))
 document.sign(certificate:, key:, reason: "Approval", location: "Paris")
+```
+
+#### Spot colours, bleed and crop marks
+
+`spot_color` names an ink a press prints on a plate of its own, such as a brand’s Pantone, with the CMYK (`cmyk:`) or RGB (`rgb:`) colour screens and proofs show for it, and a `tint` from 0 to 1. Give it to `fill_color` and `stroke_color`, or to `color:` and `background:` in Gamba’s own API. Each ink is one Separation colour space; a name keeps the alternate it was first given, and gradients refuse spot colours. Under PDF/A, an ink takes an RGB alternate.
+
+```ruby
+brand = spot_color("PANTONE 185 C", cmyk: [0, 91, 76, 0])
+fill_color brand
+fill_rectangle [0, 700], 200, 100
+fill_color spot_color("PANTONE 185 C", cmyk: [0, 91, 76, 0], tint: 0.4)
+```
+
+For a press, `bleed:` (in points, 9 for 3 mm) grows each page beyond its trimmed size, which stays `page_size`, and `crop_marks: true` adds room around the bleed for marks at each corner of the trim, in the registration colour that prints on every plate. The page’s boxes say which is which (`TrimBox`, `BleedBox`, `MediaBox`), and content keeps its coordinates: draw past the edges, below zero or past the width, to fill the bleed. Both are document options, in Gamba’s own API too.
+
+```ruby
+Prawn::Document.new(page_size: [255, 156], bleed: 9, crop_marks: true) do
+  canvas { fill_rectangle [-9, 165], 273, 174 } # the whole card, bleed included
+end
 ```
 
 #### Invoices as data

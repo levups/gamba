@@ -183,6 +183,14 @@ Signatures over the whole file, with a certificate and key from OpenSSL, which A
 document.sign(certificate:, key:, reason: "Approval", location: "Paris")
 ```
 
+Print-ready files: spot colours, a brand's ink at any tint, and a bleed with crop marks around the trimmed page:
+
+```ruby
+Prawn::Document.new(page_size: [255, 156], bleed: 9, crop_marks: true) do
+  fill_color spot_color("PANTONE 185 C", cmyk: [0, 91, 76, 0], tint: 0.4)
+end
+```
+
 QR codes, DataMatrix and barcodes (Code 128, EAN-13, EAN-8, Code 39, ITF-14) in pure Ruby, drawn as vectors: one
 fill per code, read back by zbar and libdmtx in CI:
 

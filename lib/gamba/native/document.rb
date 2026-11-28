@@ -12,7 +12,7 @@ module Gamba
 
     OPTIONS = %i[
       page_size page_layout margin left_margin right_margin top_margin bottom_margin background info print_scaling
-      pdf_a pdf lang background_pdf background_pdf_page watermark
+      pdf_a pdf lang background_pdf background_pdf_page watermark bleed crop_marks
     ].freeze
     TEXT_ATTRIBUTES = Layout::Styles::TEXT_ATTRIBUTES
     # No Prawn page to match here, so fonts that have ligatures and GPOS kerning use them.
@@ -45,6 +45,11 @@ module Gamba
       font = attributes[:font]
       @prawn.default_font_family = font if name == Layout::Styles::DEFAULT_STYLE && (@prawn.pdf_a? || @prawn.pdf_ua?)
       self
+    end
+
+    # A spot colour for color:, background: and border colours: see Prawn::Graphics::Color#spot_color.
+    def spot_color(name, cmyk: nil, rgb: nil, tint: 1)
+      @prawn.spot_color(name, cmyk:, rgb:, tint:)
     end
 
     def text(string, style: nil, **attributes)
