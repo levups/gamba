@@ -7,6 +7,8 @@ module PDF::Core
     NO_INDENTS = {left: 0, bottom: 0, right: 0, top: 0}.freeze
 
     attr_accessor :margins, :crops, :bleeds, :trims, :art_indents, :stack
+    # For print: the bleed beyond the trimmed page, and the slug beyond the bleed where crop marks go, in points.
+    attr_reader :bleed, :slug
     attr_reader :document, :content
 
     def initialize(document, options = {})
@@ -16,6 +18,8 @@ module PDF::Core
       @bleeds = options[:bleeds] || NO_INDENTS
       @trims = options[:trims] || NO_INDENTS
       @art_indents = options[:art_indents] || NO_INDENTS
+      @bleed = options[:bleed] || 0
+      @slug = options[:slug] || 0
       @stack = [GraphicState.new(options[:graphic_state])]
       @size = options[:size] || "LETTER"
       @layout = options[:layout] || :portrait
@@ -113,6 +117,17 @@ module PDF::Core
       {CropBox: crop_box, BleedBox: bleed_box, TrimBox: trim_box, ArtBox: art_box}.each do |name, box|
         dictionary.data[name] = box unless box == dimensions
       end
+      finalize_print_boxes if @bleed.positive? || @slug.positive?
+    end
+
+    # The page's size is the trimmed one: the media grows around it by the bleed and the slug, from an origin below
+    # and left of zero, so content keeps its coordinates.
+    def finalize_print_boxes
+      left, bottom, right, top = dimensions
+      outer = @bleed + @slug
+      dictionary.data[:MediaBox] = [left - outer, bottom - outer, right + outer, top + outer]
+      dictionary.data[:BleedBox] = [left - @bleed, bottom - @bleed, right + @bleed, top + @bleed]
+      dictionary.data[:TrimBox] = dimensions
     end
 
     private

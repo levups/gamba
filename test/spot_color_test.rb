@@ -4,7 +4,8 @@ require_relative "test_helper"
 require_relative "support/pdf_objects"
 require "prawn"
 
-# Spot colours: a Separation colour space per ink, named on each page that paints with it, its tint as the operand.
+# Print: spot colours, a Separation colour space per ink named on each page that paints with it, its tint as the
+# operand; and the bleed and crop marks around the trimmed page.
 class SpotColorTest < Minitest::Test
   def test_an_ink_is_one_separation_colour_space_painted_at_its_tint_on_every_page
     pdf = Prawn::Document.new do
@@ -51,5 +52,32 @@ class SpotColorTest < Minitest::Test
     pdf_a = Prawn::Document.new(pdf_a: true)
     assert_raises(Prawn::Errors::PdfAViolation) { pdf_a.fill_color pdf_a.spot_color("PANTONE 185 C", cmyk: [0, 91, 76, 0]) }
     pdf_a.fill_color pdf_a.spot_color("Gold", rgb: "d4af37")
+  end
+
+  def test_the_bleed_and_crop_marks_grow_the_media_around_the_trimmed_page
+    pdf = Prawn::Document.new(page_size: [255, 156], margin: 12, bleed: 9, crop_marks: true) do
+      text "alice"
+      start_new_page
+    end.render
+    objects = PdfObjects.new(pdf)
+
+    objects.pages.each do |page|
+      boxes = objects.value(page).values_at("/MediaBox", "/BleedBox", "/TrimBox")
+      assert_equal [[-27, -27, 282, 183], [-9, -9, 264, 165], [0, 0, 255, 156]], boxes
+      content = objects.content(page)
+      assert_includes content, "/CSAll CS 1 SCN 0.25 w 0 J\n-12.0 0.0 m -27.0 0.0 l"
+      assert_equal 8, content.scan(/ l$/).size
+    end
+    all = objects.value(objects.value(objects.value(objects.pages.first)["/Resources"])["/ColorSpace"]["/CSAll"])
+    assert_equal ["/Separation", "/All", "/DeviceGray"], all.first(3)
+  end
+
+  def test_a_bleed_alone_keeps_the_content_where_it_was
+    plain = Prawn::Document.new(page_size: "A6") { text "alice" }.render
+    bled = Gamba.document(page_size: "A6", bleed: 9).tap { _1.prawn.text "alice" }.to_s
+
+    assert_equal PdfObjects.new(plain).content(PdfObjects.new(plain).pages.first), PdfObjects.new(bled).content(PdfObjects.new(bled).pages.first)
+    assert_equal [-9, -9, 306.64, 428.53], PdfObjects.new(bled).value(PdfObjects.new(bled).pages.first)["/MediaBox"].map { _1.round(2) }
+    assert_raises(ArgumentError) { Prawn::Document.new(bleed: -3) }
   end
 end

@@ -21,8 +21,11 @@ module Prawn
 
     VALID_OPTIONS = %i[
       page_size page_layout margin left_margin right_margin top_margin bottom_margin skip_page_creation compress
-      background info text_formatter print_scaling pdf_a pdf lang background_pdf background_pdf_page watermark
+      background info text_formatter print_scaling pdf_a pdf lang background_pdf background_pdf_page watermark bleed crop_marks
     ].freeze
+    # Room for crop marks beyond the bleed, and the gap that keeps them off it.
+    CROP_MARK_SLUG = 18
+    CROP_MARK_GAP = 3
 
     attr_accessor :margin_box, :page_number, :text_formatter
     # The font used until one is set, Helvetica unless told: PDF/A and PDF/UA documents of Gamba's own API take
@@ -57,6 +60,9 @@ module Prawn
       @background_pdf = options[:background_pdf]
       @background_pdf_page = options[:background_pdf_page] || 1
       @gamba_watermark = Gamba::Watermark.from_option(options[:watermark], pdf_a: pdf_a?)
+      @bleed = options.fetch(:bleed, 0)
+      raise ArgumentError, "bleed is #{@bleed.inspect}: give it in points, such as 9 (3 mm)" unless @bleed.is_a?(Numeric) && @bleed >= 0
+      @crop_marks = options[:crop_marks] ? true : false
       @font_size = 12
       @bounding_box = nil
       @margin_box = nil
@@ -76,7 +82,8 @@ module Prawn
     def start_new_page(options = {})
       close_marks_on_page
       last_page = page
-      page_options = {size: options[:size] || last_page&.size, layout: options[:layout] || last_page&.layout, margins: last_page&.margins&.dup}
+      page_options = {size: options[:size] || last_page&.size, layout: options[:layout] || last_page&.layout, margins: last_page&.margins&.dup,
+                      bleed: @bleed, slug: @crop_marks ? CROP_MARK_SLUG : 0}
       if last_page
         new_graphic_state = last_page.graphic_state&.dup
         new_graphic_state&.color_space = {}
@@ -98,6 +105,7 @@ module Prawn
       @page_number += 1
       tag_artifact { canvas { image(@background, scale: @background_scale, at: bounds.top_left) } } if @background
       draw_background_pdf(options)
+      draw_crop_marks if @crop_marks
       @gamba_watermark&.open_page(self)
       @y = @bounding_box.absolute_top
       float { tag_artifact { @on_page_create&.call(self) } }
@@ -261,6 +269,25 @@ module Prawn
     def draw_background_pdf(options)
       source, number = options.key?(:background_pdf) ? [options[:background_pdf], options[:background_pdf_page] || 1] : [@background_pdf, @background_pdf_page]
       tag_artifact { canvas { pdf_page(source, page: number, at: bounds.top_left) } } if source
+    end
+
+    # Crop marks at each corner of the trimmed page, in its slug, off the bleed: hairlines in the registration colour,
+    # which prints on every plate.
+    def draw_crop_marks
+      _left, _bottom, width, height = page.dimensions
+      (page.resources[:ColorSpace] ||= {})[:CSAll] ||= registration_color_space
+      near = @bleed + CROP_MARK_GAP
+      far = @bleed + CROP_MARK_SLUG
+      lines = [[0, 0, -1, 0], [0, 0, 0, -1], [width, 0, 1, 0], [width, 0, 0, -1], [0, height, -1, 0], [0, height, 0, 1], [width, height, 1, 0], [width, height, 0, 1]]
+      paths = lines.map do |x, y, dx, dy|
+        "#{PDF::Core.real_params([x + (dx * near), y + (dy * near)])} m #{PDF::Core.real_params([x + (dx * far), y + (dy * far)])} l"
+      end
+      tag_artifact { save_graphics_state { add_content("/CSAll CS 1 SCN 0.25 w 0 J\n#{paths.join("\n")}\nS") } }
+    end
+
+    # The colour space of all the plates at once (ISO 32000-1 §8.6.6.4), shown black where there are none.
+    def registration_color_space
+      @registration_color_space ||= ref!([:Separation, :All, :DeviceGray, {FunctionType: 2, Domain: [0, 1], C0: [1], C1: [0], N: 1}])
     end
 
     # A gradient set as the fill or stroke stays it on the new page, in place of the colour Prawn writes.

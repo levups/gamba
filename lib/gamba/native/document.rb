@@ -12,7 +12,7 @@ module Gamba
 
     OPTIONS = %i[
       page_size page_layout margin left_margin right_margin top_margin bottom_margin background info print_scaling
-      pdf_a pdf lang background_pdf background_pdf_page watermark
+      pdf_a pdf lang background_pdf background_pdf_page watermark bleed crop_marks
     ].freeze
     TEXT_ATTRIBUTES = Layout::Styles::TEXT_ATTRIBUTES
     # No Prawn page to match here, so fonts that have ligatures and GPOS kerning use them.
