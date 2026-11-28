@@ -13,6 +13,13 @@ on:
 permissions:
   contents: read
 
+# The gems' Gemfile.lock is not committed, so each run resolves the bundle afresh, with Bundler 4.1 on every Ruby
+# (pinned like the actions, bumped by hand). Its cooldown keeps out gem versions under a week old, as Dependabot
+# does for the actions: a compromised release is usually yanked by then, and CI tests what users had a week ago.
+# For an urgent bump, set the repository variable BUNDLE_COOLDOWN to 0 until it merges.
+env:
+  BUNDLE_COOLDOWN: ${{ vars.BUNDLE_COOLDOWN || 7 }}
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -32,6 +39,7 @@ jobs:
         uses: ruby/setup-ruby@20eb24b0d509e2b9ed9b6d42ddfeb992915e0564 # v1.341.0
         with:
           ruby-version: "4.0"
+          bundler: 4.1.1
           bundler-cache: true
       - name: Lint with RuboCop
         run: bundle exec rubocop --format github
@@ -58,6 +66,7 @@ jobs:
         uses: ruby/setup-ruby@20eb24b0d509e2b9ed9b6d42ddfeb992915e0564 # v1.341.0
         with:
           ruby-version: ${{ matrix.ruby }}
+          bundler: 4.1.1
           bundler-cache: true
       - name: Cache the corpus, Mustang and the PDF tools' packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -173,6 +182,7 @@ jobs:
         uses: ruby/setup-ruby@20eb24b0d509e2b9ed9b6d42ddfeb992915e0564 # v1.341.0
         with:
           ruby-version: "4.0"
+          bundler: 4.1.1
           bundler-cache: true
       - name: Check the highlighted docs
         run: bundle exec rake docs:highlight:check
