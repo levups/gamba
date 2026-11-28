@@ -888,7 +888,7 @@ class GraphicStateTest < Minitest::Test
     page.content.stream.lines.map(&:chomp).filter_map do |line|
       next line if line.match?(/\A(?:q|Q|\/\w+ gs|.* (?:cs|CS|scn|SCN|w|J|j|d|Tr|Tc|Tw|Tz|Ts))\z/)
 
-      [line.scan(/<(\h+)>/).join].pack("H*") if line.end_with?(" TJ")
+      line.scan(/\(((?:\\.|[^\\)])*)\)/).join.gsub(/\\(.)/) { (Regexp.last_match(1) == "r") ? "\r" : Regexp.last_match(1) } if line.end_with?(" TJ")
     end
   end
 
