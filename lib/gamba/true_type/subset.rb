@@ -51,17 +51,19 @@ module Gamba
           offsets << table.bytesize
         end
         glyph_count = glyphs.size
+        # Offsets are even, glyphs being padded to 4 bytes: under 128 KiB of glyphs, loca stores them halved, in 16 bits.
+        short = glyf.bytesize <= 0x1FFFE
         widths = @file.advance_widths
         left_side_bearings = original_glyphs.map { left_side_bearing(_1) }
 
         bounds = glyphs.filter_map { |glyph| glyph.unpack("s>5") if glyph.bytesize >= 10 }
         advances = original_glyphs.map { widths[_1] }
         tables = {
-          "head" => head_table(bounds),
+          "head" => head_table(bounds, short),
           "hhea" => horizontal_header(bounds, advances, left_side_bearings, glyph_count),
           "maxp" => maximum_profile(bounds, glyphs, glyph_count),
           "hmtx" => horizontal_metrics(original_glyphs, widths, left_side_bearings),
-          "loca" => offsets.pack("N*"),
+          "loca" => short ? offsets.map { _1 / 2 }.pack("n*") : offsets.pack("N*"),
           "glyf" => glyf,
           "post" => post_table
         }
@@ -169,11 +171,11 @@ module Gamba
 
       # The subset's own extremes, as the OpenType specification defines them: readers like Poppler size their
       # glyph caches from the font's bounding box.
-      def head_table(bounds)
+      def head_table(bounds, short)
         head = @file.table("head").dup
         head[8, 4] = "\x00\x00\x00\x00".b
         head[36, 8] = [bounds.map { _1[1] }.min || 0, bounds.map { _1[2] }.min || 0, bounds.map { _1[3] }.max || 0, bounds.map { _1[4] }.max || 0].pack("s>4")
-        head[50, 2] = [1].pack("n")
+        head[50, 2] = [short ? 0 : 1].pack("n")
         head
       end
 
