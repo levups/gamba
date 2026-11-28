@@ -72,6 +72,46 @@ class PdfATest < Minitest::Test
     assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true) { encrypt_document } }
   end
 
+  # veraPDF rule 6.2.4.3-3: DeviceCMYK needs a CMYK output intent, and Gamba writes an sRGB one.
+  def test_cmyk_colors_are_refused
+    assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true) { fill_color 0, 0, 0, 50 } }
+    assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true) { stroke_color [0, 0, 0, 50] } }
+    assert_raises(Prawn::Errors::PdfAViolation) do
+      Prawn::Document.new(pdf_a: true) { fill_gradient from: [0, 100], to: [100, 0], stops: [[0, [0, 0, 0, 50]], [1, [0, 50, 0, 0]]] }
+    end
+
+    assert_equal "336699", Prawn::Document.new(pdf_a: true) { fill_color "336699" }.fill_color
+  end
+
+  # Kept, the refused colour would raise again from each new page, far from the call that set it.
+  def test_a_refused_cmyk_color_is_not_kept
+    document = Prawn::Document.new(pdf_a: true)
+    assert_raises(Prawn::Errors::PdfAViolation) { document.fill_color 0, 0, 0, 50 }
+    assert_raises(Prawn::Errors::PdfAViolation) { document.stroke_color 0, 0, 0, 50 }
+
+    document.start_new_page
+
+    assert_equal "000000", document.fill_color
+    assert_equal "000000", document.stroke_color
+  end
+
+  def test_a_refused_cmyk_gradient_says_it_as_written
+    error = assert_raises(Prawn::Errors::PdfAViolation) do
+      Prawn::Document.new(pdf_a: true) { fill_gradient from: [0, 100], to: [100, 0], stops: [[0, [0, 0, 0, 50]], [1, [0, 50, 0, 0]]] }
+    end
+
+    assert_includes error.message, "the gradient color [0, 0, 0, 50] is CMYK"
+  end
+
+  def test_cmyk_jpegs_are_refused_by_their_path
+    image = File.expand_path("../corpus/cache/prawn/data/images/fractal.jpg", __dir__)
+    skip CORPUS_MISSING_MESSAGE unless File.exist?(image)
+
+    error = assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new(pdf_a: true) { image image } }
+
+    assert_includes error.message, "the image #{image} is CMYK"
+  end
+
   def test_factur_x_needs_a_pdf_a_document
     assert_raises(Prawn::Errors::PdfAViolation) { Prawn::Document.new { factur_x INVOICE_XML } }
   end

@@ -33,11 +33,31 @@ class EncryptionTest < Minitest::Test
 
     ALGORITHMS.each do |algorithm|
       pdf = Prawn::Document.new
-      form = pdf.ref!({Type: :XObject, Subtype: :Form, BBox: [0, 0, 10, 10], PieceInfo: {Private: PDF::Core::LiteralString.new("alice")}}, "0 0 m")
+      piece = {Private: PDF::Core::LiteralString.new("alice"), Name: "Café", Date: Time.utc(2026, 11, 28, 9, 30)}
+      form = pdf.ref!({Type: :XObject, Subtype: :Form, BBox: [0, 0, 10, 10], PieceInfo: piece}, "0 0 m")
       pdf.encrypt_document(user_password: "", owner_password: "owner", algorithm:)
 
       with_file(pdf.render) do |path|
-        assert_includes qpdf("--show-object=#{form.identifier}", path), "/Private (alice)", algorithm
+        dictionary = qpdf("--show-object=#{form.identifier}", path)
+
+        assert_includes dictionary, "/Private (alice)", algorithm
+        assert_includes dictionary, "/Name <feff00430061006600e9>", algorithm
+        assert_includes dictionary, "/Date (D:20261128093000+00'00')", algorithm
+      end
+    end
+  end
+
+  # veraPDF tries to decrypt a direct dictionary of the cross-reference stream, and warns on each of its strings.
+  def test_the_encryption_dictionary_is_an_object_of_its_own_in_clear
+    skip "qpdf is not installed" unless qpdf?
+
+    ALGORITHMS.each do |algorithm|
+      with_file(encrypted_document(algorithm:)) do |path|
+        identifier = qpdf("--show-object=trailer", path)[%r{/Encrypt (\d+) 0 R}, 1]
+
+        assert identifier, algorithm
+        assert_match(/^#{identifier}\/0: uncompressed/, qpdf("--show-xref", path), algorithm)
+        assert_includes qpdf("--show-object=#{identifier}", path), "/Filter /Standard", algorithm
       end
     end
   end

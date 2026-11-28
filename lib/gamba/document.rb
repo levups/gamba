@@ -54,7 +54,7 @@ module Prawn
       @background_scale = options[:background_scale] || 1
       @background_pdf = options[:background_pdf]
       @background_pdf_page = options[:background_pdf_page] || 1
-      @gamba_watermark = Gamba::Watermark.from_option(options[:watermark])
+      @gamba_watermark = Gamba::Watermark.from_option(options[:watermark], pdf_a: pdf_a?)
       @font_size = 12
       @bounding_box = nil
       @margin_box = nil
