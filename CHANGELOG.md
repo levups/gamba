@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-11-28
+
+Text-heavy documents are lighter, encrypted ones pass veraPDF without a warning, and PDF/A refuses CMYK instead of writing an invalid file.
+
+**Breaking**
+- Under `pdf_a:`, a CMYK colour, gradient or JPEG raises `Prawn::Errors::PdfAViolation`, and so does a watermark's CMYK `color` when the document is made. Gamba's PDF/A has an sRGB output intent, so these wrote a file veraPDF refuses (ISO 19005-3 §6.2.4.3): give the colours as RGB, and convert CMYK JPEGs.
+
+**Lighter**
+- Text is written as literal strings instead of hexadecimal: about 6.7% lighter files for text-heavy documents (24 general-conditions documents of 14 to 16 pages each), with the same pages.
+
+**Fixed**
+- An encrypted document's encryption dictionary is an object of its own, outside the object stream: veraPDF no longer warns on every AES-256 file that it cannot decrypt its strings.
+- A watermark whose font is unknown, or cannot draw its text, raises an error naming the watermark instead of a bare `UnknownFont` or `IncompatibleStringEncoding` from inside `render`.
+- Page numbers and repeaters drawn on a page a block flowed off keep the colour in effect before the block, where a colour set on that page after the block ended leaked onto them.
+
 ## [2.2.0] — 2026-11-27
 
 Encrypted documents open in Preview and Safari, and can use AES-256; a watermark takes one option; invoices write their own Factur-X XML.
@@ -148,7 +163,8 @@ speed. Same API and same pages as Prawn, pixel for pixel, in lighter files.
   place of combine_pdf.
 - `Gamba::VERSION` is the gem's; `Prawn::VERSION` stays 2.5.0, the API reproduced.
 
-[Unreleased]: https://github.com/levups/gamba/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/levups/gamba/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/levups/gamba/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/levups/gamba/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/levups/gamba/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/levups/gamba/compare/v2.0.1...v2.0.2
