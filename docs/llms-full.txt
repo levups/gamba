@@ -232,7 +232,8 @@ With `orientation`, a page the other way round turns a quarter counterclockwise,
 A source given as a Hash takes `pages:` (a Range, an Array or an Integer, from 1, in the order given), `rotate:` (a
 quarter turn clockwise, or two, or three) and `outline:`, a title its bookmarks go under. Bookmarks are carried over,
 and links and bookmarks land on the copies of their pages, named destinations included; a bookmark to a page left out
-goes. Forms and tagged structure are not carried over yet.
+goes. Form fields on the pages copied come along, a field named like one of an earlier source renamed `name_2`,
+`name_3`… so both keep their values. Tagged structure is not carried over yet.
 
 ## Files your users send
 

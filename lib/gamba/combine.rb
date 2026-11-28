@@ -2,8 +2,8 @@
 
 module Gamba
   # Each page keeps its resources and content streams as they were encoded; only the page dictionaries and the
-  # document structure are written anew. Outlines are carried over, and links land on the copies of their pages,
-  # named destinations included; forms and tagged structure of the sources are not.
+  # document structure are written anew. Outlines and form fields are carried over, and links land on the copies of
+  # their pages, named destinations included; tagged structure is not.
   class Combine
     include PageBoxes
 
@@ -35,12 +35,14 @@ module Gamba
       @identifiers = {}
       @shared = {}
       @outline_items = []
+      @form = nil
       @pages_reference = reference({Type: :Pages})
       root = reference({Type: :Catalog, Pages: @pages_reference})
       info = reference({Producer: "Gamba"})
       version = sources.map { copy_source(**source_options(_1)) }.max || 1.3
       @pages_reference.data.merge!(Kids: @kids, Count: @kids.size)
       root.data[:Outlines] = outline_root(@outline_items) unless @outline_items.empty?
+      root.data[:AcroForm] = form_dictionary if @form
       finish_catalog(root)
       PDF::Core::Writer.call(objects: @objects, root:, info:, version:)
     end
@@ -88,7 +90,59 @@ module Gamba
       selected = numbers.map { all_pages[_1 - 1] }
       copies = copy_pages(reader, selected, all_pages, rotate % 360)
       copy_outline(reader, outline, copies.first)
+      copy_form(reader, copies)
       reader.version
+    end
+
+    # The source's fields whose widgets sit on the pages copied, after those of the sources before it; a top-level
+    # field named like an earlier one is renamed name_2, name_3…, so that both keep their values.
+    def copy_form(reader, copies)
+      form = reader.resolve(reader.catalog[:AcroForm])
+      return unless form.is_a?(Hash)
+
+      fields = Array(reader.resolve(form[:Fields])).filter_map { @copier.copy(_1) if _1.is_a?(PDF::Core::Reader::Ref) }
+      resources = @copier.copy(form[:DR])
+      @copier.finish
+      kept = copies.flat_map { Array(value_of(_1.data[:Annots])) }.to_h { [_1, true] }.compare_by_identity
+      @form ||= {fields: [], names: {}, resources:, appearance: form[:DA], need_appearances: false}
+      @form[:need_appearances] ||= form[:NeedAppearances] == true
+      fields.each do |field|
+        next unless keep_field?(field, kept, 0)
+
+        rename_field(field)
+        @form[:fields] << field
+      end
+    end
+
+    # A field stays if one of its widgets does, its other kids going.
+    def keep_field?(field, kept, depth)
+      data = value_of(field)
+      return false unless data.is_a?(Hash) && depth < MAX_NAME_TREE_DEPTH
+
+      kids = Array(value_of(data[:Kids]))
+      return kept.key?(field) if kids.empty?
+
+      data[:Kids] = kids.select { keep_field?(_1, kept, depth + 1) }
+      !data[:Kids].empty?
+    end
+
+    def rename_field(field)
+      data = value_of(field)
+      name = data[:T].to_s
+      candidate = name
+      index = 1
+      candidate = "#{name}_#{index += 1}" while @form[:names].key?(candidate)
+      @form[:names][candidate] = true
+      data[:T] = PDF::Core::ByteString.new(candidate) unless candidate == name
+    end
+
+    def form_dictionary
+      reference({Fields: @form[:fields], DR: @form[:resources], DA: @form[:appearance], NeedAppearances: @form[:need_appearances] || nil}.compact)
+    end
+
+    # A copied value: a reference's data, or the value itself.
+    def value_of(value)
+      (value.is_a?(PDF::Core::Reference) && !value.stream?) ? value.data : value
     end
 
     def page_numbers(pages, count)

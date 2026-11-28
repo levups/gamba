@@ -90,6 +90,22 @@ class FormsTest < Minitest::Test
     assert_raises(Prawn::Errors::IncompatibleStringEncoding) { Gamba.fill(form, "name" => "Ελένη") }
   end
 
+  def test_combined_forms_keep_their_fields_renamed_where_two_share_a_name
+    alice = Prawn::Document.new { text_field "name", at: [0, 700], width: 100, height: 20, value: "Alice" }.render
+    bob = Prawn::Document.new do
+      text_field "name", at: [0, 700], width: 100, height: 20, value: "Bob"
+      start_new_page
+      check_box "agree", at: [0, 700], checked: true
+    end.render
+
+    combined = Gamba.combine([alice, bob, {pdf: bob, pages: [1]}])
+    fields = acro_form_fields(combined).to_h { [_1["fullname"], [_1["value"], _1["pageposfrom1"]]] }
+
+    assert_equal({"name" => ["u:Alice", 1], "name_2" => ["u:Bob", 2], "agree" => ["/Yes", 3], "name_3" => ["u:Bob", 4]}, fields)
+    assert_equal({"name" => "u:Alicia", "name_2" => "u:Bob"}, acro_form_fields(Gamba.fill(combined, "name" => "Alicia")).to_h { [_1["fullname"], _1["value"]] }.slice("name", "name_2"))
+    assert_equal ["name"], acro_form_fields(Gamba.combine([{pdf: bob, pages: [1]}])).map { _1["fullname"] }
+  end
+
   private
 
   def order_form

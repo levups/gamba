@@ -59,16 +59,9 @@ module Gamba
 
     private
 
-    def copy_source(**)
-      version = super
-      @acro_form = @copier.copy(@reader.catalog[:AcroForm])
-      @copier.finish
-      @page_copies = @kids.dup
-      version
-    end
-
     def finish_catalog(root)
-      form = value_of(@acro_form)
+      @page_copies = @kids
+      form = value_of(root.data[:AcroForm])
       fields = form.is_a?(Hash) ? terminal_fields(form[:Fields], "", {}, 0) : {}
       unknown = @values.keys - fields.keys
       raise ArgumentError, "this PDF has no field #{unknown.map(&:inspect).join(", ")}: its fields are #{fields.keys.inspect}" unless unknown.empty?
@@ -76,10 +69,12 @@ module Gamba
       @appearances = Appearances.new { |data, stream| reference(data).tap { _1.stream = stream if stream } }
       @values.each { |name, value| fill(fields.fetch(name), value) }
       fields.each_value { |field| strip_actions(field) }
-      return flatten_pages if @flatten
+      if @flatten
+        root.data.delete(:AcroForm)
+        return flatten_pages
+      end
 
-      form[:NeedAppearances] = false if form.key?(:NeedAppearances)
-      root.data[:AcroForm] = @acro_form
+      form[:NeedAppearances] = false if form.is_a?(Hash) && form.key?(:NeedAppearances)
     end
 
     # By full name, each field holding a value, with what it inherits from its parents (ISO 32000-1 §12.7.3.1).
@@ -233,11 +228,6 @@ module Gamba
       left, right = [values[0] || 0.0, values[2] || 0.0].minmax
       bottom, top = [values[1] || 0.0, values[3] || 0.0].minmax
       [left, bottom, right, top]
-    end
-
-    # A copied value: a reference's data, or the value itself.
-    def value_of(value)
-      (value.is_a?(PDF::Core::Reference) && !value.stream?) ? value.data : value
     end
 
     # A PDF text string as UTF-8: UTF-16 with its byte order mark, PDFDocEncoding read as Latin-1 otherwise.
