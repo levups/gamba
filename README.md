@@ -151,6 +151,8 @@ combine_pdf gem for that use:
 
 ```ruby
 Gamba.combine([label, other_label], page_size: [288, 432], orientation: :portrait)
+Gamba.combine([cover, {pdf: report, pages: 2..5, rotate: 90, outline: "Report"}])
+Gamba.split(report, every: 1) # one PDF per page; Gamba.page_count(report) counts them
 ```
 
 Drawing on a page of an existing PDF, such as a letterhead or a pre-printed form, under every page or anywhere at
@@ -202,8 +204,12 @@ it cannot repair raises `Prawn::Errors::MalformedPDF`.
 Pages are copied as they were encoded, and resources several files share, like a carrier's fonts and logo, are
 written once. With `page_size`, each page is scaled from its lower left corner to fit, keeping its proportions.
 With `orientation`, a page the other way round turns a quarter counterclockwise, as combine_pdf does. A page's
-`/Rotate` is applied to its content, where combine_pdf left it to the viewer. Outlines, forms and tagged structure
-are not carried over.
+`/Rotate` is applied to its content, where combine_pdf left it to the viewer.
+
+A source given as a Hash takes `pages:` (a Range, an Array or an Integer, from 1, in the order given), `rotate:` (a
+quarter turn clockwise, or two, or three) and `outline:`, a title its bookmarks go under. Bookmarks are carried over,
+and links and bookmarks land on the copies of their pages, named destinations included; a bookmark to a page left out
+goes. Forms and tagged structure are not carried over yet.
 
 ## Files your users send
 

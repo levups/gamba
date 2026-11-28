@@ -120,9 +120,23 @@ module Gamba
   end
 
   # The pages of other PDF files, one after the other in a new one:
-  # Gamba.combine([label, label], page_size: [288, 432]). See Gamba::Combine#initialize for the options.
+  # Gamba.combine([label, {pdf: report, pages: 1..3, rotate: 90, outline: "Report"}], page_size: [288, 432]).
+  # See Gamba::Combine#initialize and #call for the options.
   def self.combine(sources, page_size: nil, orientation: nil)
     Combine.new(page_size:, orientation:).call(sources)
+  end
+
+  # The number of pages of a PDF (bytes, or an IO).
+  def self.page_count(pdf)
+    PDF::Core::Reader.new(pdf.respond_to?(:read) ? pdf.read : pdf.to_s).pages.size
+  end
+
+  # A PDF in parts of every pages each, the last one shorter: each a PDF of its own, as Gamba.combine writes it.
+  def self.split(pdf, every: 1)
+    raise ArgumentError, "every is #{every.inspect}: give a number of pages, 1 or more" unless every.is_a?(Integer) && every.positive?
+
+    bytes = pdf.respond_to?(:read) ? pdf.read : pdf.to_s
+    (1..page_count(bytes)).each_slice(every).map { |numbers| combine([{pdf: bytes, pages: numbers}]) }
   end
 
   # Loads what Gamba otherwise loads on first use, SVG support included: call it before a server forks its

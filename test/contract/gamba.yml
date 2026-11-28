@@ -5,6 +5,8 @@ Gamba:
   ".combine": [req sources, key page_size, key orientation]
   ".document": [keyrest options]
   ".eager_load!": []
+  ".page_count": [req pdf]
+  ".split": [req pdf, key every]
 Gamba::Document:
   "#barcode": [req data, keyrest options]
   "#data_matrix": [req data, keyrest options]

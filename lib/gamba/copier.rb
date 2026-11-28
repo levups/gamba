@@ -22,14 +22,24 @@ module Gamba
 
     # An object of the source written by the caller as `copy`, so that a link to it lands on that copy; never shared.
     def place(number, copy)
+      @left_out&.delete(number)
       @copies[number] = copy
       @content_identifiers[number] = nil
+    end
+
+    # An object of the source not to copy, a page left out: a link to it becomes null. #place takes it back.
+    def leave_out(number)
+      @copies[number] = nil
+      @left_out ||= {}
+      @left_out[number] = true
     end
 
     # The value with each reference to the source replaced by one to its copy, written by #finish.
     def copy(value)
       case value
       when PDF::Core::Reader::Ref
+        return @copies[value.number] if @left_out&.key?(value.number) && @copies[value.number].nil?
+
         @copies[value.number] ||= begin
           identifier = content_identifier(value.number)
           identifier ? (@shared[identifier] ||= pending_copy(value.number)) : pending_copy(value.number)
