@@ -41,10 +41,15 @@ module Gamba
       version = sources.map { copy_source(**source_options(_1)) }.max || 1.3
       @pages_reference.data.merge!(Kids: @kids, Count: @kids.size)
       root.data[:Outlines] = outline_root(@outline_items) unless @outline_items.empty?
+      finish_catalog(root)
       PDF::Core::Writer.call(objects: @objects, root:, info:, version:)
     end
 
     private
+
+    # What a subclass adds to the catalog once the pages are copied.
+    def finish_catalog(_root)
+    end
 
     def page_size_in_points(page_size)
       return nil if page_size.nil?
