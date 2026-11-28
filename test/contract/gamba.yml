@@ -5,6 +5,7 @@ Gamba:
   ".combine": [req sources, key page_size, key orientation]
   ".document": [keyrest options]
   ".eager_load!": []
+  ".fill": [req pdf, opt values, key flatten, keyrest named]
   ".page_count": [req pdf]
   ".split": [req pdf, key every]
 Gamba::Document:

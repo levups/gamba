@@ -107,6 +107,7 @@ end
 
 module Gamba
   autoload :Combine, ::File.expand_path("gamba/combine", __dir__)
+  autoload :Fill, ::File.expand_path("gamba/fill", __dir__)
   autoload :Copier, ::File.expand_path("gamba/copier", __dir__)
   autoload :ImportedPage, ::File.expand_path("gamba/imported_page", __dir__)
   autoload :PageBoxes, ::File.expand_path("gamba/page_boxes", __dir__)
@@ -126,6 +127,13 @@ module Gamba
   # See Gamba::Combine#initialize and #call for the options.
   def self.combine(sources, page_size: nil, orientation: nil)
     Combine.new(page_size:, orientation:).call(sources)
+  end
+
+  # A PDF form (bytes, or an IO) with its fields set: Gamba.fill(form, "name" => "Alice", "terms" => true). Fields go by
+  # full name; a check box takes true or false, radio buttons and choices the value to choose. flatten: true draws the
+  # values into the pages and leaves no form.
+  def self.fill(pdf, values = {}, flatten: false, **named)
+    Fill.new(values.merge(named), flatten:).call([pdf])
   end
 
   # The number of pages of a PDF (bytes, or an IO).

@@ -177,6 +177,9 @@ so every viewer shows it the same way:
 ```ruby
 text_field "name", at: [0, 700], width: 200, height: 20, value: "Alice Martin"
 check_box "terms", at: [0, 670], checked: true
+Gamba.fill(order_form, "name" => "Alice Martin", flatten: true) # an existing form, filled then flattened
+```
+
 Signatures over the whole file, with a certificate and key from OpenSSL, which Acrobat and Poppler verify:
 
 ```ruby

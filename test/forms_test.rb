@@ -53,6 +53,43 @@ class FormsTest < Minitest::Test
     assert_raises(Prawn::Errors::PdfUaViolation) { Gamba.document(pdf: :ua, lang: "en", info: {Title: "Order"}).prawn.check_box "agree", at: [0, 700] }
   end
 
+  def test_fill_sets_values_and_draws_them_with_new_appearances
+    filled = Gamba.fill(blank_form, "name" => "Alice Martin", "notes" => "Two lines\nof notes", "agree" => true, "size" => "m", "country" => "Belgique")
+    fields = acro_form_fields(filled).to_h { [_1["fullname"], _1["value"]] }
+
+    assert_equal({"name" => "u:Alice Martin", "notes" => "u:Two lines\nof notes", "agree" => "/Yes", "size" => "/m", "country" => "u:Belgique"}, fields)
+    text = Open3.capture2("pdftotext", write(filled), "-").first
+    ["Alice Martin", "of notes", "Belgique"].each { assert_includes text, _1 }
+  end
+
+  def test_a_flattened_form_draws_its_values_into_the_page_and_keeps_no_field
+    values = {"name" => "Alice Martin", "agree" => true, "size" => "m", "country" => "Belgique"}
+    filled = Gamba.fill(blank_form, values)
+    flat = Gamba.fill(blank_form, values, flatten: true)
+
+    refute JSON.parse(Open3.capture2("qpdf", "--json=2", "--json-key=acroform", write(flat)).first).dig("acroform", "hasacroform")
+    refute_includes Open3.capture2("qpdf", "--qdf", "--object-streams=disable", write(flat), "-").first.b, "/Widget"
+    [Open3.capture2("mutool", "draw", "-q", "-F", "txt", "-o", "-", write(flat), "1").first, Open3.capture2("pdftotext", write(flat), "-").first].each do |text|
+      ["Alice Martin", "Belgique"].each { assert_includes text, _1 }
+    end
+    assert_equal rasterized(filled), rasterized(flat)
+  end
+
+  def test_fill_drops_javascript_and_refuses_what_a_field_cannot_take
+    form = Prawn::Document.new do
+      widget = text_field "name", at: [0, 700], width: 100, height: 20
+      widget.data[:AA] = {K: {S: :JavaScript, JS: PDF::Core::LiteralString.new("app.alert(1)")}}
+      radio_buttons "size", buttons: {"s" => [0, 650]}
+      choice_field "country", at: [0, 600], width: 100, height: 20, options: %w[France]
+    end.render
+
+    refute_includes Open3.capture2("qpdf", "--qdf", "--object-streams=disable", write(Gamba.fill(form, "name" => "Alice")), "-").first.b, "JavaScript"
+    assert_raises(ArgumentError) { Gamba.fill(form, "surname" => "Martin") }
+    assert_raises(ArgumentError) { Gamba.fill(form, "size" => "xl") }
+    assert_raises(ArgumentError) { Gamba.fill(form, "country" => "Spain") }
+    assert_raises(Prawn::Errors::IncompatibleStringEncoding) { Gamba.fill(form, "name" => "Ελένη") }
+  end
+
   private
 
   def order_form
@@ -69,6 +106,23 @@ class FormsTest < Minitest::Test
       choice_field "colour", at: [150, 470], width: 120, height: 50, options: %w[Red Green Blue], value: "Green", list: true
       text_field "Prénom", at: [0, 400], width: 120, height: 20, value: "Zoë"
     end.render
+  end
+
+  def blank_form
+    Prawn::Document.new do
+      text "Order form"
+      text_field "name", at: [0, 680], width: 200, height: 20
+      text_field "notes", at: [0, 650], width: 200, height: 60, multiline: true
+      check_box "agree", at: [0, 560]
+      radio_buttons "size", buttons: {"s" => [0, 530], "m" => [20, 530]}
+      choice_field "country", at: [0, 500], width: 120, height: 20, options: %w[France Belgique]
+    end.render
+  end
+
+  def rasterized(pdf)
+    Dir.mktmpdir do |directory|
+      Oracle.rasterize(write(pdf), File.join(directory, "page")).map { File.binread(_1) }
+    end
   end
 
   def write(pdf)
