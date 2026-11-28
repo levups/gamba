@@ -198,12 +198,20 @@ module Prawn
         font.add_to_current_page(subset)
         add_content("#{PDF::Core.serialize(font.identifier_for(subset), true)} #{PDF::Core.serialize(font_size, true)} Tf")
         operator = string.is_a?(Array) ? "TJ" : "Tj"
-        add_content("#{PDF::Core.serialize(string, true)} #{operator}")
+        add_content("#{text_operand(string)} #{operator}")
       end
       add_content("ET\n")
     end
 
     private
+
+    # Encoded text as literal strings, which deflate to about half what hexadecimal does; a kerned run as an array of
+    # them and its adjustments.
+    def text_operand(string)
+      return PDF::Core.serialize(PDF::Core::LiteralString.new(string.b)) if string.is_a?(String)
+
+      "[#{string.map { _1.is_a?(String) ? text_operand(_1) : PDF::Core.number(_1) }.join(" ")}]"
+    end
 
     def draw_remaining_formatted_text_on_new_pages(remaining_text, options)
       until remaining_text.empty?
