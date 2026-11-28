@@ -3,9 +3,18 @@
 module Gamba
   class Invoice
     # Writes an invoice as UN/CEFACT Cross Industry Invoice D16B, the syntax of Factur-X and ZUGFeRD, in the element
-    # order its schema sets.
+    # order its schema sets. Each profile writes what its schema holds, the smaller ones a part of EN 16931's:
+    # minimum the header and the totals, basic WL all but the lines, basic the lines without their description.
     class CrossIndustryInvoice
-      GUIDELINE_BY_PROFILE = {en16931: "urn:cen.eu:en16931:2017"}.freeze
+      # From the smallest profile to the largest, each with the identifier of its specification.
+      GUIDELINE_BY_PROFILE = {
+        minimum: "urn:factur-x.eu:1p0:minimum",
+        basic_wl: "urn:factur-x.eu:1p0:basicwl",
+        basic: "urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic",
+        en16931: "urn:cen.eu:en16931:2017",
+        extended: "urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended"
+      }.freeze
+      PROFILES = GUIDELINE_BY_PROFILE.keys.freeze
       NAMESPACES = {
         "rsm" => "urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100",
         "ram" => "urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100",
@@ -15,8 +24,9 @@ module Gamba
 
       def initialize(invoice, profile)
         @guideline = GUIDELINE_BY_PROFILE.fetch(profile) do
-          raise ArgumentError, "Gamba writes the XML of the #{GUIDELINE_BY_PROFILE.keys.map(&:inspect).join(", ")} profile; give the XML of #{profile.inspect} as a String"
+          raise ArgumentError, "Unknown Factur-X profile #{profile.inspect}: #{PROFILES.map(&:inspect).join(", ")}"
         end
+        @level = PROFILES.index(profile)
         @invoice = invoice
         @xml = +""
         @depth = 0
@@ -29,7 +39,7 @@ module Gamba
           element("rsm:ExchangedDocumentContext") { element("ram:GuidelineSpecifiedDocumentContextParameter") { element("ram:ID", @guideline) } }
           exchanged_document
           element("rsm:SupplyChainTradeTransaction") do
-            @invoice.lines.each_with_index { |line, index| line_item(line, index) }
+            @invoice.lines.each_with_index { |line, index| line_item(line, index) } if from?(:basic)
             header_agreement
             header_delivery
             header_settlement
@@ -45,6 +55,8 @@ module Gamba
           element("ram:ID", @invoice.number)
           element("ram:TypeCode", TYPE_CODE_BY_NAME.fetch(@invoice.type))
           date("ram:IssueDateTime", @invoice.issued_on)
+          next unless from?(:basic_wl)
+
           @invoice.notes.each do |note|
             element("ram:IncludedNote") do
               element("ram:Content", note.text)
@@ -59,7 +71,7 @@ module Gamba
           element("ram:AssociatedDocumentLineDocument") { element("ram:LineID", line.id || (index + 1).to_s) }
           element("ram:SpecifiedTradeProduct") do
             element("ram:Name", line.name)
-            element("ram:Description", line.description)
+            element("ram:Description", line.description) if from?(:en16931)
           end
           element("ram:SpecifiedLineTradeAgreement") { element("ram:NetPriceProductTradePrice") { element("ram:ChargeAmount", decimal(line.unit_price, 2)) } }
           element("ram:SpecifiedLineTradeDelivery") { element("ram:BilledQuantity", decimal(line.quantity), unitCode: line.unit) }
@@ -76,13 +88,15 @@ module Gamba
         element("ram:ApplicableHeaderTradeAgreement") do
           element("ram:BuyerReference", @invoice.buyer_reference)
           party("ram:SellerTradeParty", @invoice.seller)
-          party("ram:BuyerTradeParty", @invoice.buyer)
+          party("ram:BuyerTradeParty", @invoice.buyer, buyer: true)
           element("ram:BuyerOrderReferencedDocument") { element("ram:IssuerAssignedID", @invoice.order_reference) } if @invoice.order_reference
         end
       end
 
       def header_delivery
         element("ram:ApplicableHeaderTradeDelivery") do
+          next unless from?(:basic_wl)
+
           if (delivery = @invoice.deliver_to)
             element("ram:ShipToTradeParty") do
               element("ram:Name", delivery.name)
@@ -95,8 +109,10 @@ module Gamba
 
       def header_settlement
         element("ram:ApplicableHeaderTradeSettlement") do
-          element("ram:PaymentReference", @invoice.payment&.reference)
+          element("ram:PaymentReference", @invoice.payment&.reference) if from?(:basic_wl)
           element("ram:InvoiceCurrencyCode", @invoice.currency)
+          next monetary_summation unless from?(:basic_wl)
+
           payment_means
           @invoice.tax_breakdown.each { tax_breakdown(_1) }
           if @invoice.period
@@ -130,17 +146,24 @@ module Gamba
         end
       end
 
-      def party(name, party)
+      # The minimum profile gives a party its name, its legal identifier and VAT number, and the seller's country.
+      def party(name, party, buyer: false)
+        full = from?(:basic_wl)
         element(name) do
           element("ram:Name", party.name)
-          if party.legal_id || party.trading_name
+          trading_name = party.trading_name if full
+          if party.legal_id || trading_name
             element("ram:SpecifiedLegalOrganization") do
               element("ram:ID", party.legal_id&.id, schemeID: party.legal_id&.scheme)
-              element("ram:TradingBusinessName", party.trading_name)
+              element("ram:TradingBusinessName", trading_name)
             end
           end
-          address(party.address)
-          element("ram:URIUniversalCommunication") { element("ram:URIID", party.electronic_address.id, schemeID: party.electronic_address.scheme) } if party.electronic_address
+          if full
+            address(party.address)
+          elsif !buyer
+            element("ram:PostalTradeAddress") { element("ram:CountryID", party.address.country) }
+          end
+          element("ram:URIUniversalCommunication") { element("ram:URIID", party.electronic_address.id, schemeID: party.electronic_address.scheme) } if party.electronic_address && full
           element("ram:SpecifiedTaxRegistration") { element("ram:ID", party.vat, schemeID: "VA") } if party.vat
           element("ram:SpecifiedTaxRegistration") { element("ram:ID", party.tax_registration, schemeID: "FC") } if party.tax_registration
         end
@@ -165,17 +188,21 @@ module Gamba
           if payment.iban
             element("ram:PayeePartyCreditorFinancialAccount") do
               element("ram:IBANID", payment.iban)
-              element("ram:AccountName", payment.account_name)
+              element("ram:AccountName", payment.account_name) if from?(:en16931)
             end
           end
-          element("ram:PayeeSpecifiedCreditorFinancialInstitution") { element("ram:BICID", payment.bic) } if payment.bic
+          element("ram:PayeeSpecifiedCreditorFinancialInstitution") { element("ram:BICID", payment.bic) } if payment.bic && from?(:en16931)
         end
       end
 
+      # The extended profile repeats the exemption of the category where it applies, as its breakdown matches them.
       def tax(category, rate, name = "ram:ApplicableTradeTax")
+        exemption = @invoice.exemptions[category] if from?(:extended)
         element(name) do
           element("ram:TypeCode", "VAT")
+          element("ram:ExemptionReason", exemption&.reason)
           element("ram:CategoryCode", VAT_CATEGORY_CODE_BY_NAME.fetch(category))
+          element("ram:ExemptionReasonCode", exemption&.code)
           element("ram:RateApplicablePercent", decimal(rate, 2)) if rate
         end
       end
@@ -203,23 +230,30 @@ module Gamba
       end
 
       def monetary_summation
+        full = from?(:basic_wl)
         element("ram:SpecifiedTradeSettlementHeaderMonetarySummation") do
-          element("ram:LineTotalAmount", amount(@invoice.line_total))
-          element("ram:ChargeTotalAmount", amount(@invoice.charge_total)) unless @invoice.charges.empty?
-          element("ram:AllowanceTotalAmount", amount(@invoice.allowance_total)) unless @invoice.allowances.empty?
+          element("ram:LineTotalAmount", amount(@invoice.line_total)) if full
+          element("ram:ChargeTotalAmount", amount(@invoice.charge_total)) unless !full || @invoice.charges.empty?
+          element("ram:AllowanceTotalAmount", amount(@invoice.allowance_total)) unless !full || @invoice.allowances.empty?
           element("ram:TaxBasisTotalAmount", amount(@invoice.tax_basis_total))
           element("ram:TaxTotalAmount", amount(@invoice.tax_total), currencyID: @invoice.currency)
           element("ram:GrandTotalAmount", amount(@invoice.grand_total))
-          element("ram:TotalPrepaidAmount", amount(@invoice.paid)) unless @invoice.paid.zero?
+          element("ram:TotalPrepaidAmount", amount(@invoice.paid)) unless !full || @invoice.paid.zero?
           element("ram:DuePayableAmount", amount(@invoice.due))
         end
+      end
+
+      # Whether the profile written holds what this one does.
+      def from?(profile)
+        @level >= PROFILES.index(profile)
       end
 
       def date(name, date)
         element(name) { element("udt:DateTimeString", date.strftime("%Y%m%d"), format: "102") }
       end
 
-      # An element with its text, or with the elements its block writes; one without either is left out.
+      # An element with its text, or with the elements its block writes, empty when it writes none; one without
+      # either is left out.
       def element(name, text = nil, **attributes)
         return if text.nil? && !block_given?
 
@@ -227,9 +261,12 @@ module Gamba
         attributes.each { |attribute, value| @xml << " " << attribute.to_s << "=" << value.encode(xml: :attr) if value }
         if block_given?
           @xml << ">\n"
+          empty = @xml.bytesize
           @depth += 1
           yield
           @depth -= 1
+          return @xml.bytesplice(empty - 2, 2, "/>\n") if @xml.bytesize == empty
+
           @xml << ("  " * @depth) << "</" << name << ">\n"
         else
           @xml << ">" << text.encode(xml: :text) << "</" << name << ">\n"

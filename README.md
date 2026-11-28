@@ -111,9 +111,9 @@ font "Inter.ttf", features: %i[liga kern]
 ```
 
 PDF/A-3b archival files, and Factur-X electronic invoices (the French and German standard that embeds the invoice
-data as XML inside the PDF). Gamba writes the XML of the EN 16931 profile from a `Gamba::Invoice`, which computes the
-totals and the VAT breakdown with EN 16931's rounding, in exact decimals; or it embeds the XML your invoicing system
-produced, in any profile.
+data as XML inside the PDF). Gamba writes the XML of every profile, from minimum to extended, from a `Gamba::Invoice`,
+which computes the totals and the VAT breakdown with EN 16931's rounding, in exact decimals; or it embeds the XML your
+invoicing system produced. `Gamba::Invoice.from_xml` reads such XML back.
 
 ```ruby
 invoice = Gamba::Invoice.new(number: "INV-2026-0001", issued_on: Date.new(2026, 11, 12), due_on: Date.new(2026, 12, 12),

@@ -78,25 +78,47 @@ class InvoiceTest < Minitest::Test
     assert_equal "A&B <1>", text(REXML::Document.new(invoice.to_xml), "//rsm:ExchangedDocument/ram:ID")
   end
 
-  def test_each_invoice_passes_mustang
+  # Every invoice in EN 16931, the one using every field in each profile, and in extended those whose exemptions it
+  # repeats on each line.
+  def test_each_invoice_passes_mustang_in_each_profile
     skip "Mustang or Java is not installed" unless JAVA && File.exist?(MUSTANG_JAR)
     skip CORPUS_MISSING_MESSAGE unless File.exist?(FONT)
 
-    {simple: simple_invoice, mixed: mixed_invoice, exempt: exempt_invoice, reverse_charge: reverse_charge_invoice, credit_note: credit_note}.each do |name, invoice|
+    invoices = {simple: simple_invoice, mixed: mixed_invoice, exempt: exempt_invoice, reverse_charge: reverse_charge_invoice, credit_note: credit_note, full: full_invoice}
+    cases = invoices.map { |name, invoice| [:en16931, name, invoice] } +
+      %i[minimum basic_wl basic extended].map { [_1, :full, full_invoice] } + %i[exempt reverse_charge].map { [:extended, _1, invoices[_1]] }
+    cases.each do |profile, name, invoice|
       Dir.mktmpdir do |directory|
         path = File.join(directory, "#{name}.pdf")
         Gamba.document(pdf_a: true, info: {Title: "Invoice #{invoice.number}"}) do |document|
           document.style :default, font: FONT
           document.text "Invoice #{invoice.number}"
-          document.factur_x invoice
+          document.factur_x invoice, profile:
         end.write(path)
         report, = Open3.capture2e(JAVA, "-jar", MUSTANG_JAR, "--action", "validate", "--source", path, "--no-notices")
         summary = report[/Parsed PDF:.*/]
 
-        assert_match(/Parsed PDF:valid XML:valid/, summary, "#{name}: #{report}")
-        assert_match(/Errors:\[\]/, summary, "#{name}: #{report}")
+        assert_match(/Parsed PDF:valid XML:valid/, summary, "#{profile} #{name}: #{report}")
+        assert_match(/Errors:\[\]/, summary, "#{profile} #{name}: #{report}")
       end
     end
+  end
+
+  def test_each_profile_writes_what_its_schema_holds
+    xml_by_profile = Gamba::Invoice::CrossIndustryInvoice::PROFILES.to_h { [_1, REXML::Document.new(full_invoice.to_xml(profile: _1))] }
+    present = ->(path) { xml_by_profile.select { |_profile, xml| REXML::XPath.first(xml, path, NAMESPACES) }.keys }
+
+    assert_equal "urn:factur-x.eu:1p0:minimum", text(xml_by_profile[:minimum], "//ram:GuidelineSpecifiedDocumentContextParameter/ram:ID")
+    assert_equal %i[basic en16931 extended], present["//ram:IncludedSupplyChainTradeLineItem"]
+    assert_equal %i[en16931 extended], present["//ram:SpecifiedTradeProduct/ram:Description"]
+    assert_equal %i[en16931 extended], present["//ram:PayeeSpecifiedCreditorFinancialInstitution"]
+    assert_equal %i[basic_wl basic en16931 extended], present["//ram:IncludedNote"]
+    assert_equal %i[basic_wl basic en16931 extended], present["//ram:BuyerTradeParty/ram:PostalTradeAddress"]
+    assert_equal ["FR"], texts(xml_by_profile[:minimum], "//ram:SellerTradeParty/ram:PostalTradeAddress/*")
+    assert_equal %w[TaxBasisTotalAmount TaxTotalAmount GrandTotalAmount DuePayableAmount],
+      REXML::XPath.match(xml_by_profile[:minimum], "//ram:SpecifiedTradeSettlementHeaderMonetarySummation/*", NAMESPACES).map(&:name)
+    assert_equal ["VATEX-FR-FRANCHISE"] * 2, texts(REXML::Document.new(exempt_invoice.to_xml(profile: :extended)), "//ram:ExemptionReasonCode")
+    assert_includes full_invoice.to_xml(profile: :minimum), "<ram:ApplicableHeaderTradeDelivery/>"
   end
 
   def test_an_invoice_and_its_xml_embed_the_same_attachment
@@ -115,10 +137,40 @@ class InvoiceTest < Minitest::Test
     assert_equal [xml.b, xml.b], attachments.map(&:b)
   end
 
-  def test_only_the_en16931_profile_is_written_so_far
-    error = assert_raises(ArgumentError) { Prawn::Document.new(pdf_a: true).factur_x(simple_invoice, profile: :basic) }
+  def test_an_invoice_read_back_from_its_xml_writes_the_same_xml
+    [simple_invoice, mixed_invoice, exempt_invoice, reverse_charge_invoice, credit_note, full_invoice].product(%i[basic en16931 extended]).each do |invoice, profile|
+      xml = invoice.to_xml(profile:)
 
-    assert_match(/give the XML of :basic as a String/, error.message)
+      assert_equal xml, Gamba::Invoice.from_xml(xml).to_xml(profile:), "#{invoice.number} in #{profile}"
+    end
+  end
+
+  def test_an_invoice_read_from_xml_takes_a_price_per_basis_quantity_and_must_owe_what_the_xml_states
+    xml = simple_invoice.to_xml
+    per_ten = xml.sub("<ram:ChargeAmount>1000.00</ram:ChargeAmount>", %(<ram:ChargeAmount>10000.00</ram:ChargeAmount>\n<ram:BasisQuantity unitCode="C62">10</ram:BasisQuantity>))
+
+    assert_equal 1000, Gamba::Invoice.from_xml(per_ten).lines.first.unit_price
+    error = assert_raises(ArgumentError) { Gamba::Invoice.from_xml(xml.sub("<ram:GrandTotalAmount>2400.00", "<ram:GrandTotalAmount>2400.01")) }
+    assert_match(/GrandTotalAmount is 2400.01, and Gamba computes 2400.0/, error.message)
+  end
+
+  def test_xml_gamba_cannot_read_raises
+    {
+      simple_invoice.to_xml(profile: :minimum) => /no lines, as in the minimum and basic WL profiles/,
+      simple_invoice.to_xml.sub("<ram:TypeCode>380", "<ram:TypeCode>384") => /type code "384"/,
+      mixed_invoice.to_xml.sub("<ram:TypeCode>58", "<ram:TypeCode>31") => /payment means code "31"/,
+      "<Invoice/>" => /not a Cross Industry Invoice/,
+      "<rsm:CrossIndustryInvoice" => /cannot be read/
+    }.each do |xml, message|
+      error = assert_raises(ArgumentError) { Gamba::Invoice.from_xml(xml) }
+      assert_match message, error.message
+    end
+  end
+
+  def test_an_unknown_profile_raises
+    error = assert_raises(ArgumentError) { simple_invoice.to_xml(profile: :comfort) }
+
+    assert_match(/Unknown Factur-X profile :comfort/, error.message)
   end
 
   def test_amounts_are_never_floats
@@ -137,6 +189,8 @@ class InvoiceTest < Minitest::Test
     assert_raises(ArgumentError) { invoice(allowances: [{amount: 5, reason: "Discount"}]) }
     assert_raises(ArgumentError) { invoice(charges: [{amount: 5, vat_rate: 20}]) }
     assert_raises(ArgumentError) { invoice(seller: SELLER.merge(electronic_address: {id: "alice@example.com"})) }
+    error = assert_raises(ArgumentError) { invoice(buyer: BUYER.merge(tax_registration: "98765432100012")) }
+    assert_match(/tax_registration to the seller only/, error.message)
   end
 
   def test_an_invoice_is_immutable
@@ -172,6 +226,16 @@ class InvoiceTest < Minitest::Test
       ],
       allowances: [{amount: "10.00", reason: "Loyalty discount", vat_rate: 20}],
       charges: [{amount: "12.50", reason: "Delivery", reason_code: "DL", vat_rate: 20}]
+    )
+  end
+
+  # Every field a profile may leave out: trading names, a full address, a delivery address, payment details.
+  def full_invoice
+    mixed = mixed_invoice
+    mixed.with(
+      seller: mixed.seller.with(trading_name: "Example Trade", tax_registration: "12345678900012", address: mixed.seller.address.with(lines: ["1 Example Street", "Building B", "Floor 2"], subdivision: "IDF")),
+      buyer: mixed.buyer.with(legal_id: Gamba::Invoice::Identifier.new(id: "987654321", scheme: "0002"), trading_name: "Example Buying"),
+      deliver_to: Gamba::Invoice::Delivery.new(name: "alice", address: mixed.buyer.address)
     )
   end
 

@@ -43,7 +43,8 @@ end
 
 # Whether a switch below changed what Prawn draws for the example being rendered.
 module PrawnSwitch
-  OpenSave = Struct.new(:previous, :ext_gstate, :restored)
+  # restored_to: once restored, a copy of the state before it as it was then, as Gamba keeps one.
+  OpenSave = Struct.new(:previous, :ext_gstate, :restored_to)
   # The settings a block ending on a later page writes back, each with its writer, as Gamba's do.
   GRAPHIC_SETTING_WRITERS = {fill_paint: :write_fill_paint, stroke_paint: :write_stroke_paint, line_width: :write_line_width,
                              cap_style: :write_stroke_cap_style, join_style: :write_stroke_join_style, dash: :write_stroke_dash,
@@ -99,7 +100,7 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     # The block runs here, not in Prawn's renderer, whose restore would bypass this module's.
     def save_graphics_state(graphic_state = nil)
       previous = renderer.graphic_stack.current_state
-      open_save = PrawnSwitch::OpenSave.new(previous, nil, false)
+      open_save = PrawnSwitch::OpenSave.new(previous, nil, nil)
       open_saves << open_save
       super(graphic_state, &nil)
       renderer.graphic_stack.current_state.save = open_save
@@ -112,7 +113,7 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
 
     def restore_graphics_state
       open_save = open_saves.pop
-      open_save&.restored = true
+      open_save&.restored_to = open_save.previous ? open_save.previous.dup : PDF::Core::GraphicState.new
       super
       return unless open_save && !renderer.graphic_stack.current_state.equal?(open_save.previous)
 
@@ -181,14 +182,14 @@ if ENV["ORACLE_KEEP_STATE_ACROSS_PAGE_BREAK"]
     def go_to_page(*)
       super
       closed = nil
-      while (state = renderer.graphic_stack.current_state)&.save&.restored
+      while (state = renderer.graphic_stack.current_state)&.save&.restored_to
         PrawnSwitch.taken = true
         closed = state
         renderer.restore_graphics_state
       end
       if closed
         renderer.graphic_state
-        resume_graphic_settings(closed.save.previous)
+        resume_graphic_settings(closed.save.restored_to)
       end
       reopen_ext_gstate_blocks_on_existing_page
       resume_text_state

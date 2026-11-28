@@ -204,6 +204,7 @@ module Gamba
         exemptions: exemptions.to_h { |category, exemption| [Invoice.choice(category, VAT_CATEGORY_CODE_BY_NAME, "exemption category"), Invoice.build(Exemption, exemption.is_a?(String) ? {reason: exemption} : exemption, "exemption")] }.freeze,
         paid: Invoice.cents(Invoice.decimal(paid, "paid"))
       )
+      raise ArgumentError, "the buyer takes a vat or a legal_id: EN 16931 gives a tax_registration to the seller only (BT-32)" if self.buyer.tax_registration
       document_adjustments = self.allowances + self.charges
       raise ArgumentError, "an invoice's allowances and charges each take a vat_category or a vat_rate" unless document_adjustments.all?(&:vat_category)
       raise ArgumentError, "an allowance or charge takes a reason, a reason_code, or both" unless (document_adjustments + self.lines.flat_map { _1.allowances + _1.charges }).all? { _1.reason || _1.reason_code }
