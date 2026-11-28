@@ -73,6 +73,12 @@ module Gamba
       self
     end
 
+    # Signs the document when it is written: see Gamba::Signing#sign.
+    def sign(certificate:, key:, chain: [], reason: nil, location: nil, contact: nil, signed_at: Time.now)
+      @prawn.sign(certificate:, key:, chain:, reason:, location:, contact:, signed_at:)
+      self
+    end
+
     def to_s
       prawn.render
     end

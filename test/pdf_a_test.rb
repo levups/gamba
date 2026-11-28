@@ -22,6 +22,26 @@ class PdfATest < Minitest::Test
     assert_valid_pdf_a factur_x_invoice
   end
 
+  def test_a_signed_document_stays_valid_pdf_a_3b
+    key = OpenSSL::PKey::RSA.new(2048)
+    certificate = OpenSSL::X509::Certificate.new
+    certificate.version = 2
+    certificate.serial = 1
+    certificate.subject = certificate.issuer = OpenSSL::X509::Name.parse("/CN=Alice Martin")
+    certificate.public_key = key.public_key
+    certificate.not_before = Time.now - 60
+    certificate.not_after = Time.now + 3600
+    certificate.sign(key, OpenSSL::Digest.new("SHA256"))
+    data = DATA_DIRECTORY
+    document = Prawn::Document.new(pdf_a: true) do
+      font "#{data}/fonts/DejaVuSans.ttf"
+      text "Signed"
+    end
+    document.sign(certificate:, key:)
+
+    assert_valid_pdf_a document.render
+  end
+
   def test_images_transparency_gradients_and_links_stay_valid_pdf_a_3b
     data = DATA_DIRECTORY
     pdf = Prawn::Document.new(pdf_a: true) do

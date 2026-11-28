@@ -261,8 +261,10 @@ module Prawn
         finalize_tagging if tagged?
         finalize_pdf_a if pdf_a?
         finalize_metadata if pdf_a? || pdf_ua?
-        PDF::Core::Writer.call(objects: @objects, root: @root, info: @info, version: @version, trailer: @trailer, encryption: @encryption,
-          identified: pdf_a? || pdf_ua?)
+        signature = prepare_signature if @signing
+        pdf = PDF::Core::Writer.call(objects: @objects, root: @root, info: @info, version: @version, trailer: @trailer, encryption: @encryption,
+          identified: pdf_a? || pdf_ua?, unpacked: [signature].compact)
+        signature ? sign_written(pdf) : pdf
       end
     end
   end

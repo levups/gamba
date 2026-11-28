@@ -8,6 +8,7 @@ module Prawn
     include TransformationStack
     include PDF::Core::Annotations
     include Gamba::Forms
+    include Gamba::Signing
     include PDF::Core::Destinations
     include Security
     include Images

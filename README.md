@@ -177,6 +177,10 @@ so every viewer shows it the same way:
 ```ruby
 text_field "name", at: [0, 700], width: 200, height: 20, value: "Alice Martin"
 check_box "terms", at: [0, 670], checked: true
+Signatures over the whole file, with a certificate and key from OpenSSL, which Acrobat and Poppler verify:
+
+```ruby
+document.sign(certificate:, key:, reason: "Approval", location: "Paris")
 ```
 
 QR codes, DataMatrix and barcodes (Code 128, EAN-13, EAN-8, Code 39, ITF-14) in pure Ruby, drawn as vectors: one
