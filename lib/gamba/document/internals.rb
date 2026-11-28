@@ -6,8 +6,9 @@ module Prawn
     # document state.
     module Internals
       # A save not yet restored: the state in effect before it (nil on an empty stack, the default one), the
-      # ExtGState its block sets, {name:, reference:}, if any, and whether it was restored since.
-      OpenSave = Struct.new(:previous, :ext_gstate, :restored)
+      # ExtGState its block sets, {name:, reference:}, if any, and once restored, a copy of that previous state as it
+      # was then: the page it goes on changes it afterwards.
+      OpenSave = Struct.new(:previous, :ext_gstate, :restored_to)
       DEFAULT_GRAPHIC_STATE = PDF::Core::GraphicState.new.freeze
       # The settings a block ending on a later page writes back, each with its writer, in the order Prawn writes them
       # on a new page, then the blend mode.
@@ -76,7 +77,7 @@ module Prawn
       def save_graphics_state(graphic_state = nil)
         save_transformation_stack
         previous = graphic_state ? page.stack.last : self.graphic_state
-        open_save = OpenSave.new(previous, nil, false)
+        open_save = OpenSave.new(previous, nil, nil)
         @unrestored_graphics_states << open_save
         state = PDF::Core::GraphicState.new(graphic_state || previous)
         state.save = open_save
@@ -97,7 +98,7 @@ module Prawn
       def restore_graphics_state
         restore_transformation_stack
         open_save = @unrestored_graphics_states.pop
-        open_save&.restored = true
+        open_save&.restored_to = (open_save.previous || DEFAULT_GRAPHIC_STATE).dup
         if page.stack.empty?
           raise Errors::EmptyGraphicStateStack, "\n You have reached the end of the graphic state stack" unless open_save
         else
@@ -133,7 +134,7 @@ module Prawn
       # them, as it would have been had the blocks ended there, in a base state with the settings in effect before them.
       def close_restored_graphics_states
         closed = nil
-        while (state = page.stack.last)&.save&.restored
+        while (state = page.stack.last)&.save&.restored_to
           closed = state
           page.content_stream << "Q\n"
           page.stack.pop
@@ -141,7 +142,7 @@ module Prawn
         return unless closed
 
         graphic_state
-        resume_graphic_settings(closed.save.previous)
+        resume_graphic_settings(closed.save.restored_to)
       end
 
       def open_graphics_state
