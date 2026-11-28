@@ -497,6 +497,25 @@ class GraphicStateTest < Minitest::Test
     assert_valid(pdf)
   end
 
+  def test_page_numbers_take_the_settings_in_effect_before_a_block_not_those_set_after_it
+    document = Prawn::Document.new do
+      start_new_page
+      go_to_page(1)
+      blend_mode(:Difference) do
+        start_new_page
+        go_to_page(1)
+      end
+      fill_color "0000ff"
+      number_pages "<page>", at: [0, 0]
+    end
+
+    pdf = document.render
+
+    assert_equal ["q", "/BMDifference gs", "Q", "q", "2", "Q"], operators(document.pages[1])
+    document.pages.each { assert_balanced(_1) }
+    assert_valid(pdf)
+  end
+
   def test_content_drawn_again_on_a_page_a_block_ran_through_takes_the_settings_before_it
     document = Prawn::Document.new do
       fill_color "0000ff"
